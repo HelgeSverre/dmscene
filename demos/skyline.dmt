@@ -1,0 +1,318 @@
+# skyline.dmt - night flight over a procedural neon city.  Raymarched with repeat; the city is
+# one box SDF domain-repeated on a 2x2 grid with hashed heights, windows and rooftop neon.
+title SKYLINE
+song bpm=100 speed=6 rpb=4 channels=6 loop=0 volume=0.6 scale=2 dither=1
+order 0 0 1 1 2 2 3 3 4 2 3 3 5
+pan 0.5 0.5 0.5 0.4 0.6 0.5
+
+palette neon {
+  0.00 1.00 0.20 0.60
+  0.33 0.10 0.90 1.00
+  0.66 1.00 0.80 0.20
+  1.00 1.00 0.20 0.60
+}
+
+timeline {
+  0:00 speedk=0.6 height=3.5 look=0.35 rain=0 fog=1.2
+  2:00 speedk=1.0 rain=0.4
+  4:00 height=2.2 look=0.15 rain=0.8
+  6:00 speedk=1.4 height=4.5 look=0.5
+  8:00 speedk=0.5 height=1.6 look=0.05 rain=1 fog=1.6
+  9:00 speedk=1.2 height=3 look=0.3 fog=1.0
+  12:00 speedk=0.4 height=6 look=0.7 rain=0.2
+}
+
+inst kick {
+  f = 40 + 300 * exp(-t * 18)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 3.5) * 2.2, 1.6) * 0.85)
+}
+inst clank {
+  # industrial snare: noise burst + inharmonic FM metal
+  n = svf(noise(), 1500 + 3000 * exp(-t * 25), 0.4)
+  n = r1 * 0.7 + n * 0.3
+  m = sin(tau * 1370 * t) * 3 * exp(-t * 6)
+  metal = sin(tau * 523 * t + m) * exp(-t * 9)
+  out((n * exp(-t * 10) + metal * 0.5) * 0.6)
+}
+inst bass {
+  e = env(0.01, 0.4, 0.7, 0.3)
+  s = sin(ph * tau) * 0.8 + svf(bsaw(ph, freq) + bsaw(ph + 0.002 * t, freq) * 0.7, 120 + 700 * e * (0.5 + p0), 0.5) * 0.6
+  out(dist(s, 1.3) * e * 0.5)
+}
+inst brass nna=continue {
+  # cs-80 style: slow swell, unison saws, ring resonance
+  e = env(0.5, 1.2, 0.8, 1.2)
+  f = freq * (1 + 0.004 * sin(t * 4.5) * min(t * 0.5, 1))
+  s = usaw(f, 0.2) + usaw(f * 0.5, 0.12) * 0.5
+  s = svf(s, 300 + 1500 * e + 800 * p0, 0.45)
+  s = s + r2 * 0.7
+  out(dist(s * 0.5, 1.2) * e * 0.28)
+}
+inst arp nna=continue {
+  e = env(0.002, 0.25, 0.0, 0.1)
+  s = bsqr(ph, 0.3, freq) * 0.6 + sin(ph * tau * 2) * 0.4 * e
+  s = svf(s, 600 + 3500 * e, 0.4)
+  out(s * e * 0.28)
+}
+inst drone {
+  e = env(1.5, 2.0, 0.9, 3.0)
+  s = svf(noise(), 200 + 150 * sin(t * 0.3), 0.93) * 3 + sin(ph * tau) * 0.4 + sin(ph * tau * 1.5 + 0.1) * 0.25
+  out(s * e * 0.2)
+}
+
+chan 3 {
+  w = verb(x, 0.9, 0.3)
+  out(x * 0.7 + w * 0.8)
+}
+chan 4 {
+  d = dly(x, 0.45, 0.45)
+  d2 = dly(x, 0.3, 0.3)
+  out(x + d * 0.4 + d2 * 0.25)
+}
+master {
+  w = verb(l * 0.5 + r * 0.5, 0.8, 0.5)
+  out(dist(l + w * 0.15, 1.2), dist(r + w * 0.15, 1.2))
+}
+
+# channels: 0 kick  1 clank  2 bass  3 brass  4 arp  5 drone      key D minor
+pattern 0 rows=16 {
+  . | . | . | . | D-4 5 26 | D-2 6 34
+  . | . | . | . | .        | .
+  . | . | . | . | A-4 5 22 | .
+  . | . | . | . | .        | .
+  . | . | . | . | F-5 5 24 | .
+  . | . | . | . | .        | .
+  . | . | . | . | A-4 5 20 | .
+  . | . | . | . | .        | .
+  . | . | . | . | D-5 5 26 | .
+  . | . | . | . | .        | .
+  . | . | . | . | A-4 5 22 | .
+  . | . | . | . | .        | .
+  . | . | . | . | F-5 5 24 | .
+  . | . | . | . | .        | .
+  . | . | . | . | E-5 5 20 | .
+  . | . | . | . | .        | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | D-1 3 40 S20 | . | D-4 5 26 | D-2 6 34
+  .        | .        | .            | . | .        | .
+  .        | .        | .            | . | A-4 5 22 | .
+  .        | .        | .            | . | .        | .
+  .        | .        | .            | . | F-5 5 24 | .
+  .        | .        | .            | . | .        | .
+  .        | .        | D-1 3 30     | . | A-4 5 20 | .
+  .        | .        | .            | . | .        | .
+  C-2 1 40 | .        | .            | . | D-5 5 26 | .
+  .        | .        | .            | . | .        | .
+  .        | .        | .            | . | A-4 5 22 | .
+  .        | .        | .            | . | .        | .
+  .        | C-4 2 36 | A#0 3 40     | . | F-5 5 24 | .
+  .        | .        | .            | . | .        | .
+  .        | .        | C-1 3 40     | . | E-5 5 20 | .
+  .        | .        | .            | . | .        | .
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | D-1 3 40 S50 | D-3 4 30 S30 | D-4 5 26 | D-2 6 34
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | F-3 4 26     | A-4 5 22 | .
+  .        | .        | .            | .            | .        | .
+  .        | C-4 2 36 | .            | .            | F-5 5 24 | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | D-1 3 30     | .            | A-4 5 20 | .
+  .        | .        | .            | .            | .        | .
+  C-2 1 40 | .        | A#0 3 40     | A#2 4 30     | D-5 5 26 | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | D-3 4 26     | A-4 5 22 | .
+  .        | .        | .            | .            | .        | .
+  .        | C-4 2 36 | C-1 3 40     | .            | F-5 5 24 | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | C-1 3 30     | .            | G-5 5 20 | .
+  C-2 1 30 | .        | .            | .            | .        | .
+}
+pattern 3 rows=16 {
+  C-2 1 40 | .        | G-1 3 40 S80 | G-3 4 30 S60 | G-4 5 26 | G-2 6 34
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | A#3 4 26     | D-5 5 22 | .
+  .        | .        | .            | .            | .        | .
+  .        | C-4 2 36 | .            | .            | A#5 5 24 | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | G-1 3 30     | .            | D-5 5 20 | .
+  .        | .        | .            | .            | .        | .
+  C-2 1 40 | .        | A-1 3 40     | A-3 4 30     | A-4 5 26 | A-2 6 34
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | C#4 4 26     | E-5 5 22 | .
+  .        | .        | .            | .            | .        | .
+  .        | C-4 2 36 | A-1 3 40     | .            | A-5 5 24 | .
+  .        | .        | .            | .            | .        | .
+  .        | C-4 2 20 | A-1 3 30     | .            | G-5 5 20 | .
+  .        | C-4 2 30 | .            | .            | .        | .
+}
+pattern 4 rows=16 {
+  # break: brass alone with the drone
+  . | . | . | D-3 4 34 SA0 | . | D-2 6 38
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | A-3 4 30     | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | A#3 4 34     | . | A#1 6 38
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | A-3 4 30     | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+  . | . | . | .            | . | .
+}
+pattern 5 rows=16 {
+  # outro: long chord, everything releases
+  C-2 1 40 | C-4 2 30 | D-1 3 40 S00 | D-3 4 34 S20 | D-4 5 26 | D-2 6 38
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | off          | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | off          | .        | off
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+  .        | .        | .            | .            | .        | .
+}
+
+# ------------------------------------------------------------------ city
+fn box(px, py, pz, bx, by, bz) {
+  qx = abs(px) - bx
+  qy = abs(py) - by
+  qz = abs(pz) - bz
+  return len(len(max(qx, 0), max(qy, 0)), max(qz, 0)) + min(max(qx, max(qy, qz)), 0)
+}
+fn bheight(cx, cz) {
+  hh = hash(cx * 7.31 + cz * 13.77)
+  return (0.6 + 7 * hh ^ 2) * step(0.12, hash(cx * 3.17 + cz * 5.71))
+}
+fn city(px, py, pz) {
+  cx = floor(px / 2 + 0.5)
+  cz = floor(pz / 2 + 0.5)
+  lx = px - cx * 2
+  lz = pz - cz * 2
+  ht = bheight(cx, cz)
+  wd = 0.42 + 0.3 * hash(cx * 1.71 + cz * 2.33)
+  d = box(lx, py - ht * 0.5, lz, wd, ht * 0.5, wd)
+  return min(d, py)
+}
+
+uniform camx camy camz lookd kickE snE arpE rainA fogA
+
+frame {
+  kickE = exp(-trig(0) * 7)
+  snE = exp(-trig(1) * 8)
+  arpE = exp(-trig(4) * 9)
+  $z = $z + evtl(speedk) * 0.03
+  camz = $z
+  camx = 1.0 + 0.22 * sin(beat * 0.08)              # stay in the street between building columns
+  camy = max(evtl(height), 2.4) + 0.15 * sin(beat * 0.3) + 0.08 * kickE
+  lookd = evtl(look)
+  rainA = evtl(rain)
+  fogA = evtl(fog)
+}
+pixel {
+  # camera: forward +z, tilted down by lookd, slight roll with the sway
+  roll = 0.05 * sin(beat * 0.08)
+  ux = rot(u, v, roll)
+  vy = r1
+  dx = ux
+  dy = vy * 0.85 - lookd
+  dz = 1.4
+  dl = len(len(dx, dz), dy)
+  dx = dx / dl
+  dy = dy / dl
+  dz = dz / dl
+  tt = 0.05
+  d = 1
+  repeat i 56 {
+    px = camx + dx * tt
+    py = camy + dy * tt
+    pz = camz + dz * tt
+    d = city(px, py, pz)
+    tt = tt + d * 0.6 * step(0.003, d)
+  }
+  far = 60
+  hit = step(d, 0.03) * step(tt, far)
+  px = camx + dx * tt
+  py = camy + dy * tt
+  pz = camz + dz * tt
+  e = 0.02
+  nx = city(px + e, py, pz) - city(px - e, py, pz)
+  ny = city(px, py + e, pz) - city(px, py - e, pz)
+  nz = city(px, py, pz + e) - city(px, py, pz - e)
+  nl = len(len(nx, nz), ny) + 0.0001
+  nx = nx / nl
+  ny = ny / nl
+  nz = nz / nl
+  # which cell / building did we hit
+  cx = floor(px / 2 + 0.5)
+  cz = floor(pz / 2 + 0.5)
+  ht = bheight(cx, cz)
+  ground = step(0.5, ny) * step(py, 0.05)
+  side = 1 - ground
+  # windows: grid on the facade, lit by hash, flicker with the arp
+  wall_u = (abs(nx) > abs(nz) ? pz : px) * 5
+  wall_v = py * 4
+  wid = hash(floor(wall_u) * 3.3 + floor(wall_v) * 7.7 + cx * 11 + cz * 17)
+  inwin = step(0.25, fract(wall_u)) * step(fract(wall_u), 0.75) * step(0.3, fract(wall_v)) * step(fract(wall_v), 0.8)
+  lit = step(0.45, wid + 0.25 * arpE * step(0.9, hash(floor(wall_u) + floor(wall_v) * 2 + floor(beat * 2)))) * inwin * side
+  # rooftop neon band
+  neon = side * step(ht - 0.18, py) * step(py, ht - 0.04) * step(0.3, hash(cx * 2.1 + cz * 4.3))
+  pal(neon, hash(cx * 0.37 + cz * 0.71) + bar * 0.01)
+  nr = cget(0)
+  ng = cget(1)
+  nb = cget(2)
+  # shading
+  lx = -0.4
+  ly = 0.7
+  lz = -0.6
+  diff = max(nx * lx + ny * ly + nz * lz, 0)
+  base = 0.04 + 0.06 * diff
+  # ground: wet asphalt with a glowing street grid
+  gx = exp(-abs(fract(px / 2 + 0.5) - 0.5) * 30)
+  gz = exp(-abs(fract(pz / 2 + 0.5) - 0.5) * 30)
+  street = ground * (gx + gz) * 0.6
+  fog = exp(-tt * 0.045 * fogA)
+  cr = (base + lit * 0.9 + neon * nr * 1.6 + street * 0.3) * hit
+  cg = (base * 1.1 + lit * 0.75 + neon * ng * 1.6 + street * 0.6) * hit
+  cb = (base * 1.6 + lit * 0.4 + neon * nb * 1.6 + street * 0.9) * hit
+  # sky: gradient, stars, a big moon
+  sky = 1 - hit
+  skyg = clamp(dy * 2, 0, 1)
+  star = step(0.996, hash(floor(dx * 300) + floor(dy * 300) * 71.3 + floor(dz * 300) * 9.1)) * (0.5 + 0.5 * sin(beat * 2 + hash(floor(dx * 300)) * 20))
+  moon = 1 - smooth(0.06, 0.07, len(dx - 0.35, dy - 0.3))
+  moonglow = exp(-len(dx - 0.35, dy - 0.3) * 6) * 0.3
+  cr = cr + sky * (0.03 + 0.05 * (1 - skyg) + star * 0.9 + moon * 0.9 + moonglow * 0.6)
+  cg = cg + sky * (0.02 + 0.04 * (1 - skyg) + star * 0.9 + moon * 0.85 + moonglow * 0.5)
+  cb = cb + sky * (0.08 + 0.12 * (1 - skyg) + star + moon * 0.7 + moonglow * 0.7)
+  # distance fog toward the sky colour
+  fr = 0.03
+  fg = 0.03
+  fb = 0.09
+  rgb(mix(fr, cr, fog * hit + sky), mix(fg, cg, fog * hit + sky), mix(fb, cb, fog * hit + sky))
+  cmul(1 + 0.25 * kickE)
+  cprev(x, y, 0.15)
+}
+post {
+  # bloom, rain streaks, chromatic split on the snare, vignette
+  b = tap(-2, 0) + tap(2, 0) + tap(0, -2) + tap(0, 2) + tap(-3, -3) + tap(3, 3) + tap(-3, 3) + tap(3, -3)
+  bl = b * 0.125
+  rain = step(0.985, hash(floor(x * 180 + y * 12) * 1.7 + floor(y * 6 - time * 9))) * rainA * 0.25
+  rs = tap(-1 - floor(2 * snE), 0)
+  rgb(mix(cget(0), rs, 0.5) + bl * 0.3 + rain, cget(1) + bl * 0.3 + rain, cget(2) + bl * 0.4 + rain * 1.2)
+  d = len(u, v)
+  cmul(1 - 0.35 * d * d)
+}

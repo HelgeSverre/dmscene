@@ -1,0 +1,297 @@
+# oldskool.dmt - an Amiga demo: copper bars, rotozoomer, fire, sine scroller, bobs, 4-channel chip music.
+title OLDSKOOL
+song bpm=125 speed=6 rpb=4 channels=4 loop=0 volume=0.62 scale=2
+order 0 0 1 1 2 2 3 3 1 1 2 2 4 4
+
+text scroll "      DMSCENE PRESENTS ... OLDSKOOL ... COPPER BARS, ROTOZOOMER, FIRE AND A SINE SCROLLER, ALL FROM ONE LITTLE VM ... GREETINGS TO THE AMIGA, THE C64 AND EVERYONE STILL COUNTING RASTER LINES ... WRAP      "
+text logo "DMSCENE"
+
+palette copper {
+  0.00 0.00 0.00 0.00
+  0.20 0.00 0.00 0.00
+  0.35 0.80 0.10 0.10
+  0.50 1.00 1.00 0.30
+  0.65 0.10 0.30 1.00
+  0.80 0.00 0.00 0.00
+  1.00 0.00 0.00 0.00
+}
+
+timeline {
+  0:00 scene=0 fade=0
+  0:04 fade=1
+  4:00 scene=1
+  8:00 scene=2
+  12:00 scene=1
+  13:00 scene=3
+}
+
+# chip "samples": 8-bit sounding, lowpassed like an Amiga output stage
+inst drums {
+  # one instrument, three sounds by velocity: 40 kick, 30 snare, 20 hat
+  kick = step(0.55, vel)
+  snare = step(0.4, vel) * (1 - kick)
+  hat = 1 - step(0.4, vel)
+  f = 60 + 500 * exp(-t * 50)
+  $p = $p + f / sr
+  k = crush(sin($p * tau), 32) * exp(-t * 10)
+  s = crush(noise(), 8) * exp(-t * 16) + sin(tau * 200 * t) * exp(-t * 35) * 0.6
+  h = crush(hp(noise(), 6000), 4) * exp(-t * 70)
+  out(lp(k * kick * 1.2 + s * snare * 0.8 + h * hat * 0.6, 9000) * 0.75)
+}
+inst bass {
+  e = env(0.002, 0.15, 0.6, 0.05)
+  s = crush(tri(ph) * 0.7 + sqr(ph, 0.5) * 0.3, 16)
+  out(lp(s, 5000) * e * 0.55)
+}
+inst chord {
+  e = env(0.002, 0.3, 0.4, 0.06)
+  s = crush(sqr(ph, 0.5 + 0.25 * sin(t * 6)), 16)
+  out(lp(s, 7000) * e * 0.3)
+}
+inst lead {
+  e = env(0.003, 0.25, 0.5, 0.08)
+  vib = 1 + 0.01 * sin(t * 6) * min(max(t - 0.1, 0) * 5, 1)
+  $p = $p + freq * vib / sr
+  s = crush(saw($p) * 0.5 + sqr($p, 0.3) * 0.5, 24)
+  out(lp(s, 8000) * e * 0.4)
+}
+
+master {
+  # amiga stereo: hard-ish panned channels bleed through a short delay
+  d = dly(l * 0.5 + r * 0.5, 0.12, 0.2)
+  out(dist(l + d * 0.15, 1.2), dist(r + d * 0.15, 1.2))
+}
+pan 0.5 0.3 0.7 0.5
+
+# channels: 0 drums (vel picks kick/snare/hat)  1 bass  2 chords (0xy arps)  3 lead
+pattern 0 rows=16 {
+  C-4 1 40 | A-1 2 40 | A-3 3 28 037 | .
+  .        | .        | .            | .
+  C-4 1 20 | A-2 2 36 | .            | .
+  .        | .        | .            | .
+  C-4 1 30 | A-1 2 40 | A-3 3 28 037 | .
+  .        | .        | .            | .
+  C-4 1 20 | A-2 2 36 | .            | .
+  .        | A-1 2 40 | .            | .
+  C-4 1 40 | F-1 2 40 | F-3 3 28 047 | .
+  .        | .        | .            | .
+  C-4 1 20 | F-2 2 36 | .            | .
+  .        | .        | .            | .
+  C-4 1 30 | F-1 2 40 | F-3 3 28 047 | .
+  .        | .        | .            | .
+  C-4 1 20 | G-1 2 40 | G-3 3 28 047 | .
+  .        | G-2 2 36 | .            | .
+}
+pattern 1 rows=16 {
+  C-4 1 40 | A-1 2 40 | A-3 3 28 037 | A-4 4 34
+  .        | .        | .            | .
+  C-4 1 20 | A-2 2 36 | .            | C-5 4 30
+  .        | .        | .            | .
+  C-4 1 30 | A-1 2 40 | A-3 3 28 037 | E-5 4 34
+  .        | .        | .            | .
+  C-4 1 20 | A-2 2 36 | .            | D-5 4 30
+  .        | A-1 2 40 | .            | C-5 4 30
+  C-4 1 40 | F-1 2 40 | F-3 3 28 047 | A-4 4 34
+  .        | .        | .            | .
+  C-4 1 20 | F-2 2 36 | .            | F-4 4 30
+  .        | .        | .            | .
+  C-4 1 30 | F-1 2 40 | F-3 3 28 047 | G-4 4 34
+  .        | .        | .            | .
+  C-4 1 20 | G-1 2 40 | G-3 3 28 047 | B-4 4 30
+  .        | G-2 2 36 | .            | D-5 4 30
+}
+pattern 2 rows=16 {
+  C-4 1 40 | C-2 2 40 | C-4 3 28 047 | E-5 4 34
+  .        | .        | .            | .
+  C-4 1 20 | C-3 2 36 | .            | G-5 4 30
+  .        | .        | .            | .
+  C-4 1 30 | C-2 2 40 | C-4 3 28 047 | C-6 4 34
+  .        | .        | .            | .
+  C-4 1 20 | C-3 2 36 | .            | B-5 4 30
+  .        | C-2 2 40 | .            | G-5 4 30
+  C-4 1 40 | G-1 2 40 | G-3 3 28 047 | A-5 4 34
+  .        | .        | .            | .
+  C-4 1 20 | G-2 2 36 | .            | G-5 4 30
+  .        | .        | .            | .
+  C-4 1 30 | G-1 2 40 | G-3 3 28 047 | E-5 4 34
+  .        | .        | .            | .
+  C-4 1 20 | E-1 2 40 | E-3 3 28 038 | D-5 4 30
+  .        | E-2 2 36 | .            | B-4 4 30
+}
+pattern 3 rows=16 {
+  # fire: half-time, lead holds
+  C-4 1 40 | A-1 2 40 | A-3 3 26 037 | A-4 4 34
+  .        | .        | .            | .
+  .        | .        | .            | .
+  .        | .        | .            | .
+  C-4 1 30 | .        | .            | .
+  .        | .        | .            | .
+  .        | A-1 2 36 | .            | .
+  .        | .        | .            | .
+  C-4 1 40 | F-1 2 40 | F-3 3 26 047 | E-5 4 34
+  .        | .        | .            | .
+  .        | .        | .            | .
+  .        | .        | .            | .
+  C-4 1 30 | .        | .            | .
+  .        | .        | .            | .
+  .        | G-1 2 36 | G-3 3 26 047 | D-5 4 30
+  .        | .        | .            | .
+}
+pattern 4 rows=16 {
+  # end: chord stabs and a fill
+  C-4 1 40 | A-1 2 40 | A-3 3 30 037 | A-5 4 34
+  .        | .        | .            | .
+  C-4 1 20 | .        | .            | .
+  .        | .        | .            | .
+  C-4 1 30 | A-1 2 40 | A-3 3 30 037 | .
+  .        | .        | .            | .
+  C-4 1 20 | .        | .            | .
+  .        | .        | .            | .
+  C-4 1 40 | F-1 2 40 | F-3 3 30 047 | .
+  .        | .        | .            | .
+  C-4 1 30 | .        | .            | .
+  C-4 1 30 | .        | .            | .
+  C-4 1 30 | G-1 2 40 | G-3 3 30 047 | G-5 4 30
+  C-4 1 34 | .        | .            | .
+  C-4 1 38 | .        | .            | .
+  C-4 1 40 | .        | .            | .
+}
+
+# ------------------------------------------------------------------ helpers
+fn textline(s, px, py, sz) {
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn sinescroll(s, base, sz, speed, amp) {
+  # each character cell rides a sine wave
+  per = strlen(s) * sz
+  px = aspect - fract(time * speed / per) * per
+  cx = (u - px) / sz
+  i = floor(cx)
+  wob = base + amp * sin(cx * 0.6 + time * 4)
+  cy = (wob - v) / sz
+  g = glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+  cx2 = (u - px - per) / sz
+  i2 = floor(cx2)
+  wob2 = base + amp * sin(cx2 * 0.6 + time * 4)
+  cy2 = (wob2 - v) / sz
+  g2 = glyph(str(s, i2), fract(cx2), fract(cy2)) * step(0, cx2) * step(cx2, strlen(s)) * step(0, cy2) * step(cy2, 1)
+  return max(g, g2)
+}
+fn bob(cx, cy, rad) {
+  d = len(u - cx, v - cy)
+  return (1 - smooth(rad - 0.01, rad, d)) * (0.5 + 0.5 * (1 - d / rad) * (1 - d / rad))
+}
+fn copperbar(cy, hgt) {
+  return exp(-abs(v - cy) / hgt * 3)
+}
+
+uniform kickE snE hatE bassE sc
+
+frame {
+  kickE = exp(-trig(0) * 8) * step(0.5, vel(0))
+  snE = exp(-trig(0) * 8) * step(0.35, vel(0)) * (1 - step(0.5, vel(0)))
+  bassE = exp(-trig(1) * 6)
+  sc = evt(scene)
+  select(sc)
+}
+
+pixel copper {
+  # background copper bars (max-composited), logo in the middle, scroller at the bottom, bobs in between
+  ar = 0
+  ag = 0
+  ab = 0.02
+  repeat k 6 {
+    cy = 0.75 * sin(beat * 0.9 + k * 1.1) * (0.6 + 0.3 * sin(beat * 0.13 + k))
+    pal(copper, 0.5 + (v - cy) * 2.2)
+    ar = max(ar, cget(0))
+    ag = max(ag, cget(1))
+    ab = max(ab, cget(2))
+  }
+  f = evtl(fade)
+  g = f * (0.6 + 0.4 * kickE)
+  ar = ar * g
+  ag = ag * g
+  ab = ab * g
+  repeat b 8 {
+    bx = 1.2 * sin(time * 1.3 + b * 0.35) * aspect * 0.8
+    by = 0.1 + 0.5 * sin(time * 2.1 + b * 0.35)
+    hsv(b * 0.125 + bar * 0.05, 0.8, 1)
+    m = bob(bx, by, 0.09) * f
+    ar = mix(ar, cget(0), m)
+    ag = mix(ag, cget(1), m)
+    ab = mix(ab, cget(2), m)
+  }
+  rgb(ar, ag, ab)
+  lg = textline(logo, -1.05, 0.35, 0.3) * f
+  cadd(lg, lg * 0.9, lg * 0.6)
+  sl = sinescroll(scroll, -0.6, 0.14, 1.0, 0.15) * f
+  cadd(sl, sl, sl * 0.3)
+}
+
+pixel roto {
+  # rotozoomer: checker/xor texture through a rotating, pulsing zoom; copper strip on top; scroller
+  ang = time * 0.6 + 0.5 * sin(time * 0.3)
+  zm = 3 + 1.5 * sin(time * 0.5) + 2 * kickE
+  rx = rot(u, v, ang) * zm + time * 0.8
+  ry = r1 * zm
+  cx = floor(rx)
+  cy = floor(ry)
+  chk = fract((cx + cy) * 0.5) * 2
+  tex = 0.5 + 0.5 * sin(rx * 3.14) * sin(ry * 3.14)
+  xo = fract(hash(cx * 0.37 + cy * 0.91) * 4)
+  hsv(0.55 + chk * 0.5 + bar * 0.03, 0.7, 0.35 + 0.55 * chk + 0.2 * tex)
+  cmul(0.7 + 0.3 * kickE)
+  bar1 = copperbar(0.8 + 0.1 * sin(beat), 0.05)
+  cadd(bar1, bar1 * 0.3, bar1 * 0.1)
+  sl = sinescroll(scroll, -0.55, 0.14, 1.0, 0.2)
+  cadd(sl, sl, sl)
+  cprev(x, y, 0.2)
+}
+
+pixel fire {
+  # classic fire: heat lives in the red channel of the previous frame
+  dy = 2.2 / h
+  dx = 1.5 / w
+  heat = (prev(x - dx, y + dy) + prev(x, y + dy) + prev(x + dx, y + dy) + prev(x, y + 2 * dy)) * 0.25
+  cool = 0.012 + 0.03 * hash(x * 311 + y * 977 + frame) * (0.6 + 0.4 * (1 - kickE))
+  heat = heat - cool
+  seed = step(0.985, y) * step(0.3 + 0.4 * (1 - kickE), hash(floor(x * w / 2) + frame * 3))
+  heat = max(heat, seed)
+  # the logo burns too
+  lg = textline(logo, -1.05, 0.25, 0.3)
+  heat = max(heat, lg * (0.75 + 0.25 * sin(time * 20 + u * 10)))
+  heat = clamp(heat, 0, 1)
+  rgb(heat, heat ^ 2.2, heat ^ 8)
+  sl = sinescroll(scroll, 0.75, 0.12, 1.0, 0.08)
+  cadd(sl * 0.6, sl * 0.6, sl)
+}
+
+pixel end {
+  ar = 0
+  ag = 0
+  ab = 0.02
+  repeat k 8 {
+    cy = -0.9 + k * 0.26 + 0.05 * sin(beat * 2 + k)
+    pal(copper, 0.5 + (v - cy) * 4)
+    ar = max(ar, cget(0))
+    ag = max(ag, cget(1))
+    ab = max(ab, cget(2))
+  }
+  rgb(ar, ag, ab)
+  cmul(0.5 + 0.5 * kickE)
+  lg = textline(logo, -1.05, 0.3, 0.3)
+  cadd(lg, lg, lg)
+  sl = sinescroll(scroll, -0.45, 0.16, 1.4, 0.3)
+  cadd(sl, sl * 0.8, sl * 0.2)
+}
+
+post {
+  # no scanlines/vignette during the fire scene: its heat lives in the frame buffer
+  notfire = 1 - step(1.5, sc) * step(sc, 2.5)
+  cmul(1 - 0.25 * step(0.5, fract(y * h * 0.5)) * notfire)
+  d = len(u, v)
+  cmul(1 - 0.25 * d * d * notfire)
+}

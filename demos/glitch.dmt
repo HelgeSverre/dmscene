@@ -1,0 +1,287 @@
+# glitch.dmt - breakcore at 180 bpm over datamoshed Mandelbrot video.
+# Drums are the sampled kit, pitched by note, chopped with E9x rolls, E6x pattern loops and EDx delays.
+title GLITCH
+song bpm=180 speed=3 rpb=8 channels=6 loop=0 volume=0.58 dither=1
+order 0 0 1 2 1 3 0 1 2 3 4
+
+sample kick "assets/kick.wav"
+sample snare "assets/snare.wav"
+sample hat "assets/hat.wav"
+sample ride "assets/ride.wav"
+
+timeline {
+  0:00 zoomk=0 mosh=0.2
+  2:00 mosh=0.5
+  4:00 mosh=0.9 zoomk=1
+  6:00 mosh=0.3
+  8:00 mosh=1.0 zoomk=2
+  10:00 mosh=0.6
+}
+
+inst skick {
+  out(smp(kick, t * freq / 261.6) * 0.95)
+}
+inst ssnare {
+  # pitched by note; reversed when p0 > 0.5
+  rate = freq / 261.6
+  sp = p0 > 0.5 ? smplen(snare) - t * rate : t * rate
+  out(smp(snare, sp) * 0.85)
+}
+inst shat {
+  out(smp(hat, t * freq / 261.6) * 0.6)
+}
+inst sride {
+  out(smp(ride, t * freq / 261.6) * 0.45)
+}
+inst reese {
+  e = env(0.01, 0.3, 0.8, 0.1)
+  s = bsaw(ph + 0.003 * t, freq) + bsaw(ph - 0.0025 * t, freq) + bsaw(ph * 0.5, freq * 0.5) * 0.6
+  s = svf(s, 150 + 900 * e * (0.5 + p0), 0.5)
+  out(dist(s, 1.6) * e * 0.5)
+}
+inst scream {
+  e = env(0.003, 0.2, 0.5, 0.05)
+  m = sin(ph * tau * 3.01) * (4 + 6 * exp(-t * 5))
+  s = sin(ph * tau + m) + bsqr(ph, 0.2, freq) * 0.5
+  s = dist(s * 3, 2.5)
+  s = svf(s, 1500 + 4000 * e, 0.5)
+  out(s * e * 0.32)
+}
+
+chan 1 {
+  # snares get a bitcrush that opens with mp0 (Wxx) and a slap
+  c = crush(x, 256 - 240 * mp0)
+  d = dly(c, 0.1667, 0.3)
+  out(c + d * 0.3)
+}
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.3333, 0.35)
+  d = svf(d, 2500, 0.3)
+  ol = dist(l + d * 0.2, 1.8 + 1.5 * mp0)
+  or = dist(r + d * 0.2, 1.8 + 1.5 * mp0)
+  out(ol, or)
+}
+
+# channels: 0 kick  1 snare  2 hat  3 ride  4 reese  5 scream      rows are 32nds (8 per beat)
+pattern 0 rows=32 {
+  C-4 1 40 W00 | .            | C-4 3 24 | .        | E-1 5 40 S20 | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 36     | .            | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | .            | C-4 3 24 | .        | E-1 5 .      | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 30 ED1 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | .        | G-1 5 .      | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 24 | .        | .            | .
+  .            | D-4 2 26     | .        | .        | .            | .
+  C-4 1 30     | .            | C-4 3 16 | .        | .            | .
+  .            | E-4 2 30     | .        | .        | .            | .
+}
+pattern 1 rows=32 {
+  # the chop: rolls, pitched snares, reversed hits
+  C-4 1 40 W60 | .            | C-4 3 24 | C-4 4 20 | E-1 5 40 S60 | E-4 6 30
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 24 | .        | .            | G-4 6 28
+  .            | .            | .        | .        | .            | .
+  C-4 1 36     | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | B-4 6 30
+  .            | G-4 2 30     | .        | .        | .            | .
+  C-4 1 40     | .            | C-4 3 24 | .        | .            | .
+  .            | A-4 2 32 E91 | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | .            | C-4 3 24 | C-4 4 20 | E-1 5 .      | E-5 6 30
+  .            | .            | .        | .        | .            | .
+  .            | C-5 2 28 S80 | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 24 | .        | .            | D-5 6 28
+  .            | C-4 2 36 E91 | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | .        | G-1 5 .      | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | B-4 6 28
+  C-4 1 30     | .            | .        | .        | .            | .
+  C-4 1 34     | .            | C-4 3 24 | .        | .            | .
+  C-4 1 38     | F-4 2 30     | .        | .        | .            | .
+  C-4 1 40     | D-4 2 34 E91 | C-4 3 16 | .        | .            | .
+  .            | C-4 2 40 E91 | .        | .        | .            | .
+}
+pattern 2 rows=32 {
+  # stutter bar: pattern loop on the first 4 rows, then the rest
+  C-4 1 40 E60 | C-4 2 40     | C-4 3 24 | .        | E-1 5 40 S90 | E-4 6 30
+  .            | .            | .        | .        | .            | .
+  .            | C-5 2 36     | C-4 3 16 | .        | .            | .
+  .            | . . . E63    | .        | .        | .            | .
+  .            | .            | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 36     | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | C-4 4 20 | .            | G-4 6 28
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | .            | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | A-4 2 30 S80 | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40 WA0 | .            | C-4 3 24 | .        | E-1 5 .      | E-5 6 30
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 40     | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | C-4 2 30 E91 | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | .            | C-4 3 24 | .        | G-1 5 .      | D-5 6 28
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | G-4 2 36 E91 | C-4 3 24 | .        | .            | .
+  .            | F-4 2 36 E91 | .        | .        | .            | .
+  .            | D-4 2 38 E91 | C-4 3 16 | .        | .            | .
+  .            | C-4 2 40 E91 | .        | .        | .            | .
+}
+pattern 3 rows=32 {
+  # breakdown: reese and screams, hats only
+  . | . | C-4 3 20 | C-4 4 20 | E-1 5 40 SFF | E-4 6 30
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | .            | B-4 6 28
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | F-1 5 .      | A-4 6 30
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | G-1 5 .      | G-4 6 28
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 20 | .        | .            | .
+  . | . | .        | .        | .            | .
+  . | . | C-4 3 14 | .        | .            | .
+  . | . | .        | .        | .            | off
+}
+pattern 4 rows=32 {
+  # final roll to the top
+  C-4 1 40 WFF | C-4 2 40 E91 | C-4 3 24 | C-4 4 20 | E-1 5 40 S20 | E-5 6 30
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | D-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | E-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40     | F-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40 E91 | G-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40 E91 | A-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  .            | .            | C-4 3 16 | .        | .            | .
+  .            | .            | .        | .        | .            | .
+  C-4 1 40 E91 | B-4 2 40 E91 | C-4 3 24 | .        | .            | .
+  C-4 1 40 E91 | C-5 2 40 E91 | .        | .        | .            | .
+  C-4 1 40 E91 | D-5 2 40 E91 | C-4 3 16 | .        | .            | .
+  C-4 1 40 E91 | E-5 2 40 E91 | .        | .        | .            | .
+  C-4 1 40 E91 | F-5 2 40 E91 | C-4 3 24 | .        | .            | .
+  C-4 1 40 E91 | G-5 2 40 E91 | .        | .        | .            | .
+  C-4 1 40 E91 | A-5 2 40 E91 | C-4 3 16 | .        | .            | .
+  C-4 1 40 E91 | C-6 2 40 E91 | .        | .        | .            | .
+}
+
+uniform kickE snE scrE moshA zoomA blockseed tear
+
+frame {
+  kickE = exp(-trig(0) * 12)
+  snE = exp(-trig(1) * 10)
+  scrE = exp(-trig(5) * 6)
+  moshA = evtl(mosh)
+  zoomA = evtl(zoomk)
+  blockseed = floor(beat * 4) + 100 * floor(bar)     # new displacement field every 16th
+  tear = step(0.6, snE)
+}
+pixel {
+  # the "video": a mandelbrot zoom pulsing with the kick
+  zm = 1.2 + zoomA * 2 + kickE * 0.4
+  it = mandel(-0.745 + u / zm * 0.9, 0.186 + v / zm * 0.9, 64)
+  k = log(1 + it) / log(65)
+  hsv(k * 1.5 + bar * 0.05, 0.9, (0.1 + 1.3 * k * k) * (1 - step(64, it)))
+  # datamosh: blocks of the previous frame slide by a hashed vector; stronger on the snare
+  bx = floor(x * 16)
+  by = floor(y * 10)
+  hv = hash(bx * 1.3 + by * 7.1 + blockseed)
+  hv2 = hash(bx * 2.7 + by * 3.9 + blockseed + 5)
+  amt = moshA * (0.3 + 0.7 * snE) * step(0.35, hv)
+  ox = (hv - 0.5) * 0.3 * amt
+  oy = (hv2 - 0.5) * 0.2 * amt
+  # row tearing: horizontal bands shift on the snare
+  band = floor(y * 24)
+  ox = ox + tear * (hash(band * 9.1 + blockseed) - 0.5) * 0.25
+  keep = 0.55 + 0.4 * moshA
+  cprev(x + ox, y + oy, keep)
+  # rgb split: pull red and blue from displaced copies
+  pr = prev(x + ox + 0.012 * snE, y + oy)
+  pb = prev(x + ox - 0.012 * snE, y + oy)
+  bq = r2
+  rgb(mix(cget(0), pr, 0.5 * snE), cget(1), mix(cget(2), bq, 0.5 * snE))
+  # posterise harder as the breaks get rougher, invert on the kick attack
+  lv = 8 - 5 * moshA
+  rgb(floor(cget(0) * lv + 0.5) / lv, floor(cget(1) * lv + 0.5) / lv, floor(cget(2) * lv + 0.5) / lv)
+  inv = step(0.6, kickE) * step(0.5, moshA)
+  rgb(mix(cget(0), 1 - cget(0), inv), mix(cget(1), 1 - cget(1), inv), mix(cget(2), 1 - cget(2), inv))
+  # scream: white noise snow
+  snow = step(0.995 - 0.03 * scrE, hash(x * 913 + y * 677 + frame)) * scrE
+  cadd(snow, snow, snow)
+}
+post {
+  cmul(1 - 0.2 * step(0.5, fract(y * h * 0.5)))
+}
