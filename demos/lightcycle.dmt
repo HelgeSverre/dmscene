@@ -1,0 +1,263 @@
+# lightcycle.dmt - Berlin school sequence meets synthwave, riding light cycles down an endless grid
+title LIGHTCYCLE
+song bpm=118 speed=6 rpb=4 channels=6 loop=0 volume=0.6
+order 0 0 1 1 2 2 3 3 4 4 2 3 3 5
+
+palette sunset {
+  0.00 1.00 0.90 0.20
+  0.40 1.00 0.45 0.25
+  0.70 0.95 0.15 0.55
+  1.00 0.40 0.05 0.60
+}
+
+inst kick {
+  f = 50 + 350 * exp(-t * 35)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 7) * 1.8, 1.3) * 0.8)
+}
+inst gsnare {
+  # gated reverb snare: wide noise held flat for 140 ms, then cut dead
+  g = 1 - step(0.14, t)
+  n = svf(noise(), 2500, 0.3)
+  n = n + r1 * 0.5
+  tone = sin(tau * 190 * t) * exp(-t * 30)
+  out((n * (0.5 * exp(-t * 12) + 0.5) * g + tone * 0.6) * 0.5)
+}
+inst hat {
+  out(hp(noise(), 9000) * exp(-t * (60 - 30 * vel)) * 0.2)
+}
+inst seq {
+  # the sequencer voice: saw + pwm, resonant filter swept by p0 and a very slow LFO
+  e = env(0.002, 0.18, 0.2, 0.06)
+  s = saw(ph) + sqr(ph, 0.5 + 0.2 * sin(t * 5)) * 0.5 + sin(ph * tau * 0.5) * 0.3
+  s = svf(s, 250 + (2800 * p0 + 500) * e + 400 * (0.5 + 0.5 * sin(time * 0.21)), 0.6)
+  out(s * e * 0.36)
+}
+inst bass {
+  e = env(0.005, 0.25, 0.6, 0.1)
+  s = usaw(freq, 0.08) * 0.6 + sin(ph * tau) * 0.6
+  s = svf(s, 150 + 500 * e, 0.2)
+  out(s * e * 0.55)
+}
+inst pad {
+  e = env(0.6, 1.0, 0.8, 1.2)
+  s = usaw(freq, 0.3) + usaw(freq * 2, 0.2) * 0.3
+  s = svf(s, 500 + 700 * e + 300 * sin(t * 0.7), 0.15)
+  out(s * e * 0.2)
+}
+inst lead {
+  e = env(0.03, 0.3, 0.7, 0.3)
+  vib = 1 + 0.006 * sin(t * 5.5) * min(t * 2, 1)
+  f = freq * vib
+  $p = $p + f / sr
+  s = saw($p) + sqr($p * 0.5 + 0.1, 0.5) * 0.4
+  s = svf(s, 800 + 2500 * e, 0.35)
+  out(dist(s, 1.2) * e * 0.3)
+}
+
+master {
+  wl = verb(l, 0.82, 0.3)
+  wr = verb(r, 0.82, 0.3)
+  dl = dly(l, 0.3814, 0.4)
+  dr = dly(r, 0.2542, 0.4)
+  out(dist(l + wl * 0.3 + dr * 0.2, 1.1), dist(r + wr * 0.3 + dl * 0.2, 1.1))
+}
+
+# channels: 0 kick  1 snare/hat  2 sequence  3 bass  4 pad  5 lead
+pattern 0 rows=16 {
+  # the sequence alone, filter closed
+  . | . | A-2 4 36 S10 | A-1 5 40 | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | A-3 4 34     | .        | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | E-3 4 36     | .        | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | G-3 4 34     | .        | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | A-2 4 36     | .        | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | A-3 4 34     | .        | . | .
+  . | . | A-2 4 28     | .        | . | .
+  . | . | E-3 4 36     | .        | . | .
+  . | . | C-3 4 30     | .        | . | .
+  . | . | G-2 4 34     | .        | . | .
+  . | . | E-3 4 30     | .        | . | .
+}
+pattern 1 rows=16 {
+  # drums in, filter opening
+  C-2 1 40 | .        | A-2 4 36 S40 | A-1 5 40 | . | .
+  .        | .        | A-2 4 28     | .        | . | .
+  .        | C-6 3 20 | A-3 4 34     | .        | . | .
+  .        | .        | A-2 4 28     | .        | . | .
+  .        | D-5 2 38 | E-3 4 36     | .        | . | .
+  .        | .        | A-2 4 28     | .        | . | .
+  .        | C-6 3 20 | G-3 4 34     | .        | . | .
+  .        | .        | A-2 4 28     | A-1 5 30 | . | .
+  C-2 1 40 | .        | A-2 4 36     | .        | . | .
+  .        | .        | A-2 4 28     | .        | . | .
+  .        | C-6 3 20 | A-3 4 34     | .        | . | .
+  .        | .        | A-2 4 28     | .        | . | .
+  .        | D-5 2 38 | E-3 4 36     | .        | . | .
+  .        | .        | C-3 4 30     | .        | . | .
+  .        | C-6 3 20 | G-2 4 34     | G-1 5 34 | . | .
+  .        | .        | E-3 4 30     | .        | . | .
+}
+pattern 2 rows=16 {
+  # pad arrives: Am  F
+  C-2 1 40 | .        | A-2 4 36 S70 | A-1 5 40 | A-3 6 30 | .
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | A-3 4 34     | .        | .        | .
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | D-5 2 38 | E-3 4 36     | .        | .        | .
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | G-3 4 34     | .        | .        | .
+  .        | .        | A-2 4 28     | A-1 5 30 | .        | .
+  C-2 1 40 | .        | F-2 4 36     | F-1 5 40 | F-3 6 30 | .
+  .        | .        | F-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | F-3 4 34     | .        | .        | .
+  .        | .        | F-2 4 28     | .        | .        | .
+  .        | D-5 2 38 | C-3 4 36     | .        | .        | .
+  .        | .        | F-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | A-3 4 34     | F-1 5 30 | .        | .
+  .        | .        | C-3 4 30     | .        | .        | .
+}
+pattern 3 rows=16 {
+  # lead over the top: C  G
+  C-2 1 40 | .        | C-3 4 36 SA0 | C-2 5 40 | C-4 6 30 | E-5 7 32
+  .        | .        | C-3 4 28     | .        | .        | .
+  .        | C-6 3 20 | C-4 4 34     | .        | .        | .
+  .        | .        | C-3 4 28     | .        | .        | .
+  .        | D-5 2 38 | G-3 4 36     | .        | .        | D-5 7 30
+  .        | .        | C-3 4 28     | .        | .        | .
+  .        | C-6 3 20 | E-3 4 34     | .        | .        | C-5 7 30
+  .        | .        | C-3 4 28     | C-2 5 30 | .        | .
+  C-2 1 40 | .        | G-2 4 36     | G-1 5 40 | G-3 6 30 | B-4 7 32
+  .        | .        | G-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | G-3 4 34     | .        | .        | .
+  .        | .        | G-2 4 28     | .        | .        | .
+  .        | D-5 2 38 | D-3 4 36     | .        | .        | D-5 7 28
+  .        | .        | G-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | B-2 4 34     | G-1 5 30 | .        | G-5 7 30 44A
+  .        | .        | D-3 4 30     | .        | .        | .
+}
+pattern 4 rows=16 {
+  # break: drums out, pad and a half-time sequence, filter sweeps down
+  . | . | A-2 4 30 S60 | A-1 5 36 | A-3 6 34 | A-5 7 24
+  . | . | .            | .        | .        | .
+  . | . | A-3 4 28     | .        | .        | .
+  . | . | .            | .        | .        | .
+  . | . | E-3 4 30 S40 | .        | .        | .
+  . | . | .            | .        | .        | .
+  . | . | G-3 4 28     | .        | .        | .
+  . | . | .            | .        | .        | .
+  . | . | F-2 4 30 S20 | F-1 5 36 | F-3 6 34 | E-5 7 24
+  . | . | .            | .        | .        | .
+  . | . | F-3 4 28     | .        | .        | .
+  . | . | .            | .        | .        | .
+  . | . | C-3 4 30 S10 | .        | .        | .
+  . | . | .            | .        | .        | .
+  . | . | A-3 4 28     | .        | .        | .
+  . | . | .            | .        | off      | off
+}
+pattern 5 rows=16 {
+  # turnaround with a tom fill (pitched snare) to loop back to the top
+  C-2 1 40 | .        | A-2 4 36 SB0 | A-1 5 40 | A-3 6 30 | A-5 7 30
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | A-3 4 34     | .        | .        | .
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | D-5 2 38 | E-3 4 36     | .        | .        | G-5 7 28
+  .        | .        | A-2 4 28     | .        | .        | .
+  .        | C-6 3 20 | G-3 4 34     | .        | .        | E-5 7 28
+  .        | .        | A-2 4 28     | A-1 5 30 | .        | .
+  C-2 1 40 | A-4 2 36 | A-2 4 36     | .        | .        | D-5 7 30
+  .        | .        | A-2 4 28     | .        | .        | .
+  C-2 1 36 | F-4 2 36 | A-3 4 34     | .        | .        | .
+  .        | .        | A-2 4 28     | .        | .        | .
+  C-2 1 40 | D-4 2 38 | E-3 4 36     | .        | .        | C-5 7 30
+  .        | A-3 2 38 | C-3 4 30     | .        | .        | .
+  C-2 1 40 | F-3 2 40 | G-2 4 34     | G-1 5 34 | .        | B-4 7 30
+  .        | D-3 2 40 | E-3 4 30     | .        | .        | .
+}
+
+uniform scroll kickE snE seqE camx hue leadE
+
+frame {
+  kickE = exp(-trig(0) * 8)
+  snE = exp(-trig(1) * 6) * step(0.5, vel(1))
+  seqE = exp(-trig(2) * 12)
+  leadE = exp(-trig(5) * 3)
+  scroll = beat * 1.5
+  camx = 0.8 * sin(beat * 0.05)
+  hue = bar * 0.01
+}
+pixel {
+  horizon = 0.05
+  sky = step(horizon, v)
+  # ------------------------------------------------ ground: perspective grid
+  z  = 0.9 / max(horizon - v, 0.0015)             # depth in grid units
+  gx = u * z * 0.55 + camx
+  gz = z + scroll
+  fog = exp(-z * 0.045)
+  tx = 0.035 * z
+  dx = abs(fract(gx * 0.5 + 0.5) - 0.5) * 2
+  dz = abs(fract(gz * 0.5 + 0.5) - 0.5) * 2
+  lines = exp(-(dx / tx) ^ 2) + exp(-(dz / (tx * 1.6)) ^ 2)
+  lines = lines * (0.55 + 0.7 * kickE) * fog
+  # ------------------------------------------------ light cycles: lanes change per grid block
+  bz = scroll + 7                                   # head of the trail, 7 blocks ahead
+  zb = floor(gz)
+  l0 = (floor(hash(zb * 0.37 + 1.3) * 5) - 2) * 2
+  lm = (floor(hash((zb - 1) * 0.37 + 1.3) * 5) - 2) * 2
+  behind = step(gz, bz)
+  dvA = abs(gx - l0)
+  dhA = max(abs(gz - zb) * 0.7, max(min(l0, lm) - gx, gx - max(l0, lm)))
+  dA = min(dvA, dhA)
+  bbz = floor(bz)
+  bl = (floor(hash(bbz * 0.37 + 1.3) * 5) - 2) * 2
+  blp = (floor(hash((bbz - 1) * 0.37 + 1.3) * 5) - 2) * 2
+  bx = mix(blp, bl, smooth(0, 0.2, fract(bz)))
+  bikeA = exp(-len((gx - bx) * 1.5, (gz - bz) * 0.6) * 4)
+  trailA = exp(-dA * 7 / max(z * 0.1, 1)) * behind * fog
+  # second bike, other seed, half a block offset
+  l1 = (floor(hash(zb * 0.53 + 7.7) * 5) - 2) * 2
+  lq = (floor(hash((zb - 1) * 0.53 + 7.7) * 5) - 2) * 2
+  dvB = abs(gx - l1)
+  dhB = max(abs(gz - zb) * 0.7, max(min(l1, lq) - gx, gx - max(l1, lq)))
+  dB = min(dvB, dhB)
+  bz2 = scroll + 9.5
+  bbz2 = floor(bz2)
+  bl2 = (floor(hash(bbz2 * 0.53 + 7.7) * 5) - 2) * 2
+  blp2 = (floor(hash((bbz2 - 1) * 0.53 + 7.7) * 5) - 2) * 2
+  bx2 = mix(blp2, bl2, smooth(0, 0.2, fract(bz2)))
+  bikeB = exp(-len((gx - bx2) * 1.5, (gz - bz2) * 0.6) * 4)
+  trailB = exp(-dB * 7 / max(z * 0.1, 1)) * step(gz, bz2) * fog
+  # ------------------------------------------------ sky: gradient, striped sun, stars, mountains
+  skyg = 0.5 + 0.5 * v
+  sunr = len(u * 0.9, (v - 0.42) * 1.0)
+  sun = 1 - smooth(0.30, 0.315, sunr)
+  stripe = step(0.3, fract(v * 16 - beat * 0.5)) + step(0.42, v)
+  sun = sun * min(stripe, 1)
+  pal(sunset, (0.72 - v) * 1.1 + hue)
+  scr = cget(0)
+  scg = cget(1)
+  scb = cget(2)
+  star = step(0.996, hash(floor(u * 90) * 1.7 + floor(v * 90) * 131.3)) * (0.5 + 0.5 * sin(beat * 3 + hash(floor(u * 90)) * 20))
+  mtn = horizon + 0.10 * fbm(u * 1.5 + camx * 0.3 + 3, 0.7, 4) + 0.05 * fbm(u * 5 + 11, 0.2, 2)
+  inM = step(v, mtn) * sky
+  mrim = exp(-(mtn - v) * 40) * inM
+  skyR = 0.05 + 0.25 * (1 - skyg) + sun * scr + star + snE * 0.25
+  skyG = 0.02 + 0.05 * (1 - skyg) + sun * scg + star * 0.9 + snE * 0.1
+  skyB = 0.12 + 0.25 * (1 - skyg) + sun * scb + star + snE * 0.3
+  skyR = mix(skyR, 0.03 + mrim * 0.8, inM)
+  skyG = mix(skyG, 0.01 + mrim * 0.1, inM)
+  skyB = mix(skyB, 0.08 + mrim * 0.6, inM)
+  # ------------------------------------------------ compose
+  gR = 0.03 + lines * 0.9 + trailA * (1.0 + seqE) + bikeA * 2 + trailB * 0.1 + bikeB * 0.3
+  gG = 0.0 + lines * 0.2 + trailA * (0.45 + seqE * 0.3) + bikeA * 1.2 + trailB * 0.8 + bikeB * 1.5
+  gB = 0.06 + lines * 0.9 + trailA * 0.1 + bikeA * 0.4 + trailB * (1.0 + seqE) + bikeB * 2
+  rgb(mix(gR, skyR, sky), mix(gG, skyG, sky), mix(gB, skyB, sky))
+  # horizon haze and lead bloom
+  hz = exp(-abs(v - horizon) * 14) * (0.25 + 0.4 * leadE)
+  cadd(hz * 0.9, hz * 0.2, hz * 0.8)
+  cprev(x, y, 0.2)
+}

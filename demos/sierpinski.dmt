@@ -1,0 +1,118 @@
+# sierpinski.dmt - minimal techno over folding kaleidoscopic IFS geometry
+title SIERPINSKI
+song bpm=132 speed=6 rpb=4 channels=5 loop=0 volume=0.55
+order 0 0 1 1 0 2 1 2
+
+inst kick {
+  f = 48 + 500 * exp(-t * 40)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 6) * 2.5, 1.5) * 0.85)
+}
+inst rumble {
+  e = env(0.01, 0.4, 0.3, 0.2)
+  s = svf(noise() * 0.5 + sin(ph * tau) * 0.8, 120 + 200 * e, 0.7)
+  out(s * e * 0.5)
+}
+inst click {
+  out(hp(noise(), 4000 + 6000 * vel) * exp(-t * 200) * 0.6 + sin(tau * 3000 * t) * exp(-t * 400) * 0.3)
+}
+inst bleep {
+  e = env(0.001, 0.08, 0.0, 0.03)
+  s = sin(ph * tau) + sin(ph * tau * 2.01) * 0.4 * e
+  out(crush(s, 32) * e * 0.3)
+}
+inst hat {
+  out(hp(noise(), 9000) * exp(-t * (50 + 100 * (1 - vel))) * 0.22)
+}
+
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.3409, 0.5)
+  d = svf(d, 2500, 0.2)
+  out(dist(l + d * 0.3, 1.3), dist(r - d * 0.3, 1.3))
+}
+
+# channels: 0 kick  1 rumble  2 clicks  3 bleep  4 hats
+pattern 0 rows=16 {
+  C-2 1 40 | C-1 2 30 | .        | .        | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | .        | .
+  C-2 1 40 | .        | .        | .        | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 12 | .        | .
+  C-2 1 40 | C-1 2 30 | .        | .        | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | .        | .
+  C-2 1 40 | .        | .        | .        | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 12 | .        | C-6 5 14
+}
+pattern 1 rows=16 {
+  C-2 1 40 | C-1 2 30 | .        | A-4 4 30 | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | E-5 4 24 | .
+  C-2 1 40 | .        | .        | .        | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | A-5 4 20 | C-6 5 28
+  .        | .        | C-4 3 12 | .        | .
+  C-2 1 40 | C-1 2 30 | .        | .        | .
+  .        | .        | C-4 3 20 | G-4 4 30 | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | .        | .
+  C-2 1 40 | .        | .        | D-5 4 24 | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 12 | B-4 4 20 | C-6 5 14
+}
+pattern 2 rows=16 {
+  C-2 1 40 | C-1 2 30 | .        | A-4 4 30 | .
+  .        | .        | C-4 3 20 | A-5 4 20 | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | E-5 4 24 | .
+  C-2 1 40 | .        | .        | E-6 4 16 | .
+  .        | .        | C-4 3 20 | .        | .
+  .        | .        | .        | A-5 4 20 | C-6 5 28
+  .        | .        | C-4 3 12 | .        | .
+  C-2 1 40 | C-1 2 30 | .        | G-4 4 30 | .
+  .        | .        | C-4 3 20 | G-5 4 20 | .
+  .        | .        | .        | .        | C-6 5 28
+  .        | .        | C-4 3 36 | D-5 4 24 | .
+  C-2 1 40 | .        | .        | D-6 4 16 | .
+  C-2 1 30 | .        | C-4 3 20 | .        | .
+  C-2 1 34 | .        | .        | B-4 4 20 | C-6 5 28
+  C-2 1 40 | .        | C-4 3 40 | B-5 4 20 | C-6 5 30
+}
+
+uniform spin scale kickE bleepE invert hue zoom
+
+frame {
+  kickE = exp(-trig(0) * 12)
+  bleepE = exp(-trig(3) * 7)
+  spin = beat * 0.03 + 0.3 * sin(beat * 0.09)
+  scale = 1.66 + 0.12 * sin(beat * 0.0625 * pi) + kickE * 0.03
+  invert = step(0.6, kickE) * step(fract(bar * 0.25), 0.05)   # one inverted flash every 4 bars
+  hue = bar * 0.05
+  zoom = 1.0 + 0.15 * sin(beat * 0.17)
+}
+pixel {
+  px = rot(u, v, spin) * zoom
+  py = r1 * zoom
+  de = kifs(px * 0.5, py * 0.5, scale, 0.32 + 0.14 * sin(beat * 0.05), 10)
+  trap = r1
+  edge = exp(-de * 120)
+  fill = step(de, 0.0015)
+  shade = exp(-trap * 1.5)
+  hsv(hue + trap * 0.15, 0.6, 1)
+  cmul(edge * (0.6 + 0.6 * kickE) + shade * 0.5 * bleepE)
+  cadd(fill * kickE * 0.9, fill * kickE * 0.9, fill * kickE * 0.9)
+  # invert every 4 bars
+  rr = cget(0)
+  gg = cget(1)
+  bb = cget(2)
+  rgb(mix(rr, 1 - rr, invert), mix(gg, 1 - gg, invert), mix(bb, 1 - bb, invert))
+  cprev(0.5 + (x - 0.5) * 1.01, 0.5 + (y - 0.5) * 1.01, 0.4)
+}

@@ -1,0 +1,355 @@
+# hakkuh.dmt - Rotterdam hardcore. 180 bpm, the kick is the bassline.
+# WARNING: strobes on every kick.
+title HAKKUH
+song bpm=180 speed=6 rpb=4 channels=6 loop=0 volume=0.5
+order 0 0 1 1 2 6 2 6 3 3 4 1 1 2 6 5
+
+# ------------------------------------------------------------------ instruments
+inst kick {
+  # 909 body into a wall of overdrive: pitch drops 1500 -> 55 Hz, tanh squares it off
+  f  = 55 + 170 * exp(-t * 16) + 1500 * exp(-t * 95)
+  $p = $p + f / sr
+  s  = sin($p * tau)
+  s  = dist(s * (4 + 8 * p0) * exp(-t * 2.4), 3.2)
+  s  = svf(s, 2600 + 5000 * exp(-t * 9), 0.15)
+  out(s * 0.8)
+}
+inst hoover {
+  # alpha juno "what the": three detuned saws + pwm sub, pitch falls 5 semitones into the note
+  e  = env(0.012, 0.35, 0.8, 0.18)
+  sw = 2 ^ ((5 * exp(-t * 5)) / 12)
+  f  = freq * sw
+  $a = $a + f / sr
+  $b = $b + f * 1.011 / sr
+  $c = $c + f * 0.989 / sr
+  $d = $d + f * 0.5 / sr
+  pw = 0.5 + 0.35 * sin(t * 6 + 1)
+  s  = saw($a) + saw($b) + saw($c) + sqr($d, pw) * 0.8 + sqr($a * 2, 0.3) * 0.3
+  s  = svf(s, 1100 + 2600 * e + 2000 * p0, 0.35)
+  out(dist(s * 0.6, 1.5) * e * 0.58)
+}
+inst hat {
+  out(hp(noise(), 8000) * exp(-t * (70 - 55 * vel)) * 0.3)
+}
+inst lead {
+  # hardcore square lead: two detuned squares + an octave saw, a little drive, vibrato after the attack
+  e  = env(0.003, 0.2, 0.6, 0.08)
+  vib = 1 + 0.004 * sin(t * 6.5) * min(t * 4, 1)
+  f  = freq * vib
+  $a = $a + f / sr
+  $b = $b + f * 1.004 / sr
+  s  = sqr($a, 0.5) + sqr($b, 0.5) + saw($a * 2) * 0.35
+  s  = svf(s, 1800 + 2500 * e, 0.2)
+  out(dist(s * 0.5, 1.3) * e * 0.5)
+}
+inst hit {
+  # orchestra hit: stacked saws, root fifth octave tenth, with a noise crack
+  e = env(0.001, 0.28, 0.0, 0.06)
+  s = saw(ph) + saw(ph * 1.498 + 0.2) + saw(ph * 2.003) + saw(ph * 2.52 + 0.1) * 0.6 + noise() * exp(-t * 40) * 0.6
+  s = svf(s, 700 + 4500 * e, 0.3)
+  out(dist(s * 0.6, 1.5) * e * 0.5)
+}
+inst riser {
+  e = env(0.02, 0.1, 1.0, 0.3)
+  s = svf(noise(), 250 + 9000 * min(t / 2.6, 1), 0.75)
+  out((s + r2 * 0.5) * e * 0.3 * (0.4 + 0.6 * min(t / 2.6, 1)))
+}
+
+master {
+  # short slap to glue, a little hall on the synths, then crush everything against the ceiling
+  d = dly(l * 0.5 + r * 0.5, 0.0833, 0.15)
+  w = verb(hp(l * 0.5 + r * 0.5, 400), 0.72, 0.5)
+  ol = dist(l + d * 0.15 + w * 0.12, 1.9)
+  or = dist(r + d * 0.15 + w * 0.12, 1.9)
+  out(ol, or)
+}
+
+# ------------------------------------------------------------------ patterns
+# channels: 0 kick  1 hoover  2 hats  3 lead  4 hit  5 riser
+
+pattern 0 rows=16 {
+  # intro: just the kick
+  C-2 1 40 S00 | .           | .        | . | . | .
+  .            | .           | .        | . | . | .
+  .            | .           | C-6 3 20 | . | . | .
+  .            | .           | .        | . | . | .
+  C-2 1 40     | .           | .        | . | . | .
+  .            | .           | .        | . | . | .
+  .            | .           | C-6 3 20 | . | . | .
+  .            | .           | .        | . | . | .
+  C-2 1 40     | .           | .        | . | . | .
+  .            | .           | .        | . | . | .
+  .            | .           | C-6 3 20 | . | . | .
+  .            | .           | .        | . | . | .
+  C-2 1 40     | .           | .        | . | . | .
+  .            | .           | .        | . | . | .
+  .            | .           | C-6 3 20 | . | . | .
+  .            | .           | C-6 3 14 | . | . | .
+}
+pattern 1 rows=16 {
+  # main A: hoover riff
+  C-2 1 40 S40 | A-2 2 36 S30 | .        | . | . | .
+  .            | .            | .        | . | . | .
+  .            | .            | C-6 3 22 | . | . | .
+  .            | A-3 2 30     | .        | . | . | .
+  C-2 1 40     | off          | .        | . | . | .
+  .            | .            | .        | . | . | .
+  .            | G-2 2 34     | C-6 3 22 | . | . | .
+  .            | .            | .        | . | . | .
+  C-2 1 40     | A-2 2 36     | .        | . | . | .
+  .            | .            | .        | . | . | .
+  .            | .            | C-6 3 22 | . | . | .
+  .            | C-3 2 32     | .        | . | . | .
+  C-2 1 40     | off          | .        | . | . | .
+  .            | .            | .        | . | . | .
+  .            | E-2 2 34     | C-6 3 22 | . | . | .
+  .            | off          | C-6 3 30 | . | . | .
+}
+pattern 2 rows=16 {
+  # main B, hook bar 1
+  C-2 1 40 S80 | A-2 2 36 S60 | .        | A-4 4 36 | A-3 5 36 | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | C-6 3 22 | A-5 4 34 | .        | .
+  .            | A-3 2 30     | .        | .        | .        | .
+  C-2 1 40     | off          | .        | G-5 4 34 | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | G-2 2 34     | C-6 3 22 | E-5 4 34 | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | A-2 2 36     | .        | D-5 4 34 | A-3 5 36 | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | C-6 3 22 | E-5 4 34 | .        | .
+  .            | C-3 2 32     | .        | .        | .        | .
+  C-2 1 40     | off          | .        | C-5 4 34 | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | E-2 2 34     | C-6 3 22 | A-4 4 34 | .        | .
+  .            | off          | C-6 3 30 | .        | .        | .
+}
+pattern 6 rows=16 {
+  # main B, hook bar 2
+  C-2 1 40 S80 | A-2 2 36 S60 | .        | G-4 4 36 | A-3 5 36 | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | C-6 3 22 | A-4 4 34 | .        | .
+  .            | A-3 2 30     | .        | .        | .        | .
+  C-2 1 40     | off          | .        | C-5 4 34 | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | G-2 2 34     | C-6 3 22 | D-5 4 34 | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | F-2 2 36     | .        | E-5 4 36 | F-3 5 36 | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | C-6 3 22 | .        | .        | .
+  .            | F-3 2 30     | .        | D-5 4 34 | .        | .
+  C-2 1 40     | off          | .        | .        | .        | .
+  .            | .            | .        | C-5 4 34 | .        | .
+  .            | G-2 2 34     | C-6 3 22 | .        | G-3 5 36 | .
+  .            | off          | C-6 3 30 | B-4 4 30 | .        | .
+}
+pattern 3 rows=16 {
+  # breakdown: no kick, the hoover sings, riser climbs
+  .            | A-2 2 38 SA0 | .        | .        | .        | A-4 6 30
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | F-2 2 38     | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | G-2 2 38     | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | A-3 2 34     | .        | .        | .        | .
+  .            | A-2 2 38     | .        | .        | .        | .
+}
+pattern 4 rows=16 {
+  # build: kick rolls accelerating into the drop
+  C-2 1 40 SC0 | A-2 2 38 SF0 | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | G-2 2 38     | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40 SFF | off          | .        | .        | .        | .
+  C-2 1 40     | .            | .        | .        | .        | .
+  C-2 1 40     | .            | .        | .        | .        | .
+  C-2 1 40     | .            | .        | A-4 4 36 | A-3 5 40 | off
+}
+pattern 5 rows=16 {
+  # turnaround: double kicks and a hit to throw it back to the top
+  C-2 1 40 S80 | A-2 2 36     | .        | A-4 4 30 | A-3 5 36 | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | C-6 3 22 | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | off          | .        | E-5 4 30 | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | C-6 3 22 | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | C-3 2 36     | .        | .        | C-4 5 36 | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | C-6 3 22 | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | off          | .        | .        | .        | .
+  .            | .            | .        | .        | .        | .
+  C-2 1 40     | .            | C-6 3 30 | .        | .        | .
+  C-2 1 40     | .            | C-6 3 30 | .        | G-3 5 40 | .
+}
+
+# ------------------------------------------------------------------ shape helpers (inlined fns)
+fn segd(px, py, ax, ay, bx, by) {
+  dx = bx - ax
+  dy = by - ay
+  tt = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1)
+  return len(px - ax - dx * tt, py - ay - dy * tt)
+}
+fn elld(px, py, cx, cy, rx, ry) {
+  return (len((px - cx) / rx, (py - cy) / ry) - 1) * min(rx, ry)
+}
+fn fill(d) {
+  return 1 - smooth(-0.004, 0.004, d)
+}
+fn flame(px, py, y0, y1, w, seed, spd) {
+  hf = clamp((py - y0) / (y1 - y0), 0, 1)
+  wob = (fbm(px * 5 + seed, py * 4 - time * spd, 3) - 0.5) * (0.08 + 0.25 * hf)
+  wid = w * (1 - hf) ^ 0.75 * (1 + 0.5 * wob / w)
+  d = abs(px + wob * 0.6) - wid
+  return max(d, max(min(y0, y1) - py, py - max(y0, y1)))
+}
+
+# ------------------------------------------------------------------ visuals
+uniform zoom ang kickE hoovE strobe sx sy cx cy melt hitE mascot
+
+frame {
+  kickE = exp(-trig(0) * 12)
+  hoovE = exp(-trig(1) * 2.5)
+  hitE  = exp(-trig(4) * 6)
+  strobe = step(0.5, kickE)                        # ~2 frames of inversion per kick
+  sx = (hash(frame * 1.7) - 0.5) * 0.1 * kickE     # screen shake
+  sy = (hash(frame * 2.3) - 0.5) * 0.1 * kickE
+  zoom = 1.0 + 0.3 * kickE + 0.4 * hitE
+  $a = $a + 0.012 * (step(0.5, fract(bar * 0.5)) * 2 - 1)   # spin flips direction every bar
+  ang = $a
+  th = hash(floor(bar) + 3) * tau                  # hard-cut julia parameter every bar
+  cx = 0.7885 * cos(th)
+  cy = 0.7885 * sin(th)
+  melt = hoovE * 0.7
+  mascot = (1 - step(4.1, trig(5))) * step(0.02, trig(5)) + hitE * 0.8   # breakdown + build, and on every hit
+}
+pixel {
+  px = rot(abs(u) + sx, v + sy, ang) / zoom        # mirrored left/right
+  py = r1 / zoom
+  it = julia(px * 1.25, py * 1.25, cx, cy, 48)
+  k = it / 48
+  inside = step(1, k)
+  kb = log(1 + it) / log(49)                       # log scale so the far field gets stripes too
+  band = step(0.5, fract(kb * 7 - beat * 0.5))     # black/white bands racing outward on the beat
+  bw = band * (1 - inside)
+  red = inside * (0.45 + 0.55 * kickE)
+  rgb(bw + red, bw * (1 - 0.5 * hitE), bw * (1 - 0.8 * hitE))
+  cmul(1 - 0.35 * step(0.5, fract(y * h * 0.5)))   # scanlines
+  # melt: drag the previous frame through noise while the hoover rings
+  dx = (fbm(x * 6, y * 6 + beat, 2) - 0.5) * melt * 0.3
+  dy = (fbm(x * 6 + 7, y * 6 - beat, 2) - 0.5) * melt * 0.3
+  cprev(x + dx, y + dy + 0.004, melt * 0.85)
+  # ---- the wizard: flame-haired, fists up, ring behind; drawn from signed distances over the fractal
+  px = (u + sx * 0.5) * 1.15
+  py = (v + sy * 0.5) * 1.15 - 0.05
+  wa = abs(px)
+  cr = cget(0)
+  cg = cget(1)
+  cb = cget(2)
+  am = 0
+  mk = min(mascot, 1)
+  # ring: blue upper-left to red lower-right, thin white inner line
+  rd = abs(len(px, py + 0.1) - 0.75) - 0.055
+  rk = 0.5 + 0.5 * sin(atan2(py + 0.1, px) - 0.8)
+  m = fill(rd) * mk
+  cr = mix(cr, mix(0.15, 1.0, rk), m)
+  cg = mix(cg, mix(0.35, 0.15, rk), m)
+  cb = mix(cb, mix(1.0, 0.05, rk), m)
+  m = fill(abs(len(px, py + 0.1) - 0.69) - 0.012) * mk
+  cr = mix(cr, 0.9, m)
+  cg = mix(cg, 0.9, m)
+  cb = mix(cb, 0.9, m)
+  # robe
+  bd = max(wa - (0.38 + 0.12 * max(-py, 0)), max(py - 0.02, -0.72 - py))
+  m = fill(bd) * mk
+  shade = 0.6 + 0.4 * smooth(-0.9, 0.0, py)
+  cr = mix(cr, 0.95 * shade, m)
+  cg = mix(cg, 0.25 * shade, m)
+  cb = mix(cb, 0.05 * shade, m)
+  # arms: shoulder -> elbow -> fist, pumping on the kick
+  fy = 0.62 + 0.06 * kickE
+  aL = min(segd(px, py, -0.3, -0.02, -0.64, 0.24), segd(px, py, -0.64, 0.24, -0.56, fy)) - 0.085
+  aR = min(segd(px, py, 0.3, -0.02, 0.64, 0.24), segd(px, py, 0.64, 0.24, 0.56, fy)) - 0.085
+  m = fill(min(aL, aR)) * mk
+  cr = mix(cr, 1.0, m)
+  cg = mix(cg, 0.32, m)
+  cb = mix(cb, 0.05, m)
+  # beard: flame pointing down from the chin, dark streaks
+  fd = flame(px, py, 0.16, -1.0, 0.32, 3, 0.7)
+  m = fill(fd) * mk
+  hb = clamp((0.16 - py) / 1.16, 0, 1)
+  streak = step(0.72, fract(fbm(px * 6 + 1, py * 3 - time * 0.5, 2) * 5 + px * 3))
+  cr = mix(cr, mix(1.0, 0.75, hb) - 0.45 * streak, m)
+  cg = mix(cg, mix(0.45, 0.08, hb) - 0.2 * streak, m)
+  cb = mix(cb, 0.03, m)
+  # head, moustache, mouth, nose, eyes, brows
+  m = fill(elld(px, py, 0, 0.3, 0.18, 0.21)) * mk
+  cr = mix(cr, 1.0, m)
+  cg = mix(cg, 0.72, m)
+  cb = mix(cb, 0.5, m)
+  m = fill(min(elld(px, py, -0.1, 0.16, 0.14, 0.045), elld(px, py, 0.1, 0.16, 0.14, 0.045))) * mk
+  cr = mix(cr, 1.0, m)
+  cg = mix(cg, 0.4, m)
+  cb = mix(cb, 0.03, m)
+  m = fill(elld(px, py, 0, 0.1, 0.06 + 0.02 * hoovE, 0.035 + 0.03 * hoovE)) * mk
+  cr = mix(cr, 0.15, m)
+  cg = mix(cg, 0.02, m)
+  cb = mix(cb, 0.02, m)
+  m = fill(elld(px, py, 0, 0.22, 0.04, 0.055)) * mk
+  cr = mix(cr, 0.95, m)
+  cg = mix(cg, 0.6, m)
+  cb = mix(cb, 0.4, m)
+  m = fill(min(elld(px, py, -0.085, 0.3, 0.055, 0.022), elld(px, py, 0.085, 0.3, 0.055, 0.022))) * mk
+  cr = mix(cr, 1, m)
+  cg = mix(cg, 1, m)
+  cb = mix(cb, 0.95, m)
+  m = fill(min(len(px + 0.08, (py - 0.3) * 1.5) - 0.018, len(px - 0.08, (py - 0.3) * 1.5) - 0.018)) * mk
+  cr = mix(cr, 0.05, m)
+  cg = mix(cg, 0.02, m)
+  cb = mix(cb, 0.02, m)
+  m = fill(min(segd(px, py, -0.17, 0.39, -0.03, 0.33), segd(px, py, 0.17, 0.39, 0.03, 0.33)) - 0.028) * mk
+  cr = mix(cr, 0.2, m)
+  cg = mix(cg, 0.05, m)
+  cb = mix(cb, 0.0, m)
+  # hair: flame pointing up, brighter on the kick
+  m = fill(flame(px, py, 0.44, 1.05, 0.2, 7, 1.6)) * mk
+  hh = clamp((py - 0.44) / 0.6, 0, 1)
+  cr = mix(cr, 1.0, m)
+  cg = mix(cg, mix(0.85, 0.25, hh) + 0.2 * kickE, m)
+  cb = mix(cb, mix(0.2, 0.0, hh), m)
+  # fists and knuckles
+  m = fill(min(len(px + 0.56, py - fy - 0.06) - 0.115, len(px - 0.56, py - fy - 0.06) - 0.115)) * mk
+  cr = mix(cr, 1.0, m)
+  cg = mix(cg, 0.7, m)
+  cb = mix(cb, 0.48, m)
+  kd = min(segd(px, py, -0.64, fy + 0.12, -0.48, fy + 0.12), segd(px, py, 0.48, fy + 0.12, 0.64, fy + 0.12)) - 0.012
+  kd = min(kd, min(segd(px, py, -0.62, fy + 0.04, -0.5, fy + 0.04), segd(px, py, 0.5, fy + 0.04, 0.62, fy + 0.04)) - 0.012)
+  m = fill(kd) * mk
+  cr = mix(cr, 0.6, m)
+  cg = mix(cg, 0.3, m)
+  cb = mix(cb, 0.15, m)
+  rgb(cr, cg, cb)
+  # strobe: invert on the kick attack
+  rr = cget(0)
+  gg = cget(1)
+  bb = cget(2)
+  rgb(mix(rr, 1 - rr, strobe), mix(gg, 1 - gg, strobe), mix(bb, 1 - bb, strobe))
+}

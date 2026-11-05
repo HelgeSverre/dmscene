@@ -1,0 +1,124 @@
+# features.dmt - exercises every v3 engine feature; used by tests/run.sh
+title FEATURES
+song bpm=120 speed=6 rpb=4 channels=4 loop=0 volume=0.7 scale=2 dither=1
+order 0 1
+pan 0.2 0.8 0.5 0.5
+
+text greet "HELLO DMSCENE 0123456789 abc"
+sample clap "assets/clap.wav" rate=11025
+sample wt "assets/wt.wav"
+venv pluck sustain=2 {
+  0.00 0
+  0.01 1
+  0.20 0.5
+  0.60 0
+}
+timeline {
+  0:00 scene=0 glow=0 bright=0.2
+  0:08 glow=1
+  1:00 scene=1 bright=1
+  1:08 glow=0
+}
+
+inst kick {
+  f = 50 + 400 * exp(-t * 30)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 6) * 2, 1.4) * 0.8)
+}
+inst clapper {
+  out(smp(clap, t) * 0.8 + smp(clap, t * 1.5) * 0.3)
+}
+inst pad nna=continue {
+  e = venv(pluck)
+  s = bsaw(ph, freq) + bsqr(ph, 0.3, freq) * 0.5 + wave(wt, ph) * 0.4
+  s = fold(s * 0.5, 1 + mp0 * 3)
+  out(s * e * 0.4)
+}
+inst sub {
+  out(sin(ph * tau) * env(0.01, 0.2, 0.6, 0.1) * 0.5 * (1 - 0.5 * cenv(0)))
+}
+
+chan 2 {
+  w = verb(x, 0.8, 0.3)
+  d = dly(x, 0.25, 0.4)
+  out(x + w * 0.4 + d * 0.3)
+}
+master {
+  out(dist(l, 1.2), dist(r, 1.2))
+}
+
+# channels: 0 kick  1 clap  2 pad  3 sub
+pattern 0 rows=16 {
+  C-2 1 40 W80 | .        | C-4 3 30     | C-2 4 40
+  .            | .        | .            | .
+  .            | .        | E-4 3 30     | .
+  .            | .        | .            | .
+  C-2 1 40 ED2 | D-5 2 36 | G-4 3 30     | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | C-5 3 30 EC3 | .
+  C-2 1 40     | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | E-4 3 30 E92 | .
+  .            | .        | .            | .
+  C-2 1 40 E60 | D-5 2 36 | .            | G-1 4 40
+  .            | .        | .            | .
+  C-2 1 30 E61 | .        | C-4 3 30 E12 | .
+  .            | .        | .            | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 WFF | .        | A-3 3 30     | A-1 4 40
+  .            | .        | .            | .
+  .            | .        | C-4 3 30     | .
+  .            | .        | .            | .
+  C-2 1 40     | D-5 2 36 | E-4 3 30     | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | A-4 3 30     | .
+  C-2 1 40     | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+  C-2 1 40     | D-5 2 36 | .            | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+  .            | .        | .            | .
+}
+
+fn textline(s, px, py, sz) {
+  # returns glyph coverage for text id s drawn at px,py (character cells of size sz)
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+
+uniform spin
+
+frame {
+  spin = beat * 0.1
+  select(evt(scene))
+}
+pixel bars {
+  acc = 0
+  repeat i 8 {
+    acc = acc + step(abs(u - (i - 3.5) * 0.3), 0.08) * (0.5 + 0.5 * sin(beat + i))
+  }
+  rgb(acc, acc * 0.5, evtl(bright))
+  tx = textline(greet, -1.3, 0.6, 0.1)
+  cadd(tx, tx, tx)
+}
+pixel rings {
+  d = len(u, v)
+  rgb(fract(d * 4 - beat), 0.2, evtl(glow))
+  tx = textline(greet, -1.0, -0.3, 0.07)
+  cadd(tx, 0, tx)
+  cprevz(0.5, 0.5, 1.02, 0.02, 0.3)
+}
+post {
+  # 3-tap horizontal blur on red, scanlines
+  r0 = tap(-1, 0)
+  r1v = tap(1, 0)
+  rgb((cget(0) + r0 + r1v) / 3, cget(1), cget(2))
+  cmul(1 - 0.2 * step(0.5, fract(y * h * 0.5)))
+}

@@ -1,0 +1,267 @@
+# vowels.dmt - vocal formant synthesis.  Glottal source -> three resonant bandpasses.
+# The vowel morph (A E I O U) is the master param mp0, set with Wxx in the patterns,
+# so the choir, the soprano and the picture all read the same value.
+title VOWELS
+song bpm=84 speed=6 rpb=4 channels=6 loop=0 volume=0.6 dither=1
+order 0 1 2 3 0 1 2 4
+pan 0.35 0.65 0.5 0.5 0.5 0.5
+
+text vowels "AEIOU"
+
+palette aurora {
+  0.00 0.02 0.00 0.06
+  0.30 0.10 0.30 0.60
+  0.55 0.20 0.90 0.70
+  0.75 0.95 0.70 0.30
+  1.00 0.02 0.00 0.06
+}
+
+# ------------------------------------------------------------------ formant helpers
+fn pick5(v, a, b, c, d, e) {
+  # piecewise-linear table lookup, v in 0..4
+  i = clamp(v, 0, 3.999)
+  k = fract(i)
+  s = floor(i)
+  lo = s < 1 ? a : (s < 2 ? b : (s < 3 ? c : d))
+  hi = s < 1 ? b : (s < 2 ? c : (s < 3 ? d : e))
+  return mix(lo, hi, k)
+}
+fn f1(v) {
+  return pick5(v, 800, 400, 300, 450, 325)
+}
+fn f2(v) {
+  return pick5(v, 1150, 1600, 2200, 800, 700)
+}
+fn f3(v) {
+  return pick5(v, 2900, 2700, 3000, 2830, 2700)
+}
+fn formant(x, f, q, amp) {
+  y = svf(x, f, q)
+  return r2 * amp
+}
+fn vocal(src, v, bright) {
+  # three parallel formants; higher formants fade with "bright"
+  a = formant(src, f1(v), 0.90, 1.0)
+  b = formant(src, f2(v), 0.93, 0.55 * bright)
+  c = formant(src, f3(v), 0.94, 0.22 * bright)
+  return a + b + c
+}
+fn glottis(p, hz, breath) {
+  # pulse-like glottal source: saw plus narrow pulse, a little aspiration noise
+  g = bsaw(p, hz) * 0.55 + bsqr(p, 0.12, hz) * 0.45
+  return g + noise() * breath
+}
+
+# ------------------------------------------------------------------ instruments
+inst choir nna=continue {
+  e = env(0.25, 0.6, 0.85, 0.9)
+  vib = 1 + 0.004 * sin(t * 5.3 + chan) * min(t * 0.8, 1) + 0.0015 * noise()
+  $p = $p + freq * vib / sr
+  $q = $q + freq * vib * 1.006 / sr
+  $r = $r + freq * vib * 0.994 / sr
+  src = glottis($p, freq, 0.02) + glottis($q, freq, 0.02) + glottis($r, freq, 0.02)
+  v = mp0 * 4
+  s = vocal(src * 0.4, v, 0.7 + 0.3 * e)
+  out(s * e * 0.5)
+}
+inst soprano nna=continue {
+  # vowel per note from p0 (Sxx), sliding toward it like a real singer
+  e = env(0.06, 0.4, 0.8, 0.5)
+  $v = $v + (p0 * 4 - $v) * 0.0006
+  vib = 1 + 0.006 * sin(t * 5.8) * min(max(t - 0.15, 0) * 3, 1) + 0.002 * noise()
+  $p = $p + freq * vib / sr
+  src = glottis($p, freq, 0.03)
+  s = vocal(src, $v, 1.0)
+  out(dist(s, 1.1) * e * 0.55)
+}
+inst whisper {
+  # unvoiced: noise through the formants of the current vowel
+  e = env(0.01, 0.15, 0.3, 0.1)
+  s = vocal(noise() * 0.8, mp0 * 4, 1.2)
+  out(s * e * 0.35)
+}
+inst sub {
+  e = env(0.01, 0.3, 0.7, 0.4)
+  out((sin(ph * tau) + sin(ph * tau * 2) * 0.15) * e * 0.55)
+}
+inst thump {
+  f = 45 + 200 * exp(-t * 25)
+  $p = $p + f / sr
+  out(sin($p * tau) * exp(-t * 7) * 0.7)
+}
+inst shaker {
+  out(hp(noise(), 6000) * exp(-t * (40 + 60 * (1 - vel))) * 0.18)
+}
+
+chan 0 {
+  w = verb(x, 0.9, 0.3)
+  out(x * 0.6 + w * 0.7)
+}
+chan 1 {
+  w = verb(x, 0.9, 0.3)
+  out(x * 0.6 + w * 0.7)
+}
+chan 2 {
+  d = dly(x, 0.5357, 0.35)
+  w = verb(x + d * 0.5, 0.85, 0.4)
+  out(x * 0.8 + d * 0.25 + w * 0.5)
+}
+master {
+  out(dist(l, 1.15), dist(r, 1.15))
+}
+
+# channels: 0 choir low  1 choir high  2 soprano  3 whisper  4 sub  5 perc
+# vowel plan: W00 A  W40 E  W80 I  WC0 O  WFF U
+pattern 0 rows=16 {
+  # Am: choir enters on "ah", drifts to "oh"
+  A-2 1 34 W00 | E-3 1 30 | .            | .        | A-1 4 36 | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .   . . WC0  | .        | .            | .        | .        | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+}
+pattern 1 rows=16 {
+  # F: "oo" -> "ee", whisper answers, soprano enters
+  F-2 1 34 WFF | C-3 1 30 | A-4 2 34 S00 | .        | F-1 4 36 | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 20
+  .            | .        | .            | F-4 3 28 | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .   . . W80  | .        | C-5 2 34 S80 | .        | .        | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | F-4 3 28 | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+}
+pattern 2 rows=16 {
+  # C: "eh", soprano phrase cycling vowels
+  C-3 1 34 W40 | G-3 1 30 | E-5 2 34 S40 | .        | C-2 4 36 | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | D-5 2 32 SC0 | .        | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .   . . W00  | .        | C-5 2 34 S00 | C-4 3 26 | .        | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | E-5 2 30 SFF | .        | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+}
+pattern 3 rows=16 {
+  # G: "oh" -> "ah", whisper rhythm
+  G-2 1 34 WC0 | D-3 1 30 | D-5 2 34 S80 | .        | G-1 4 36 | C-3 5 30
+  .            | .        | .            | G-4 3 24 | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | G-4 3 24 | .        | .
+  .            | .        | .            | .        | .        | C-6 6 20
+  .            | .        | .            | G-4 3 24 | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | B-4 2 30 S40 | G-4 3 24 | .        | .
+  .   . . W00  | .        | .            | .        | .        | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | .            | .        | .        | .
+  .            | .        | G-4 2 32 S00 | .        | .        | C-6 6 20
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | C-6 6 14
+  .            | .        | off          | .        | .        | .
+}
+pattern 4 rows=16 {
+  # cadence: everything on "ah", then release
+  A-2 1 36 W00 | E-3 1 32 | A-5 2 34 S00 | .        | A-1 4 36 | C-3 5 30
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .   . . WFF  | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  off          | off      | off          | .        | off      | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+}
+
+# ------------------------------------------------------------------ visuals
+fn logx(f) {
+  # 80 Hz .. 5 kHz across the screen in u (-aspect..aspect)
+  return (log(f / 80) / log(62.5) * 2 - 1) * aspect
+}
+fn peak(f, amp, wd) {
+  return amp * exp(-((u - logx(f)) / wd) ^ 2)
+}
+
+uniform vv F1 F2 F3 lvl sop open wide hue
+
+frame {
+  vv = mp0 * 4
+  F1 = f1(vv)
+  F2 = f2(vv)
+  F3 = f3(vv)
+  lvl = cenv(0) + cenv(1)
+  sop = cenv(2)
+  open = (F1 - 280) / 560                  # 0 closed .. 1 open (jaw)
+  wide = (F2 - 650) / 1600                 # 0 rounded .. 1 spread (lips)
+  hue = bar * 0.02
+}
+pixel {
+  # spectral landscape: the three formant peaks as glowing hills, sweeping with the vowel
+  env1 = peak(F1, 1.0, 0.14) + peak(F2, 0.65, 0.12) + peak(F3, 0.35, 0.1)
+  curve = env1 * 0.8 - 0.75                          # spectral envelope as a height
+  line = exp(-abs(v - curve) * 22)
+  under = smooth(0.0, 0.5, curve - v) * step(v, curve)
+  grid = exp(-abs(fract((u / aspect) * 6) - 0.5) * 30) * 0.06
+  pal(aurora, env1 * 0.4 + hue + v * 0.1)
+  cmul((0.3 + 1.5 * lvl) * line + under * (0.08 + 0.25 * lvl) + (0.02 + 0.04 * (v + 1)))
+  cadd(grid, grid, grid)
+  # the mouth: an opening whose height follows F1 and width follows F2, lips lit by the soprano
+  mw = 0.55 + 0.45 * wide
+  mh = 0.06 + 0.42 * open
+  dm = len(u / mw, (v - 0.15) / mh) - 1
+  lips = exp(-abs(dm) * 18) * (0.6 + 1.5 * sop)
+  inner = 1 - smooth(-0.02, 0.02, dm)
+  cadd(lips * 0.9 + inner * 0.08, lips * 0.3 + inner * 0.02, lips * 0.4 + inner * 0.05)
+  # teeth when the mouth is spread
+  teeth = inner * step(0.6, wide) * step(0.55, fract(u * 9)) * step(v - 0.15, mh * 0.5) * step(mh * 0.25, v - 0.15)
+  cadd(teeth * 0.8, teeth * 0.8, teeth * 0.75)
+  # vowel letter top-left, choir level as a bar at the right
+  i = floor(vv + 0.5)
+  lx = (u + 0.95 * aspect) / 0.5
+  ly = (0.92 - v) / 0.5
+  letter = glyph(str(vowels, i), lx, ly) * step(0, lx) * step(lx, 1) * step(0, ly) * step(ly, 1)
+  cadd(letter, letter * 0.9, letter * 0.7)
+  cprev(x, y + 0.002, 0.35)
+}
+post {
+  g = tap(-1, 0) + tap(1, 0) + tap(0, -1) + tap(0, 1)
+  bl = g * 0.25
+  rgb(cget(0) + bl * 0.25, cget(1) + bl * 0.25, cget(2) + bl * 0.3)
+  d = len(u, v)
+  cmul(1 - 0.3 * d * d)
+}

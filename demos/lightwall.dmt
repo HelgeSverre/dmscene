@@ -1,0 +1,321 @@
+# lightwall.dmt - Tron. Three light cycles ride the grid on 16th notes and leave walls of light behind them.
+# The walls persist in the feedback buffer, re-projected through the moving camera every frame.
+title LIGHTWALL
+song bpm=100 speed=6 rpb=4 channels=7 loop=0 volume=0.6
+order 0 0 1 1 2 2 3 3 4 2 3 3
+
+inst kick {
+  f = 42 + 320 * exp(-t * 22)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 4) * 2, 1.6) * 0.85)
+}
+inst snare {
+  n = svf(noise(), 1800 + 2500 * exp(-t * 18), 0.35)
+  n = n + r1 * 0.7
+  out((n * exp(-t * 9) + sin(tau * 160 * t) * exp(-t * 28) * 0.6) * 0.55)
+}
+inst hat {
+  out(hp(noise(), 8000) * exp(-t * (55 - 25 * vel)) * 0.18)
+}
+inst pulse {
+  # the grid pulse: 8th-note sub pluck
+  e = env(0.002, 0.16, 0.0, 0.05)
+  s = sqr(ph, 0.5) * 0.5 + sin(ph * tau) * 0.8 + sin(ph * tau * 2) * 0.2 * e
+  s = svf(s, 180 + 900 * e, 0.3)
+  out(s * e * 0.6)
+}
+inst brass {
+  # massive unison brass, slow swell, bandpass bite
+  e = env(0.09, 0.5, 0.8, 0.35)
+  f = freq * (1 + 0.003 * sin(t * 5) * min(t, 1))
+  s = usaw(f, 0.22) + usaw(f * 0.5, 0.14) * 0.6
+  s = svf(s, 350 + 1400 * e + 600 * p0, 0.3)
+  s = s + r2 * 0.8
+  out(dist(s * 0.6, 1.3) * e * 0.3)
+}
+inst arp {
+  # derezzed: driven saw, chopped
+  e = env(0.001, 0.12, 0.0, 0.04)
+  s = saw(ph) + saw(ph * 1.005) + sqr(ph * 0.5, 0.5) * 0.4
+  s = dist(s * 2, 2.5)
+  s = svf(s, 500 + 3000 * e * (0.5 + p0), 0.45)
+  out(s * e * 0.3)
+}
+inst lead {
+  e = env(0.05, 0.4, 0.75, 0.5)
+  vib = 1 + 0.005 * sin(t * 5) * min(t * 1.5, 1)
+  f = freq * vib
+  $p = $p + f / sr
+  s = sqr($p, 0.5 + 0.3 * sin(t * 1.5)) + saw($p * 2 + 0.2) * 0.3 + sqr($p * 0.5, 0.5) * 0.4
+  s = svf(s, 700 + 2200 * e, 0.3)
+  out(dist(s, 1.2) * e * 0.28)
+}
+
+master {
+  wl = verb(l, 0.86, 0.35)
+  wr = verb(r, 0.86, 0.35)
+  dl = dly(l, 0.45, 0.35)
+  dr = dly(r, 0.3, 0.35)
+  out(dist(l + wl * 0.35 + dr * 0.15, 1.15), dist(r + wr * 0.35 + dl * 0.15, 1.15))
+}
+
+# channels: 0 kick  1 snare/hat  2 pulse  3 brass low  4 brass high  5 arp  6 lead
+pattern 0 rows=16 {
+  # the grid: pulses and a low brass drone
+  . | . | C-2 4 36 | C-2 5 30 S00 | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 30 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 36 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 30 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 36 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 30 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | C-2 4 36 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+  . | . | G-1 4 30 | .            | . | . | .
+  . | . | .        | .            | . | . | .
+}
+pattern 1 rows=16 {
+  # drums, brass chord Cm
+  C-2 1 40 | .        | C-2 4 36 | C-2 5 34 S40 | G-2 5 28 | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | C-6 3 22 | C-2 4 30 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | D-5 2 38 | C-2 4 36 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | C-6 3 22 | C-2 4 30 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  C-2 1 40 | .        | C-2 4 36 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | C-6 3 22 | C-2 4 30 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | D-5 2 38 | C-2 4 36 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+  .        | C-6 3 22 | G-1 4 30 | .            | .        | . | .
+  .        | .        | .        | .            | .        | . | .
+}
+pattern 2 rows=16 {
+  # arp in: Cm -> Ab
+  C-2 1 40 | .        | C-2 4 36 | C-2 5 34 S70 | G-2 5 28 | C-4 6 32 S40 | .
+  .        | .        | .        | .            | .        | D#4 6 26    | .
+  .        | C-6 3 22 | C-2 4 30 | .            | .        | G-4 6 30    | .
+  .        | .        | .        | .            | .        | C-5 6 26    | .
+  .        | D-5 2 38 | C-2 4 36 | .            | .        | G-4 6 30    | .
+  .        | .        | .        | .            | .        | D#4 6 26    | .
+  .        | C-6 3 22 | C-2 4 30 | .            | .        | C-4 6 30    | .
+  .        | .        | .        | .            | .        | D#4 6 26    | .
+  C-2 1 40 | .        | G#1 4 36 | G#1 5 34     | D#2 5 28 | G#3 6 32    | .
+  .        | .        | .        | .            | .        | C-4 6 26    | .
+  .        | C-6 3 22 | G#1 4 30 | .            | .        | D#4 6 30    | .
+  .        | .        | .        | .            | .        | G#4 6 26    | .
+  .        | D-5 2 38 | G#1 4 36 | .            | .        | D#4 6 30    | .
+  .        | .        | .        | .            | .        | C-4 6 26    | .
+  .        | C-6 3 22 | G#1 4 30 | .            | .        | G#3 6 30    | .
+  .        | C-6 3 16 | .        | .            | .        | C-4 6 26    | .
+}
+pattern 3 rows=16 {
+  # lead over Fm -> G
+  C-2 1 40 | .        | F-1 4 36 | F-1 5 34 SA0 | C-2 5 28 | F-3 6 32 S80 | C-5 7 32
+  .        | .        | .        | .            | .        | G#3 6 26    | .
+  .        | C-6 3 22 | F-1 4 30 | .            | .        | C-4 6 30    | .
+  .        | .        | .        | .            | .        | F-4 6 26    | .
+  .        | D-5 2 38 | F-1 4 36 | .            | .        | C-4 6 30    | D#5 7 30
+  .        | .        | .        | .            | .        | G#3 6 26    | .
+  .        | C-6 3 22 | F-1 4 30 | .            | .        | F-3 6 30    | .
+  .        | .        | .        | .            | .        | G#3 6 26    | D-5 7 30
+  C-2 1 40 | .        | G-1 4 36 | G-1 5 34     | D-2 5 28 | G-3 6 32    | .
+  .        | .        | .        | .            | .        | B-3 6 26    | .
+  .        | C-6 3 22 | G-1 4 30 | .            | .        | D-4 6 30    | C-5 7 30
+  .        | .        | .        | .            | .        | G-4 6 26    | .
+  .        | D-5 2 38 | G-1 4 36 | .            | .        | D-4 6 30    | G-4 7 28
+  .        | .        | .        | .            | .        | B-3 6 26    | .
+  .        | C-6 3 22 | G-1 4 30 | .            | .        | G-3 6 30    | .
+  .        | D-5 2 24 | .        | .            | .        | B-3 6 26    | B-4 7 30 44A
+}
+pattern 4 rows=16 {
+  # break: drums out, brass swells, arp runs on
+  . | . | C-2 4 30 | C-2 5 38 SFF | G-2 5 32 | C-4 6 28 SC0 | C-5 7 30
+  . | . | .        | .            | .        | D#4 6 24    | .
+  . | . | .        | .            | .        | G-4 6 28    | .
+  . | . | .        | .            | .        | C-5 6 24    | .
+  . | . | C-2 4 30 | .            | .        | G-4 6 28    | .
+  . | . | .        | .            | .        | D#4 6 24    | .
+  . | . | .        | .            | .        | C-4 6 28    | .
+  . | . | .        | .            | .        | D#4 6 24    | .
+  . | . | G#1 4 30 | G#1 5 38     | D#2 5 32 | G#3 6 28    | G#4 7 30
+  . | . | .        | .            | .        | C-4 6 24    | .
+  . | . | .        | .            | .        | D#4 6 28    | .
+  . | . | .        | .            | .        | G#4 6 24    | .
+  . | . | G#1 4 30 | .            | .        | D#4 6 28    | .
+  . | . | .        | .            | .        | C-4 6 24    | .
+  . | . | .        | .            | .        | G#3 6 28    | .
+  . | . | .        | .            | .        | C-4 6 24    | off
+}
+
+fn segd(px, py, ax, ay, bx, by) {
+  dx = bx - ax
+  dy = by - ay
+  tt = clamp(((px - ax) * dx + (py - ay) * dy) / max(dx * dx + dy * dy, 0.000001), 0, 1)
+  return len(px - ax - dx * tt, py - ay - dy * tt)
+}
+
+uniform camx camy zoom pcamx pcamy pzoom reset flash kickE snE arpE
+uniform b1x b1y b1px b1py b2x b2y b2px b2py b3x b3y b3px b3py
+
+frame {
+  kickE = exp(-trig(0) * 6)
+  snE = exp(-trig(1) * 8) * step(0.5, vel(1))
+  arpE = exp(-trig(5) * 10)
+  # camera: publish last frame's transform so the pixel program can re-project the wall buffer
+  pcamx = camx
+  pcamy = camy
+  pzoom = zoom
+  camx = 0.25 * sin(beat * 0.07)
+  camy = 0.18 * cos(beat * 0.05)
+  zoom = 0.88 + 0.06 * sin(beat * 0.11) + 0.04 * kickE
+  # arena reset every 8 bars: walls flash and vanish
+  rb = floor(bar / 8)
+  flash = step(0.5, abs(rb - $rb))                 # frame 1: walls erased, screen flashes
+  reset = max(flash, $pf)                          # frame 2: the flash itself is erased
+  $pf = flash
+  $rb = rb
+  # bikes advance one cell per 16th note; decide turns at cell boundaries
+  n = floor(beat * 4)
+  f = fract(beat * 4)
+  stepn = step(0.5, abs(n - $n))
+  $n = n
+  # --- bike 1
+  $x1 = $x1 + $dx1 * stepn
+  $y1 = $y1 + $dy1 * stepn
+  init = 1 - step(0.5, $i1)
+  $dx1 = mix($dx1, 1, init)
+  $x1 = mix($x1, -8, init)
+  $y1 = mix($y1, -4, init)
+  $i1 = 1
+  ax1 = $x1 + $dx1 * 2
+  ay1 = $y1 + $dy1 * 2
+  oob = max(step(11.5, abs(ax1)), step(7.5, abs(ay1)))
+  r = hash(n * 1.31 + 7.7)
+  want = max(step(r, 0.16), oob) * stepn
+  lx = -$dy1
+  ly = $dx1
+  rx = $dy1
+  ry = -$dx1
+  toL = lx * -$x1 + ly * -$y1
+  toR = rx * -$x1 + ry * -$y1
+  goL = mix(step(0.5, hash(n * 2.17 + 1.1)), step(toR, toL), oob)
+  ndx = mix(rx, lx, goL)
+  ndy = mix(ry, ly, goL)
+  $dx1 = mix($dx1, ndx, want)
+  $dy1 = mix($dy1, ndy, want)
+  b1px = b1x
+  b1py = b1y
+  b1x = ($x1 + $dx1 * f) * 0.12
+  b1y = ($y1 + $dy1 * f) * 0.12
+  b1px = mix(b1px, b1x, init)
+  b1py = mix(b1py, b1y, init)
+  # --- bike 2
+  $x2 = $x2 + $dx2 * stepn
+  $y2 = $y2 + $dy2 * stepn
+  init = 1 - step(0.5, $i2)
+  $dx2 = mix($dx2, -1, init)
+  $x2 = mix($x2, 8, init)
+  $y2 = mix($y2, 4, init)
+  $i2 = 1
+  ax1 = $x2 + $dx2 * 2
+  ay1 = $y2 + $dy2 * 2
+  oob = max(step(11.5, abs(ax1)), step(7.5, abs(ay1)))
+  r = hash(n * 1.71 + 3.3)
+  want = max(step(r, 0.16), oob) * stepn
+  lx = -$dy2
+  ly = $dx2
+  rx = $dy2
+  ry = -$dx2
+  toL = lx * -$x2 + ly * -$y2
+  toR = rx * -$x2 + ry * -$y2
+  goL = mix(step(0.5, hash(n * 2.71 + 5.1)), step(toR, toL), oob)
+  ndx = mix(rx, lx, goL)
+  ndy = mix(ry, ly, goL)
+  $dx2 = mix($dx2, ndx, want)
+  $dy2 = mix($dy2, ndy, want)
+  b2px = b2x
+  b2py = b2y
+  b2x = ($x2 + $dx2 * f) * 0.12
+  b2y = ($y2 + $dy2 * f) * 0.12
+  b2px = mix(b2px, b2x, init)
+  b2py = mix(b2py, b2y, init)
+  # --- bike 3
+  $x3 = $x3 + $dx3 * stepn
+  $y3 = $y3 + $dy3 * stepn
+  init = 1 - step(0.5, $i3)
+  $dy3 = mix($dy3, 1, init)
+  $x3 = mix($x3, 0, init)
+  $y3 = mix($y3, -6, init)
+  $i3 = 1
+  ax1 = $x3 + $dx3 * 2
+  ay1 = $y3 + $dy3 * 2
+  oob = max(step(11.5, abs(ax1)), step(7.5, abs(ay1)))
+  r = hash(n * 1.13 + 9.9)
+  want = max(step(r, 0.16), oob) * stepn
+  lx = -$dy3
+  ly = $dx3
+  rx = $dy3
+  ry = -$dx3
+  toL = lx * -$x3 + ly * -$y3
+  toR = rx * -$x3 + ry * -$y3
+  goL = mix(step(0.5, hash(n * 3.37 + 2.2)), step(toR, toL), oob)
+  ndx = mix(rx, lx, goL)
+  ndy = mix(ry, ly, goL)
+  $dx3 = mix($dx3, ndx, want)
+  $dy3 = mix($dy3, ndy, want)
+  b3px = b3x
+  b3py = b3y
+  b3x = ($x3 + $dx3 * f) * 0.12
+  b3y = ($y3 + $dy3 * f) * 0.12
+  b3px = mix(b3px, b3x, init)
+  b3py = mix(b3py, b3y, init)
+}
+pixel {
+  tiltk = 0.72                                     # 3/4 view: squash world y
+  wx = camx + u / zoom
+  wy = camy + v / (zoom * tiltk)
+  # floor: faint grid in world space, arena border
+  gx = abs(fract(wx / 0.12 + 0.5) - 0.5) * 0.12
+  gy = abs(fract(wy / 0.12 + 0.5) - 0.5) * 0.12
+  grid = exp(-min(gx, gy) * 400) * 0.18
+  bx = max(abs(wx) - 1.44, abs(wy) - 0.96)
+  border = exp(-abs(bx) * 60) * (0.6 + 0.4 * kickE)
+  inArena = step(bx, 0)
+  cr = 0.01 + grid * 0.3 + border * 0.6
+  cg = 0.02 + grid * 0.6 + border * 0.9
+  cb = 0.04 + grid * 1.0 + border * 1.0
+  rgb(cr * (0.4 + 0.6 * inArena), cg * (0.4 + 0.6 * inArena), cb * (0.4 + 0.6 * inArena))
+  # walls: pull in the previous frame, re-projected through last frame's camera
+  pu = (wx - pcamx) * pzoom
+  pv = (wy - pcamy) * pzoom * tiltk
+  sx = 0.5 + pu / (2 * aspect)
+  sy = 0.5 - pv / 2
+  keep = 0.982 * (1 - reset) * step(0, sx) * step(sx, 1) * step(0, sy) * step(sy, 1)
+  cprev(sx, sy, keep)
+  # bikes: segment from last position to this one; walls are written once at full brightness
+  # and then only retained by the feedback (max, not add, so nothing accumulates)
+  d1 = segd(wx, wy, b1px, b1py, b1x, b1y)
+  d2 = segd(wx, wy, b2px, b2py, b2x, b2y)
+  d3 = segd(wx, wy, b3px, b3py, b3x, b3y)
+  w1 = exp(-max(d1 - 0.011, 0) * 260)
+  w2 = exp(-max(d2 - 0.011, 0) * 260)
+  w3 = exp(-max(d3 - 0.011, 0) * 260)
+  h1 = exp(-len(wx - b1x, wy - b1y) * 40) * (0.6 + arpE + snE)
+  h2 = exp(-len(wx - b2x, wy - b2y) * 40) * (0.6 + arpE + snE)
+  h3 = exp(-len(wx - b3x, wy - b3y) * 40) * (0.6 + arpE + snE)
+  lr = w1 * 1.0 + h1 * 1.0 + w2 * 0.15 + h2 * 0.4 + w3 * 0.95 + h3 * 1.0
+  lg = w1 * 0.45 + h1 * 0.7 + w2 * 0.85 + h2 * 1.0 + w3 * 0.95 + h3 * 1.0
+  lb = w1 * 0.05 + h1 * 0.3 + w2 * 1.0 + h2 * 1.2 + w3 * 0.3 + h3 * 0.5
+  rgb(max(cget(0), lr), max(cget(1), lg), max(cget(2), lb))
+  # reset flash (erased next frame by the two-frame reset)
+  cadd(flash * 0.7, flash * 0.8, flash * 0.9)
+}

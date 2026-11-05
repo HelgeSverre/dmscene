@@ -1,0 +1,139 @@
+# kaleido.dmt - chiptune arps over a kaleidoscopic IFS
+title KALEIDO
+song bpm=150 speed=6 rpb=4 channels=4 loop=0 volume=0.68
+order 0 1 0 1 2 3 2 3
+
+inst lead {
+  e  = env(0.002, 0.3, 0.3, 0.06)
+  pw = 0.5 - 0.25 * sin(t * 7)
+  s  = sqr(ph, pw)
+  out(crush(s * e, 24) * 0.33)
+}
+inst harm {
+  e = env(0.004, 0.25, 0.25, 0.08)
+  out(sqr(ph, 0.25) * e * 0.22)
+}
+inst tri {
+  e = env(0.002, 0.1, 0.8, 0.05)
+  out(crush(tri(ph), 16) * e * 0.5)
+}
+inst nkick {
+  f = 60 + 900 * exp(-t * 60)
+  $p = $p + f / sr
+  out((sqr($p, 0.5) * exp(-t * 14) + noise() * exp(-t * 70) * 0.5) * 0.55)
+}
+inst nsnare {
+  out((crush(noise(), 6) * exp(-t * 18) + tri(t * 220) * exp(-t * 40) * 0.5) * 0.5)
+}
+inst nhat {
+  out(crush(hp(noise(), 7000), 4) * exp(-t * 60) * 0.3)
+}
+
+master {
+  out(dist(l, 1.1), dist(r, 1.1))
+}
+
+# channels: 0 lead  1 harmony  2 tri bass  3 noise drums
+pattern 0 rows=16 {
+  A-4 1 38 037 | A-3 2 20 037 | A-1 3 40 | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  .            | .            | A-2 3 .  | C-6 6 14
+  .            | .            | A-1 3 .  | C-6 6 20
+  C-5 1 34 034 | .            | .        | C-4 5 36
+  .            | .            | A-2 3 .  | C-6 6 14
+  E-5 1 36 035 | E-3 2 20 035 | A-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  A-4 1 38 037 | .            | A-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 14
+  G-4 1 34 047 | F-3 2 20 047 | F-1 3 .  | C-6 6 20
+  .            | .            | F-2 3 .  | C-6 6 14
+  F-4 1 36 047 | .            | F-1 3 .  | C-4 5 36
+  .            | .            | .        | C-6 6 20
+  E-4 1 36 038 | G-3 2 20 047 | G-1 3 .  | C-6 6 14
+  .            | .            | G-2 3 .  | C-4 5 20
+}
+pattern 1 rows=16 {
+  A-4 1 38 037 | A-3 2 20 037 | A-1 3 40 | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  A-5 1 30 037 | .            | A-2 3 .  | C-6 6 14
+  .            | .            | A-1 3 .  | C-6 6 20
+  E-5 1 34 034 | .            | .        | C-4 5 36
+  D-5 1 30     | .            | A-2 3 .  | C-6 6 14
+  C-5 1 36 035 | E-3 2 20 035 | A-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  D-5 1 38 037 | D-3 2 20 037 | D-2 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 14
+  E-5 1 34 047 | .            | D-1 3 .  | C-6 6 20
+  .            | .            | D-2 3 .  | C-6 6 14
+  G-5 1 36 047 | G-3 2 20 047 | G-1 3 .  | C-4 5 36
+  .            | .            | .        | C-6 6 20
+  E-5 1 36 038 | E-3 2 20 038 | E-1 3 .  | C-6 6 14
+  D-5 1 30     | .            | E-2 3 .  | C-4 5 30
+}
+pattern 2 rows=16 {
+  F-4 1 38 047 | F-3 2 20 047 | F-1 3 40 | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  .            | .            | F-2 3 .  | C-6 6 14
+  A-4 1 34     | .            | F-1 3 .  | C-6 6 20
+  C-5 1 36 047 | .            | .        | C-4 5 36
+  .            | .            | F-2 3 .  | C-6 6 14
+  F-5 1 36 047 | A-3 2 20 047 | F-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  G-4 1 38 047 | G-3 2 20 047 | G-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 14
+  .            | .            | G-2 3 .  | C-6 6 20
+  B-4 1 34     | .            | G-1 3 .  | C-6 6 14
+  D-5 1 36 047 | .            | .        | C-4 5 36
+  .            | .            | G-2 3 .  | C-6 6 20
+  G-5 1 36 047 | B-3 2 20 047 | G-1 3 .  | C-6 6 14
+  .            | .            | G-2 3 .  | C-4 5 20
+}
+pattern 3 rows=16 {
+  E-4 1 38 038 | E-3 2 20 038 | E-1 3 40 | C-3 4 40
+  .            | .            | .        | C-6 6 20
+  G#4 1 34     | .            | E-2 3 .  | C-6 6 14
+  B-4 1 34     | .            | E-1 3 .  | C-6 6 20
+  E-5 1 36 038 | .            | .        | C-4 5 36
+  .            | .            | E-2 3 .  | C-6 6 14
+  D-5 1 36 037 | G#3 2 20 038 | E-1 3 .  | C-3 4 40
+  B-4 1 30     | .            | .        | C-6 6 20
+  A-4 1 38 037 | A-3 2 20 037 | A-1 3 .  | C-3 4 40
+  .            | .            | .        | C-6 6 14
+  C-5 1 34     | .            | A-2 3 .  | C-4 5 20
+  E-5 1 34     | .            | A-1 3 .  | C-4 5 24
+  A-5 1 38 037 | C-4 2 20 037 | A-2 3 .  | C-4 5 30
+  .            | .            | .        | C-4 5 34
+  G-5 1 34 047 | .            | A-1 3 .  | C-4 5 38
+  E-5 1 34 047 | E-3 2 20     | E-2 3 .  | C-4 5 40
+}
+
+uniform kx ky spin hue flash zoom sides
+
+frame {
+  k = exp(-trig(3) * 8)
+  flash = k * step(0.5, vel(3))
+  ld = exp(-trig(0) * 5)
+  kx = 0.78 + 0.2 * sin(beat * 0.09) + ld * 0.03
+  ky = 0.8 + 0.28 * cos(beat * 0.07)
+  spin = beat * 0.06 + sin(beat * 0.13) * 0.5
+  hue = bar * 0.11 + ld * 0.08
+  zoom = 0.9 + 0.2 * sin(beat * 0.25 * pi) + flash * 0.15
+  sides = 3 + floor(fract(lbeat / llen) * 4) * 2        # 3,5,7,9-fold over the loop
+}
+pixel {
+  # polar kaleidoscope
+  rr = polar(u, v)
+  a  = r1 + spin
+  seg = tau / sides
+  a  = abs(fract(a / seg + 0.5) - 0.5) * seg
+  px = cos(a) * rr * zoom
+  py = sin(a) * rr * zoom
+  m  = kali(px, py, kx, ky, 7)
+  avg = r1
+  v1 = 1 - smooth(0, 0.5, m)
+  hsv(hue + avg * 0.3 + m * 0.2, 0.8, v1 * 0.9 + 0.1)
+  g = exp(-m * 10) * (0.3 + 0.9 * flash)
+  cadd(g, g * 0.8, g)
+  cmul(1 - 0.3 * rr * rr)
+  cprev(x, y, 0.2)
+}

@@ -1,0 +1,138 @@
+# feedback.dmt - dub at 75 bpm; a tiny julia seed smeared through a rotating zoom feedback loop
+title FEEDBACK
+song bpm=75 speed=6 rpb=4 channels=5 loop=0 volume=0.48
+order 0 1 0 2
+
+palette dub {
+  0.00 0.00 0.00 0.00
+  0.30 0.00 0.20 0.30
+  0.55 0.90 0.60 0.00
+  0.75 1.00 0.10 0.10
+  1.00 0.00 0.00 0.00
+}
+
+inst kick808 {
+  f = 42 + 300 * exp(-t * 25)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 2.5) * 2, 1.3) * 0.85)
+}
+inst rim {
+  out((sin(tau * 1700 * t) * exp(-t * 90) + hp(noise(), 3000) * exp(-t * 150)) * 0.5)
+}
+inst skank {
+  e = env(0.002, 0.09, 0.0, 0.05)
+  s = sqr(ph, 0.5) + sqr(ph * 1.26, 0.5) + sqr(ph * 1.5, 0.5)
+  s = svf(s, 600 + 2000 * e, 0.3)
+  out(s * e * 0.14)
+}
+inst sub {
+  e = env(0.02, 0.3, 0.8, 0.4)
+  out(sin(ph * tau) * e * 0.7)
+}
+inst melodica {
+  e = env(0.05, 0.3, 0.6, 0.3)
+  s = saw(ph) * 0.5 + sqr(ph, 0.3) * 0.5
+  s = svf(s, 900 + 500 * sin(t * 5), 0.4)
+  out(s * e * 0.22)
+}
+
+master {
+  dl = dly(l, 0.6, 0.6)
+  dr = dly(r, 0.4, 0.6)
+  dl = svf(dl, 1800, 0.3)
+  dr = svf(dr, 1400, 0.3)
+  out(dist(l + dr * 0.5, 1.1), dist(r + dl * 0.5, 1.1))
+}
+
+# channels: 0 kick  1 rim  2 skank  3 sub  4 melodica
+pattern 0 rows=16 {
+  C-2 1 40 | .        | .        | A-1 4 40 | .
+  .        | .        | .        | .        | .
+  .        | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | .        | .
+  .        | .        | .        | .        | .
+  .        | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  C-2 1 40 | .        | .        | .        | .
+  .        | .        | .        | .        | .
+  C-2 1 30 | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | G-1 4 .  | .
+  .        | .        | .        | .        | .
+  .        | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | .        | F-1 4 40 | A-4 5 30
+  .        | .        | .        | .        | .
+  .        | .        | F-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | .        | C-5 5 28
+  .        | .        | .        | .        | .
+  .        | .        | F-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  C-2 1 40 | .        | .        | .        | E-5 5 30
+  .        | .        | .        | .        | .
+  .        | .        | G-3 3 30 | G-1 4 .  | .
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | .        | D-5 5 26
+  .        | D-5 2 20 | .        | .        | .
+  .        | .        | G-3 3 30 | .        | .
+  .        | D-5 2 28 | .        | .        | B-4 5 20
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | .        | A-1 4 40 | C-5 5 30
+  .        | .        | .        | .        | .
+  .        | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | .        | A-4 5 28
+  .        | .        | .        | .        | .
+  .        | .        | A-3 3 30 | .        | .
+  .        | .        | .        | .        | .
+  C-2 1 40 | .        | .        | .        | .
+  .        | .        | .        | .        | .
+  .        | .        | E-3 3 30 | E-1 4 .  | G-4 5 26
+  .        | .        | .        | .        | .
+  .        | D-5 2 36 | .        | .        | .
+  .        | .        | .        | .        | .
+  .        | .        | E-3 3 30 | .        | E-4 5 24
+  .        | D-5 2 36 | .        | .        | .
+}
+
+uniform cx cy kickE rimE sk hue seedR
+
+frame {
+  kickE = exp(-trig(0) * 4)
+  rimE = exp(-trig(1) * 10)
+  sk = exp(-trig(2) * 12)
+  a = beat * 0.08 * tau
+  cx = 0.7885 * cos(a)
+  cy = 0.7885 * sin(a)
+  hue = beat * 0.02
+  seedR = 0.22 + 0.06 * kickE
+}
+pixel {
+  # feedback: sample the previous frame rotated and zoomed around the centre
+  ang = 0.04 + 0.03 * sk
+  zm  = 1.035 + 0.02 * kickE
+  fx = rot((x - 0.5) * aspect, y - 0.5, ang)
+  fy = r1
+  sx = 0.5 + fx / zm / aspect
+  sy = 0.5 + fy / zm
+  pr = prev(sx, sy)
+  pg = r1
+  pb = r2
+  # slow hue rotation of the trail: rotate rgb components a little
+  rgb(pr * 0.962 + pb * 0.012, pg * 0.958 + pr * 0.012, pb * 0.96 + pg * 0.012)
+  # seed: small julia in a disc near the centre
+  rr = len(u, v)
+  disc = 1 - smooth(seedR * 0.8, seedR, rr)
+  zx = u / seedR * 1.5
+  zy = v / seedR * 1.5
+  it = julia(zx, zy, cx, cy, 40)
+  k = it / 40
+  trap = r1
+  bright = (0.3 + 1.6 * k * k) * (1 - step(1, k)) + exp(-trap * 8) * rimE * 1.5
+  mixpal(dub, k * 1.5 + hue, disc * bright)
+}

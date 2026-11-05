@@ -1,0 +1,15 @@
+# build output
+build/
+/dm
+/dmc
+/dmplay
+*.o
+*.dms
+# rendered output anywhere except the shipped sample assets
+*.mp4
+*.png
+*.wav
+!demos/assets/*.wav
+!tests/assets/*.wav
+# os
+.DS_Store

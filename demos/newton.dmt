@@ -1,0 +1,123 @@
+# newton.dmt - slow ambient over a Newton fractal's three basins
+title NEWTON
+song bpm=90 speed=6 rpb=4 channels=4 loop=0 volume=0.72
+order 0 1 2 1
+
+palette basin {
+  0.00 0.95 0.35 0.10
+  0.33 0.95 0.35 0.10
+  0.34 0.10 0.70 0.95
+  0.66 0.10 0.70 0.95
+  0.67 0.80 0.95 0.30
+  1.00 0.80 0.95 0.30
+}
+
+inst pad {
+  e = env(0.8, 1.0, 0.8, 1.5)
+  a = sin(ph * tau + 0.9 * sin(ph * tau * 0.5 + t * 0.3))
+  b = saw(ph + 0.0018 * t) * 0.4 + saw(ph - 0.0014 * t) * 0.4 + tri(ph * 2.002) * 0.3
+  s = svf(a + b, 300 + 600 * e + 200 * sin(t * 0.9), 0.2)
+  out(s * e * 0.3)
+}
+inst bell {
+  e = exp(-t * 1.8)
+  m = sin(ph * tau * 3.5) * 1.8 * exp(-t * 3)
+  s = sin(ph * tau + m) + sin(ph * tau * 2 + m * 0.5) * 0.3
+  out(s * e * 0.28)
+}
+inst sub {
+  e = env(0.05, 0.4, 0.7, 0.8)
+  out(sin(ph * tau) * e * 0.6 + sin(ph * tau * 2) * e * 0.1)
+}
+inst air {
+  e = env(1.5, 1.0, 0.6, 2.0)
+  out(svf(noise(), 1500 + 1000 * sin(t * 0.5), 0.9) * e * 0.08)
+}
+
+master {
+  dl = dly(l, 0.6667, 0.55)
+  dr = dly(r, 0.5, 0.55)
+  out(dist(l + dr * 0.45, 1.1), dist(r + dl * 0.45, 1.1))
+}
+
+# channels: 0 pad  1 bell  2 sub  3 air
+pattern 0 rows=16 {
+  A-3 1 30 | .        | A-1 3 40 | A-4 4 30
+  .        | .        | .        | .
+  .        | E-5 2 26 | .        | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+  .        | A-5 2 20 | .        | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+  E-3 1 30 | .        | .        | .
+  .        | B-5 2 22 | .        | .
+  .        | .        | .        | .
+  .        | .        | E-1 3 .  | .
+  .        | .        | .        | .
+  .        | G#5 2 18 | .        | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+}
+pattern 1 rows=16 {
+  F-3 1 30 | .        | F-1 3 40 | .
+  .        | .        | .        | .
+  .        | C-6 2 26 | .        | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+  .        | A-5 2 20 | .        | .
+  .        | F-5 2 16 | .        | .
+  .        | .        | .        | .
+  G-3 1 30 | .        | .        | .
+  .        | D-6 2 22 | .        | .
+  .        | .        | .        | .
+  .        | .        | G-1 3 .  | .
+  .        | B-5 2 18 | .        | .
+  .        | .        | .        | .
+  .        | G-5 2 14 | .        | .
+  .        | .        | .        | .
+}
+pattern 2 rows=16 {
+  D-3 1 30 | .        | D-1 3 40 | D-4 4 30
+  .        | .        | .        | .
+  .        | A-5 2 26 | .        | .
+  .        | .        | .        | .
+  .        | F-5 2 18 | .        | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+  .        | D-6 2 22 | .        | .
+  E-3 1 30 | .        | .        | .
+  .        | .        | .        | .
+  .        | B-5 2 22 | E-1 3 .  | .
+  .        | .        | .        | .
+  .        | .        | .        | .
+  .        | G#5 2 18 | .        | .
+  .        | E-5 2 14 | .        | .
+  .        | .        | .        | .
+}
+
+uniform ang zoom bellE hue cx cy
+
+frame {
+  bellE = exp(-trig(1) * 3)
+  ang = beat * 0.02 + sin(beat * 0.05) * 0.3
+  zoom = 1.6 + 0.6 * sin(beat * 0.03) + bellE * 0.05
+  hue = beat * 0.004
+  cx = 0.3 * sin(beat * 0.021)
+  cy = 0.3 * cos(beat * 0.017)
+}
+pixel {
+  px = rot(u, v, ang) * zoom + cx
+  py = r1 * zoom + cy
+  root = newton(px, py, 40)
+  it = r1
+  d = r2
+  shade = exp(-it * 0.12)
+  pal(basin, root / 3 + 0.05 + hue)
+  edge = 1 - exp(-d * 6)
+  cmul(0.2 + 0.8 * shade)
+  cmul(0.6 + 0.4 * sin(it * 0.8 + beat) ^ 2)
+  g = exp(-it * 0.35) * bellE
+  cadd(g * 0.6, g * 0.6, g * 0.6)
+  cprev(x, y, 0.55)
+}

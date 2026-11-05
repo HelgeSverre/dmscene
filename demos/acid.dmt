@@ -1,0 +1,135 @@
+# acid.dmt - 303 line over a breathing Mandelbrot with feedback trails
+title ACID
+song bpm=140 speed=6 rpb=4 channels=4 loop=0 volume=0.52
+order 0 0 1 1 0 2 1 2
+
+palette acid {
+  0.00 0.00 0.00 0.00
+  0.25 0.05 0.25 0.05
+  0.45 0.20 1.00 0.10
+  0.60 0.95 1.00 0.20
+  0.75 1.00 0.20 0.80
+  0.90 0.20 0.00 0.30
+  1.00 0.00 0.00 0.00
+}
+
+inst kick {
+  f  = 50 + 600 * exp(-t * 42)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 7) * 2.5, 1.6) * 0.8)
+}
+inst acid {
+  e   = env(0.002, 0.22, 0.0, 0.03)
+  acc = step(0.55, vel)                       # accented notes open the filter more
+  cut = 120 + (1200 + 4000 * p0) * e * (0.55 + 0.6 * acc)
+  s   = svf(saw(ph) + sqr(ph, 0.5) * 0.3, cut, 0.86)
+  out(dist(s * (1.2 + e * acc), 1.8) * 0.42)
+}
+inst hat {
+  n = hp(noise(), 9000)
+  out(n * exp(-t * (35 + 60 * (1 - vel))) * 0.3)
+}
+inst clap {
+  b = exp(-t * 60) + exp(-(t - 0.012) * 60) * step(0.012, t) + exp(-(t - 0.024) * 60) * step(0.024, t)
+  n = svf(noise(), 1800, 0.5)
+  out((r2 * 2.5 * b * 0.5 + n * exp(-t * 10) * 0.6) * 0.5)
+}
+inst stab {
+  e = env(0.002, 0.12, 0.0, 0.04)
+  s = saw(ph) + saw(ph * 1.5 + 0.1) * 0.6 + saw(ph * 2 + 0.3) * 0.4
+  s = svf(s, 600 + 2500 * e, 0.4)
+  out(s * e * 0.3)
+}
+
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.3214, 0.45)
+  d = hp(d, 300)
+  out(dist(l + d * 0.3, 1.3), dist(r + d * 0.3, 1.3))
+}
+
+# channels: 0 kick  1 acid  2 hats/clap  3 stab
+pattern 0 rows=16 {
+  C-2 1 40 | C-2 2 40 S20 | C-6 3 10 |
+  .        | .            | .        |
+  .        | C-2 . 28     | C-6 3 20 |
+  .        | .            | .        |
+  C-2 1 40 | C-3 . . 320  | D-5 4 30 |
+  .        | .            | .        |
+  .        | C-2 2 28     | C-6 3 20 |
+  .        | D#2 2 40     | .        |
+  C-2 1 40 | .            | C-6 3 10 |
+  .        | C-2 2 28     | .        |
+  .        | .            | C-6 3 20 |
+  .        | G-2 2 40 S60 | .        |
+  C-2 1 40 | C-2 . . 320  | D-5 4 30 |
+  .        | .            | .        |
+  .        | C-2 2 28     | C-6 3 20 |
+  .        | A#1 2 36     | C-6 3 14 |
+}
+pattern 1 rows=16 {
+  C-2 1 40 | C-2 2 40 S80 | C-6 3 10 | C-4 5 24
+  .        | C-2 2 28     | .        | .
+  .        | .            | C-6 3 20 | .
+  .        | C-3 2 40     | .        | .
+  C-2 1 40 | C-2 . . 318  | D-5 4 30 | .
+  .        | .            | .        | .
+  .        | D#2 2 28     | C-6 3 20 | D#4 5 24
+  .        | .            | .        | .
+  C-2 1 40 | C-2 2 40     | C-6 3 10 | .
+  .        | .            | .        | .
+  .        | F-2 2 28     | C-6 3 20 | F-4 5 24
+  .        | G-2 . . 310  | .        | .
+  C-2 1 40 | .            | D-5 4 30 | .
+  .        | C-2 2 28     | .        | .
+  .        | .            | C-6 3 20 | .
+  .        | G-1 2 40 SB0 | C-6 3 14 | G-3 5 20
+}
+pattern 2 rows=16 {
+  C-2 1 40 | C-2 2 40 SFF | C-6 3 10 | C-4 5 24
+  .        | .            | C-6 3 10 | .
+  C-2 1 30 | C-3 2 28     | C-6 3 20 | .
+  .        | .            | C-6 3 10 | .
+  C-2 1 40 | C-4 . . 330  | D-5 4 30 | .
+  .        | .            | C-6 3 10 | .
+  .        | A#2 2 28     | C-6 3 20 | A#3 5 24
+  C-2 1 30 | .            | C-6 3 10 | .
+  C-2 1 40 | C-2 2 40     | C-6 3 10 | .
+  .        | .            | C-6 3 10 | .
+  .        | G-2 2 28     | C-6 3 20 | G-3 5 24
+  .        | .            | C-6 3 10 | .
+  C-2 1 40 | C-2 . . 330  | D-5 4 30 | .
+  .        | .            | D-5 4 20 | .
+  C-2 1 30 | D#2 2 28     | C-6 3 20 | .
+  C-2 1 40 | C-2 2 40 S00 | D-5 4 36 | C-4 5 20
+}
+
+uniform zoom cx cy kickE acidE hue ang
+
+frame {
+  kickE = exp(-trig(0) * 9)
+  acidE = exp(-trig(1) * 6) * (0.4 + 0.6 * vel(1))
+  # breathe in and out of the seahorse valley over the loop
+  ph   = lbeat / llen
+  zoom = 2.2 + 1.8 * (0.5 - 0.5 * cos(ph * tau)) ^ 2 * 9 + kickE * 0.35
+  cx   = -0.745 + 0.01 * sin(beat * 0.17)
+  cy   =  0.186 + 0.008 * cos(beat * 0.13)
+  hue  = beat * 0.012 + acidE * 0.1
+  ang  = sin(beat * 0.05) * 0.4
+}
+pixel {
+  px = rot(u, v, ang)
+  py = r1
+  zx = cx + px / zoom
+  zy = cy + py / zoom
+  it = julia(0, 0, zx, zy, 96)          # julia(0,0,c) == mandelbrot at c
+  trap = r1
+  k = log(1 + it) / log(97)
+  inside = step(96, it)
+  pal(acid, k * 3 + hue)
+  cmul((0.1 + 1.4 * k * k) * (1 - inside) + inside * (0.02 + 0.3 * kickE * exp(-trap * 3)))
+  # acid line lights the orbit traps
+  g = exp(-trap * 8) * acidE * (1 - inside)
+  cadd(g * 0.3, g * 1.0, g * 0.2)
+  # feedback trails: pull the previous frame in toward the centre
+  cprev(0.5 + (x - 0.5) * 0.985, 0.5 + (y - 0.5) * 0.985, 0.45 + 0.25 * kickE)
+}

@@ -1,0 +1,412 @@
+# megademo.dmt - one of everything: sampled drums, NNA pad with a drawn envelope, chan reverb,
+# timeline-driven scene cuts, title + scroller text, a raymarched torus (repeat), feedback, post bloom/CRT.
+title MEGADEMO
+song bpm=125 speed=6 rpb=4 channels=6 loop=0 volume=0.62 scale=2 dither=1
+order 0 0 1 1 2 2 3 3 4 4 5 5 6 6 7
+pan 0.5 0.4 0.5 0.6 0.35 0.65
+
+text title "DMSCENE"
+text scroll "   GREETINGS TO EVERYONE WHO EVER TYPED A TRACKER PATTERN AT 3AM ... THIS IS ONE VM, FOUR PROGRAMS, A TRACKER AND SOME FRACTALS ... PRESS 1-6 TO MUTE CHANNELS ... "
+text credits "CODE + MUSIC + GFX : HELGE AND THE MACHINE   ::   THE END   ::   "
+
+sample kick "assets/kick.wav"
+sample snare "assets/snare.wav"
+sample hat "assets/hat.wav"
+sample ride "assets/ride.wav"
+
+venv padenv sustain=2 {
+  0.00 0
+  0.08 1
+  0.50 0.7
+  1.60 0
+}
+venv pluckenv {
+  0.000 0
+  0.004 1
+  0.120 0.35
+  0.400 0
+}
+
+palette sky {
+  0.00 0.02 0.00 0.08
+  0.35 0.40 0.05 0.50
+  0.60 1.00 0.35 0.20
+  0.80 1.00 0.90 0.50
+  1.00 0.02 0.00 0.08
+}
+
+timeline {
+  0:00 scene=0 glow=0.2 cam=0 twist=0 fog=1
+  1:08 glow=1
+  2:00 scene=1 glow=0.6 cam=0 twist=0
+  4:00 twist=1 cam=1
+  6:00 twist=2.5 cam=2 glow=1
+  8:00 scene=2 glow=0.3
+  9:08 glow=1.2
+  10:00 scene=1 twist=1.5 cam=3 glow=0.8
+  12:00 twist=0 cam=0
+  13:00 scene=3 glow=0.5
+  14:08 glow=0
+}
+
+# ------------------------------------------------------------------ instruments
+inst dkick {
+  out(smp(kick, t) * 0.95)
+}
+inst dsnare {
+  out(smp(snare, t) * 0.8)
+}
+inst dhat {
+  out(smp(hat, t * (1.2 - 0.4 * vel)) * 0.6)
+}
+inst dride {
+  out(smp(ride, t) * 0.5)
+}
+inst bass {
+  e = env(0.003, 0.18, 0.5, 0.08)
+  s = bsaw(ph, freq) + bsqr(ph, 0.5, freq * 0.5) * 0.4
+  s = svf(s, 180 + 2200 * e * (0.4 + p0), 0.45)
+  out(s * e * 0.5)
+}
+inst pad nna=continue {
+  e = venv(padenv)
+  s = usaw(freq, 0.18) + usaw(freq * 2.0, 0.12) * 0.25
+  s = svf(s, 400 + 900 * e + 300 * sin(t * 0.8), 0.2)
+  out(s * e * 0.22)
+}
+inst pluck nna=continue {
+  e = venv(pluckenv)
+  s = bsqr(ph, 0.25 + 0.2 * sin(t * 9), freq) + bsaw(ph * 2 + 0.3, freq * 2) * 0.4
+  s = svf(s, 500 + 6000 * e, 0.3)
+  out(fold(s * 0.6, 1 + mp0 * 2) * e * 0.3)
+}
+inst lead nna=continue {
+  e = env(0.02, 0.3, 0.7, 0.4)
+  vib = 1 + 0.005 * sin(t * 5.5) * min(t * 2, 1)
+  $p = $p + freq * vib / sr
+  s = bsaw($p, freq) + bsqr($p * 0.5, 0.5, freq * 0.5) * 0.5
+  s = svf(s, 700 + 2500 * e, 0.3)
+  out(dist(s, 1.3) * e * 0.3)
+}
+
+chan 3 {
+  # pad goes through its own hall
+  w = verb(x, 0.88, 0.35)
+  out(x * 0.7 + w * 0.6)
+}
+chan 4 {
+  # plucks: ping-pong-ish slap
+  d = dly(x, 0.36, 0.45)
+  out(x + d * 0.35)
+}
+master {
+  w = verb(l * 0.5 + r * 0.5, 0.75, 0.5)
+  out(dist(l + w * 0.12, 1.25), dist(r + w * 0.12, 1.25))
+}
+
+# channels: 0 kick  1 snare/hat/ride  2 bass  3 pad  4 pluck  5 lead
+pattern 0 rows=16 {
+  # intro: pad + plucks
+  . | .        | . | A-2 6 30 | A-4 7 26     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | C-5 7 22     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | E-5 7 26     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | A-5 7 20     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | F-2 6 30 | F-4 7 26     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | A-4 7 22     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | C-5 7 26     | .
+  . | .        | . | .        | .            | .
+  . | .        | . | .        | F-5 7 20     | .
+  . | .        | . | .        | .            | .
+}
+pattern 1 rows=16 {
+  # drums + bass in
+  C-4 1 40 | C-4 3 20 | A-1 5 40 S20 | A-2 6 30 | A-4 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | A-1 5 30     | .        | C-5 7 22 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | E-5 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | A-1 5 36     | .        | A-5 7 20 | .
+  .        | .        | A-2 5 30     | .        | .        | .
+  C-4 1 40 | C-4 3 20 | F-1 5 40     | F-2 6 30 | F-4 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | F-1 5 30     | .        | A-4 7 22 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | C-5 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | F-1 5 36     | .        | F-5 7 20 | .
+  .        | C-4 3 16 | G-1 5 30     | .        | .        | .
+}
+pattern 2 rows=16 {
+  # groove: ride, lead enters
+  C-4 1 40 | C-4 4 24 | A-1 5 40 S50 | A-2 6 30 | A-4 7 26 | A-4 8 30
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | A-1 5 30     | .        | C-5 7 22 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | E-5 7 26 | C-5 8 28
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | A-1 5 36     | .        | A-5 7 20 | .
+  C-4 1 30 | .        | A-2 5 30     | .        | .        | E-5 8 30
+  C-4 1 40 | C-4 4 24 | F-1 5 40     | F-2 6 30 | F-4 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | F-1 5 30     | .        | A-4 7 22 | D-5 8 28
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | C-5 7 26 | C-5 8 30
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | F-1 5 36     | .        | F-5 7 20 | .
+  .        | C-4 2 24 | G-1 5 30     | .        | .        | B-4 8 26
+}
+pattern 3 rows=16 {
+  # variation: C  G
+  C-4 1 40 | C-4 4 24 | C-2 5 40 S80 | C-3 6 30 | C-5 7 26 | E-5 8 30
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | C-2 5 30     | .        | E-5 7 22 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | G-5 7 26 | G-5 8 28
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | C-2 5 36     | .        | C-6 7 20 | .
+  C-4 1 30 | .        | C-3 5 30     | .        | .        | A-5 8 30
+  C-4 1 40 | C-4 4 24 | G-1 5 40     | G-2 6 30 | G-4 7 26 | .
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | G-1 5 30     | .        | B-4 7 22 | G-5 8 28
+  .        | .        | .            | .        | .        | .
+  .        | C-4 2 40 | .            | .        | D-5 7 26 | E-5 8 30
+  .        | .        | .            | .        | .        | .
+  .        | C-4 3 30 | G-1 5 36     | .        | G-5 7 20 | .
+  .        | C-4 2 24 | A-1 5 30     | .        | .        | D-5 8 26 44A
+}
+pattern 4 rows=16 {
+  # break: pad swells, pluck echoes, drums gone
+  . | .        | A-1 5 30 SFF | A-2 6 36 | A-4 7 26 | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | E-5 7 22 | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | A-5 7 24 | .
+  . | .        | .            | .        | .        | .
+  . | .        | F-1 5 30     | F-2 6 36 | F-4 7 26 | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | C-5 7 22 | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | .        | .
+  . | .        | .            | .        | F-5 7 24 | .
+  . | .        | .            | .        | .        | .
+}
+pattern 5 rows=16 {
+  # build: snare roll into the drop (E9 retrigger)
+  C-4 1 40 | .            | A-1 5 40 S40 | A-2 6 30 | A-4 7 26 | A-4 8 30
+  .        | .            | .            | .        | .        | .
+  .        | C-4 3 30     | A-1 5 30     | .        | C-5 7 22 | .
+  .        | .            | .            | .        | .        | .
+  C-4 1 40 | C-4 2 30     | .            | .        | E-5 7 26 | .
+  .        | .            | .            | .        | .        | .
+  .        | C-4 3 30     | A-1 5 36     | .        | A-5 7 20 | .
+  .        | .            | .            | .        | .        | .
+  C-4 1 40 | C-4 2 32 E93 | F-1 5 40     | F-2 6 30 | F-4 7 26 | .
+  .        | .            | .            | .        | .        | .
+  C-4 1 40 | C-4 2 36 E93 | F-1 5 30     | .        | A-4 7 22 | .
+  .        | .            | .            | .        | .        | .
+  C-4 1 40 | C-4 2 38 E92 | .            | .        | C-5 7 26 | .
+  .        | C-4 2 40 E92 | .            | .        | .        | .
+  C-4 1 40 | C-4 2 40 E91 | F-1 5 36     | .        | F-5 7 20 | .
+  C-4 1 40 | C-4 2 40 E91 | G-1 5 30     | .        | .        | .
+}
+pattern 6 rows=16 {
+  # drop: like 3 with master filter wide open (W) and pluck folding (W feeds mp0)
+  C-4 1 40 WFF | C-4 4 24 | A-1 5 40 SA0 | A-2 6 30 | A-4 7 30 | A-5 8 30
+  .            | .        | .            | .        | .        | .
+  .            | C-4 3 30 | A-1 5 30     | .        | C-5 7 26 | .
+  .            | .        | .            | .        | .        | .
+  .            | C-4 2 40 | .            | .        | E-5 7 30 | G-5 8 28
+  .            | .        | .            | .        | .        | .
+  .            | C-4 3 30 | A-1 5 36     | .        | A-5 7 24 | .
+  C-4 1 30     | .        | A-2 5 30     | .        | .        | E-5 8 30
+  C-4 1 40     | C-4 4 24 | F-1 5 40     | F-2 6 30 | F-4 7 30 | .
+  .            | .        | .            | .        | .        | .
+  .            | C-4 3 30 | F-1 5 30     | .        | A-4 7 26 | D-5 8 28
+  .            | .        | .            | .        | .        | .
+  .            | C-4 2 40 | .            | .        | C-5 7 30 | C-5 8 30
+  .            | .        | .            | .        | .        | .
+  .            | C-4 3 30 | F-1 5 36     | .        | F-5 7 24 | .
+  .            | C-4 2 24 | G-1 5 30     | .        | .        | A-4 8 26
+}
+pattern 7 rows=16 {
+  # outro: everything fades, one last chord
+  C-4 1 40 W00 | C-4 4 24 | A-1 5 40 S20 | A-2 6 34 | A-4 7 24 | A-4 8 26
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | C-4 2 30 | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | E-5 7 20 | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | A-5 7 16 | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | .            | .        | .        | .
+  .            | .        | off          | off      | .        | off
+}
+
+# ------------------------------------------------------------------ helpers
+fn textline(s, px, py, sz) {
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn scroller(s, py, sz, speed) {
+  # endless wrap: the text repeats after strlen + 12 cells
+  per = (strlen(s) + 12) * sz
+  px = 1.7 * aspect - fract(time * speed / per) * per
+  a = textline(s, px, py, sz)
+  b = textline(s, px + per, py, sz)
+  return max(a, b)
+}
+fn torus(px, py, pz, R, rr) {
+  q = len(px, pz) - R
+  return len(q, py) - rr
+}
+fn scenesdf(px, py, pz, tw) {
+  # twisted torus: rotate xz by y
+  a = py * tw
+  rx = rot(px, pz, a)
+  rz = r1
+  return torus(rx, py, rz, 1.0, 0.38 + 0.08 * kickE)
+}
+
+uniform kickE snE padE plE camx camy camz twistk fogk
+
+frame {
+  kickE = exp(-trig(0) * 9)
+  snE = exp(-trig(1) * 8) * step(0.5, vel(1))
+  padE = cenv(3)
+  plE = exp(-trig(4) * 7)
+  select(evt(scene))
+  cam = evtl(cam)
+  twistk = evtl(twist) * (1 + 0.2 * sin(beat * 0.5))
+  fogk = evtl(fog)
+  camx = 3.2 * sin(beat * 0.1 + cam)
+  camz = 3.2 * cos(beat * 0.1 + cam)
+  camy = 1.2 * sin(beat * 0.07) + 0.3 * cam
+}
+
+pixel intro {
+  # plasma background, big title, scroller
+  p1 = sin(u * 3 + beat * 0.5) + sin(v * 4 - beat * 0.3) + sin((u + v) * 2.5 + beat * 0.2)
+  pal(sky, p1 * 0.12 + 0.5 + bar * 0.02)
+  cmul(0.25 + 0.2 * kickE)
+  g = evtl(glow)
+  ttl = textline(title, -1.05, 0.45, 0.3)
+  halo = 0
+  repeat k 5 {
+    halo = halo + textline(title, -1.05 + (k - 2) * 0.012, 0.45 + (k - 2) * 0.008, 0.3)
+  }
+  cadd(ttl * 1.0 + halo * 0.12 * g, ttl * 0.85 + halo * 0.06 * g, ttl * 0.5 + halo * 0.15 * g)
+  sc = scroller(scroll, -0.55, 0.11, 1.2)
+  cadd(sc * 0.9, sc, sc)
+  cprevz(0.5, 0.42, 1.01, 0.0, 0.3 * g)
+}
+
+pixel march {
+  # raymarched twisted torus
+  ro_x = camx
+  ro_y = camy
+  ro_z = camz
+  # look at the origin: build a camera basis
+  fl = len(len(ro_x, ro_z), ro_y)
+  fx = -ro_x / fl
+  fy = -ro_y / fl
+  fz = -ro_z / fl
+  rl = len(fz, fx) + 0.0001
+  rxx = fz / rl
+  rxz = -fx / rl
+  upx = fy * rxz
+  upy = fz * rxx - fx * rxz
+  upz = -fy * rxx
+  dx = fx * 1.6 + rxx * u + upx * v
+  dy = fy * 1.6 + upy * v
+  dz = fz * 1.6 + rxz * u + upz * v
+  dl = len(len(dx, dz), dy)
+  dx = dx / dl
+  dy = dy / dl
+  dz = dz / dl
+  tt = 0
+  d = 1
+  repeat i 36 {
+    px = ro_x + dx * tt
+    py = ro_y + dy * tt
+    pz = ro_z + dz * tt
+    d = scenesdf(px, py, pz, twistk)
+    tt = tt + d * 0.85 * step(0.002, d)
+  }
+  hit = step(d, 0.02) * step(tt, 12)
+  px = ro_x + dx * tt
+  py = ro_y + dy * tt
+  pz = ro_z + dz * tt
+  e = 0.01
+  nx = scenesdf(px + e, py, pz, twistk) - scenesdf(px - e, py, pz, twistk)
+  ny = scenesdf(px, py + e, pz, twistk) - scenesdf(px, py - e, pz, twistk)
+  nz = scenesdf(px, py, pz + e, twistk) - scenesdf(px, py, pz - e, twistk)
+  nl = len(len(nx, nz), ny) + 0.0001
+  nx = nx / nl
+  ny = ny / nl
+  nz = nz / nl
+  lx = 0.5
+  ly = 0.8
+  lz = -0.3
+  diff = max(nx * lx + ny * ly + nz * lz, 0)
+  rim = (1 - max(-(nx * dx + ny * dy + nz * dz), 0)) ^ 3
+  band = 0.5 + 0.5 * sin(atan2(pz, px) * 6 + py * 10 - beat * 2)
+  pal(sky, 0.15 + band * 0.25 + tt * 0.03 + bar * 0.01)
+  cmul(hit * (0.15 + 0.9 * diff + 0.8 * rim * evtl(glow)) * exp(-tt * 0.08 * fogk))
+  # background: dark gradient with stars on the snare
+  bg = (1 - hit) * (0.02 + 0.05 * (v + 1))
+  st = (1 - hit) * step(0.997, hash(floor(u * 120) + floor(v * 120) * 77.7)) * (0.3 + snE)
+  cadd(bg * 0.4 + st, bg * 0.2 + st, bg + st)
+  cmul(1 + 0.3 * kickE)
+}
+
+pixel feedback {
+  # spiral feedback with the pluck drawing rings
+  rr = len(u, v)
+  ring = exp(-abs(rr - 0.3 - 0.4 * fract(beat * 0.5)) * 30) * plE
+  pal(sky, rr * 0.5 + bar * 0.05)
+  cmul(ring * 1.5 + kickE * 0.1 * exp(-rr * 3))
+  sc = scroller(scroll, 0.7, 0.09, 0.9)
+  cadd(sc, sc * 0.9, sc * 0.6)
+  cprevz(0.5, 0.5, 1.04, 0.03 + 0.03 * padE, 0.92)
+}
+
+pixel end {
+  pal(sky, 0.55 + 0.1 * sin(u * 2 + beat * 0.2))
+  cmul(0.12 + 0.15 * kickE)
+  ttl = textline(title, -1.05, 0.5, 0.3)
+  cadd(ttl, ttl * 0.9, ttl * 0.7)
+  cr = scroller(credits, -0.3, 0.12, 0.8)
+  cadd(cr * 0.9, cr, cr)
+  cprevz(0.5, 0.5, 1.0, 0.0, 0.5 * evtl(glow))
+}
+
+post {
+  # bloom-ish: average a cross of taps, add on top; chromatic shift on red; vignette; scanlines
+  g = evtl(glow)
+  b = tap(-2, 0) + tap(2, 0) + tap(0, -2) + tap(0, 2) + tap(-1, -1) + tap(1, 1) + tap(-1, 1) + tap(1, -1)
+  bl = b * 0.125
+  rsh = tap(-2 - floor(3 * kickE), 0)
+  cr = mix(cget(0), rsh, 0.5)
+  rgb(cr + bl * 0.35 * g, cget(1) + bl * 0.3 * g, cget(2) + bl * 0.4 * g)
+  d = len(u, v)
+  cmul(1 - 0.35 * d * d)
+  cmul(1 - 0.18 * step(0.5, fract(y * h * 0.5)))
+}

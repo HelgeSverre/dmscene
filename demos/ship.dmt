@@ -1,0 +1,129 @@
+# ship.dmt - drum & bass over the burning ship, mirrored and set on fire
+title BURNING SHIP
+song bpm=174 speed=6 rpb=4 channels=5 loop=0 volume=0.6
+order 0 1 0 1 2 2 0 1
+
+palette fire {
+  0.00 0.00 0.00 0.00
+  0.20 0.30 0.00 0.05
+  0.40 0.90 0.10 0.00
+  0.60 1.00 0.60 0.00
+  0.80 1.00 1.00 0.60
+  1.00 0.20 0.30 1.00
+}
+
+inst kick {
+  f = 55 + 700 * exp(-t * 50)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 9) * 2.2, 1.6) * 0.8)
+}
+inst snare {
+  n = svf(noise(), 2200 + 3000 * exp(-t * 30), 0.3)
+  n = r1 * 0.6 + n * 0.4
+  tone = sin(tau * (200 * t - 40 * t * t)) * exp(-t * 25)
+  out((n * exp(-t * 11) + tone * 0.7) * 0.65)
+}
+inst hat {
+  out(hp(noise(), 10000) * exp(-t * (45 + 100 * (1 - vel))) * 0.28)
+}
+inst reese {
+  e = env(0.01, 0.3, 0.8, 0.12)
+  s = saw(ph + 0.0025 * t) + saw(ph - 0.0021 * t) + saw(ph * 0.5 + 0.0012 * t) * 0.8
+  s = svf(s, 180 + 900 * e * (0.5 + p0), 0.55)
+  s = dist(s, 1.4)
+  out(s * e * 0.45)
+}
+inst stab {
+  e = env(0.001, 0.2, 0.0, 0.08)
+  s = sqr(ph, 0.5 + 0.3 * sin(t * 20)) + saw(ph * 2.01) * 0.5
+  s = svf(s, 400 + 5000 * e, 0.5)
+  out(s * e * 0.3)
+}
+
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.1724, 0.3)
+  out(dist(l + d * 0.2, 1.3), dist(r - d * 0.2, 1.3))
+}
+
+# channels: 0 kick  1 snare  2 hats  3 reese  4 stab   (amen-ish two-step)
+pattern 0 rows=16 {
+  C-2 1 40 | .        | C-6 3 20 | E-1 4 40 S20 | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | .            | E-4 5 24
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | E-1 4 . S60  | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 20 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  C-2 1 40 | .        | C-6 3 22 | G-1 4 .      | G-4 5 24
+  .        | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  C-2 1 30 | .        | C-6 3 22 | F-1 4 . SA0  | .
+  .        | D-5 2 20 | C-6 3 10 | .            | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | C-6 3 20 | E-1 4 40 S20 | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | .            | .
+  C-2 1 30 | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | .            | B-4 5 24
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | E-1 4 . S80  | .
+  C-2 1 34 | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 20 | .            | .
+  .        | D-5 2 30 | C-6 3 10 | .            | .
+  C-2 1 40 | .        | C-6 3 22 | D-1 4 .      | D-5 5 24
+  .        | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | .            | .
+  .        | .        | C-6 3 10 | C-1 4 . SC0  | .
+  .        | .        | C-6 3 22 | .            | C-5 5 20
+  .        | D-5 2 30 | C-6 3 30 | B-0 4 .      | .
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | C-6 3 20 | E-1 4 40 SFF | E-4 5 26
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  C-2 1 40 | .        | C-6 3 22 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 20 | F#1 4 .      | .
+  C-2 1 40 | .        | C-6 3 10 | .            | .
+  .        | .        | C-6 3 22 | .            | .
+  .        | .        | C-6 3 10 | .            | .
+  .        | D-5 2 40 | C-6 3 20 | G-1 4 .      | G-4 5 26
+  .        | D-5 2 24 | C-6 3 10 | .            | .
+  .        | D-5 2 30 | C-6 3 22 | .            | .
+  .        | D-5 2 40 | C-6 3 30 | .            | .
+}
+
+uniform zoom cx cy kickE snareE hue
+
+frame {
+  kickE = exp(-trig(0) * 10)
+  snareE = exp(-trig(1) * 12)
+  ph = lbeat / llen
+  zoom = 0.75 + 0.1 * sin(beat * 0.5 * pi) + kickE * 0.1
+  cx = -1.755 + 0.02 * sin(ph * tau)
+  cy = -0.03 + 0.012 * cos(ph * tau * 2)
+  hue = bar * 0.04
+}
+pixel {
+  # the ship is drawn upside down by convention; flip and mirror for symmetry
+  px = u * 0.22 / zoom + cx
+  py = -abs(v) * 0.22 / zoom + cy
+  it = ship(px, py, 80)
+  trap = r1
+  k = log(1 + it) / log(81)
+  inside = step(80, it)
+  pal(fire, k * 1.6 + hue + snareE * 0.08)
+  cmul((0.05 + 1.5 * k * k) * (1 - inside))
+  cadd(inside * kickE * 0.6, inside * kickE * 0.15, 0)
+  f = exp(-trap * 5) * snareE
+  cadd(f, f * 0.9, f * 0.6)
+  cprev(x, 0.5 + (y - 0.5) * 0.99 - 0.003, 0.35)
+}

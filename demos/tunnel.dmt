@@ -1,0 +1,135 @@
+# tunnel.dmt - trance gate down an infinite textured tunnel
+title TUNNEL
+song bpm=138 speed=6 rpb=4 channels=5 loop=0 volume=0.55
+order 0 0 1 1 0 0 1 2
+
+palette neon {
+  0.00 0.00 0.00 0.05
+  0.25 0.10 0.00 0.40
+  0.50 0.90 0.00 0.60
+  0.70 0.00 0.80 1.00
+  0.85 1.00 1.00 1.00
+  1.00 0.00 0.00 0.05
+}
+
+inst kick {
+  f = 52 + 650 * exp(-t * 45)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 8) * 2.4, 1.6) * 0.85)
+}
+inst bass {
+  e = env(0.002, 0.14, 0.0, 0.03)
+  s = saw(ph) + sqr(ph * 0.5, 0.5) * 0.5
+  s = svf(s, 200 + 1800 * e, 0.3)
+  out(s * e * 0.55)
+}
+inst super {
+  e = env(0.01, 0.1, 0.9, 0.08)
+  g = 0.5 + 0.5 * sqr(t * 9.2, 0.6)          # 16th gate at 138 bpm
+  s = saw(ph) + saw(ph + 0.0031 * t) + saw(ph - 0.0027 * t) + saw(ph * 2 + 0.0051 * t) * 0.5 + saw(ph * 0.5) * 0.4
+  s = svf(s, 500 + 4500 * p0 + 1500 * e, 0.25)
+  out(s * e * g * 0.18)
+}
+inst hat {
+  out(hp(noise(), 8500) * exp(-t * (40 + 80 * (1 - vel))) * 0.25)
+}
+inst clap {
+  b = exp(-t * 70) + exp(-(t - 0.011) * 70) * step(0.011, t) + exp(-(t - 0.022) * 70) * step(0.022, t) + exp(-(t - 0.033) * 18) * step(0.033, t) * 0.8
+  out(svf(noise(), 1600, 0.6) * 1.5 * b * 0.45)
+}
+
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.3261, 0.4)
+  out(dist(l + d * 0.25, 1.2), dist(r + d * 0.25, 1.2))
+}
+
+# channels: 0 kick  1 bass  2 supersaw  3 hats  4 clap
+pattern 0 rows=16 {
+  C-2 1 40 | .        | A-3 3 30 S20 | .        | .
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | D-5 5 30
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | .
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | D-5 5 30
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | A-1 2 30 | .            | C-6 4 16 | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | F-3 3 30 S60 | .        | .
+  .        | .        | .            | .        | .
+  .        | F-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | D-5 5 30
+  .        | .        | .            | .        | .
+  .        | F-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | G-3 3 30     | .        | .
+  .        | .        | .            | .        | .
+  .        | G-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | D-5 5 30
+  .        | .        | .            | .        | .
+  .        | G-1 2 40 | .            | C-6 4 28 | .
+  .        | G-1 2 30 | .            | C-6 4 16 | D-5 5 20
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | A-3 3 30 SC0 | .        | .
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | .            | .        | D-5 5 30
+  .        | .        | .            | .        | .
+  .        | A-1 2 40 | .            | C-6 4 28 | .
+  .        | .        | .            | .        | .
+  C-2 1 40 | .        | E-4 3 30 SFF | .        | D-5 5 20
+  .        | .        | .            | .        | D-5 5 24
+  .        | A-1 2 40 | .            | C-6 4 28 | D-5 5 28
+  .        | .        | .            | .        | D-5 5 32
+  C-2 1 40 | .        | .            | .        | D-5 5 36
+  .        | A-1 2 30 | .            | .        | D-5 5 38
+  C-2 1 40 | A-1 2 36 | .            | C-6 4 28 | D-5 5 40
+  C-2 1 40 | A-1 2 40 | .            | C-6 4 30 | D-5 5 40
+}
+
+uniform depth spin kickE clapE hue wob
+
+frame {
+  kickE = exp(-trig(0) * 9)
+  clapE = exp(-trig(4) * 7)
+  depth = beat * 0.45
+  spin = beat * 0.04 + sin(beat * 0.11) * 0.6
+  hue = bar * 0.03
+  wob = 0.5 + 0.5 * sin(beat * 0.25 * pi)
+}
+pixel {
+  # bend the tunnel axis with time
+  ox = 0.25 * sin(beat * 0.3)
+  oy = 0.2 * cos(beat * 0.23)
+  rr = polar(u - ox, v - oy)
+  a  = r1
+  d  = 0.4 / (rr + 0.03) + depth           # perspective depth
+  aa = a / tau + spin
+  mx = abs(fract(aa * 3) * 2 - 1)          # mirrored so the angle wrap has no seam
+  # texture: voronoi tiles on the tunnel wall, rings every depth unit, noise grime
+  c  = vor(mx * 4, d * 2.5)
+  id = r1
+  tile = smooth(0.04, 0.3, c)
+  ring = exp(-abs(fract(d * 0.5) - 0.5) * 9)
+  f  = fbm(mx * 5, d * 1.5, 3)
+  pal(neon, id * 0.6 + f * 0.3 + hue + d * 0.03)
+  pulse = 0.5 + 0.5 * sin(id * tau + beat * pi)
+  bright = 0.12 + 0.9 * tile * pulse + ring * kickE * 1.3 + 0.6 * tile * clapE
+  fog = smooth(0.02, 0.3, rr) * (0.35 + 0.65 * min(rr, 1))
+  cmul(bright * fog)
+  g = exp(-c * 8) * 0.25
+  cadd(g, g, g)
+  cprev(x, y, 0.2)
+}

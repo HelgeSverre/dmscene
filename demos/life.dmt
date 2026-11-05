@@ -1,0 +1,182 @@
+# life.dmt - Conway-like cellular automata in the previous-frame buffer
+# Red encodes the live cell bit, blue carries its fading afterglow.
+# Every 16th note advances one generation; every two bars a ring of seeds arrives.
+title LIFE GARDEN
+song bpm=120 speed=6 rpb=4 channels=6 loop=0 volume=0.56
+order 0 0 1 1 2 2 3 3 1 2 3 0
+
+inst kick {
+  f = 49 + 480 * exp(-t * 44)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 8) * 1.9, 1.4) * 0.67)
+}
+inst snare {
+  n = svf(noise(), 1800 + 2600 * exp(-t * 30), 0.35)
+  out((r2 * 0.8 + n * 0.3) * exp(-t * 13) * 0.48)
+}
+inst hat {
+  out(hp(noise(), 8700) * exp(-t * (36 + 70 * (1 - vel))) * 0.23)
+}
+inst bass {
+  e = env(0.004, 0.20, 0.25, 0.08)
+  s = svf(saw(ph) * 0.45 + sin(ph * tau) * 0.8, 190 + 1100 * e, 0.3)
+  out(s * e * 0.44)
+}
+inst glass {
+  e = exp(-t * 2.5)
+  m = sin(ph * tau * 2.03) * exp(-t * 4) * 1.3
+  out((sin(ph * tau + m) + sin(ph * tau * 2.01) * 0.35) * e * 0.26)
+}
+inst cloud {
+  e = env(0.25, 0.7, 0.70, 0.8)
+  s = sin(ph * tau + 0.6 * sin(ph * tau * 0.5 + t * 0.3))
+  s = s + saw(ph + t * 0.0014) * 0.25 + saw(ph - t * 0.0018) * 0.25
+  out(svf(s, 480 + 330 * sin(t * 0.33), 0.2) * e * 0.22)
+}
+master {
+  dl = dly(l, 0.375, 0.42)
+  dr = dly(r, 0.50, 0.42)
+  vl = verb(l + dr * 0.2, 0.72, 0.48)
+  vr = verb(r + dl * 0.2, 0.72, 0.48)
+  out(dist(l + dr * 0.25 + vl * 0.18, 1.15), dist(r + dl * 0.25 + vr * 0.18, 1.15))
+}
+
+# Channels: kick, snare, hats, bass, glass notes, pad.
+pattern 0 rows=16 {
+  C-2 1 38 | .        | C-6 3 11 | A-1 4 34 | .        | A-3 6 24
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 18 | A-2 4 26 | E-5 5 19 | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 34 | D-5 2 30 | C-6 3 12 | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 18 | A-1 4 32 | C-6 5 18 | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 38 | .        | C-6 3 11 | F-1 4 34 | .        | F-3 6 24
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 18 | F-2 4 26 | A-5 5 19 | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 34 | D-5 2 30 | C-6 3 12 | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 18 | F-1 4 32 | C-6 5 18 | .
+  .        | .        | .        | .        | .        | .
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | C-6 3 13 | D-1 4 36 | A-4 5 24 | D-3 6 27
+  .        | .        | C-6 3 10 | .        | .        | .
+  .        | .        | C-6 3 20 | D-2 4 28 | F-5 5 19 | .
+  .        | .        | C-6 3 10 | .        | .        | .
+  C-2 1 36 | D-5 2 35 | C-6 3 13 | .        | C-6 5 22 | .
+  .        | .        | C-6 3 10 | .        | .        | .
+  .        | .        | C-6 3 20 | D-1 4 34 | A-5 5 19 | .
+  .        | .        | C-6 3 10 | .        | .        | .
+  C-2 1 40 | .        | C-6 3 13 | G-1 4 36 | G-4 5 24 | G-3 6 27
+  .        | .        | C-6 3 10 | .        | .        | .
+  .        | .        | C-6 3 20 | G-2 4 28 | D-5 5 19 | .
+  .        | .        | C-6 3 10 | .        | .        | .
+  C-2 1 36 | D-5 2 35 | C-6 3 13 | .        | B-5 5 22 | .
+  .        | .        | C-6 3 10 | .        | .        | .
+  .        | .        | C-6 3 20 | G-1 4 34 | D-6 5 19 | .
+  .        | D-5 2 18 | C-6 3 10 | .        | .        | .
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | C-6 3 13 | C-1 4 38 | E-5 5 24 | C-3 6 29
+  .        | .        | C-6 3 12 | .        | .        | .
+  .        | .        | C-6 3 22 | C-2 4 30 | G-5 5 21 | .
+  .        | .        | C-6 3 12 | .        | .        | .
+  C-2 1 38 | D-5 2 36 | C-6 3 13 | .        | C-6 5 24 | .
+  .        | .        | C-6 3 12 | .        | .        | .
+  .        | .        | C-6 3 22 | C-1 4 36 | E-6 5 21 | .
+  .        | .        | C-6 3 12 | .        | .        | .
+  C-2 1 40 | .        | C-6 3 13 | E-1 4 38 | G-4 5 24 | E-3 6 29
+  .        | .        | C-6 3 12 | .        | .        | .
+  .        | .        | C-6 3 22 | E-2 4 30 | B-4 5 21 | .
+  .        | .        | C-6 3 12 | .        | .        | .
+  C-2 1 38 | D-5 2 36 | C-6 3 13 | .        | E-5 5 24 | .
+  .        | .        | C-6 3 12 | .        | .        | .
+  .        | .        | C-6 3 22 | E-1 4 36 | G-5 5 21 | .
+  C-2 1 24 | D-5 2 20 | C-6 3 12 | .        | .        | .
+}
+pattern 3 rows=16 {
+  C-2 1 33 | .        | C-6 3 10 | F-1 4 33 | A-4 5 20 | F-3 6 25
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 16 | F-2 4 25 | C-5 5 18 | .
+  .        | .        | .        | .        | .        | .
+  .        | D-5 2 31 | C-6 3 10 | .        | F-5 5 19 | .
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 16 | F-1 4 30 | A-5 5 18 | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 33 | .        | C-6 3 10 | G-1 4 33 | B-4 5 20 | G-3 6 25
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 16 | G-2 4 25 | D-5 5 18 | .
+  .        | .        | .        | .        | .        | .
+  .        | D-5 2 31 | C-6 3 10 | .        | G-5 5 19 | .
+  .        | .        | .        | .        | .        | .
+  .        | .        | C-6 3 16 | G-1 4 30 | B-5 5 18 | .
+  .        | .        | .        | .        | .        | .
+}
+
+uniform advance seed burst epoch hue kickE snE mode
+frame {
+  gen = floor(beat * 4)
+  advance = step(0.5, abs(gen - $gen))
+  $gen = gen
+  seed = step(frame, 0.5)
+  epoch = floor(lbeat / 8)
+  burst = step(0.5, abs(epoch - $epoch))
+  $epoch = epoch
+  kickE = exp(-trig(0) * 9)
+  snE = exp(-trig(1) * 12)
+  hue = 0.5 + 0.5 * sin(lbeat * 0.13)
+  mode = step(0.55, 0.5 + 0.5 * sin(lbeat * 0.10))
+}
+pixel {
+  # One logical cell occupies several display pixels, so prev() samples its centre.
+  cellSize = max(2, floor(h / 48))
+  cols = floor(w / cellSize)
+  rows = floor(h / cellSize)
+  gx = floor(x * cols)
+  gy = floor(y * rows)
+  cx = (gx + 0.5) / cols
+  cy = (gy + 0.5) / rows
+  dx = 1 / cols
+  dy = 1 / rows
+  here = prev(cx, cy)
+  oldTrail = r2
+  self = step(0.5, here)
+
+  # Toroidal neighbourhood: all eight adjacent cells wrap around the screen.
+  a = step(0.5, prev(fract(cx - dx), fract(cy - dy)))
+  b = step(0.5, prev(cx, fract(cy - dy)))
+  c = step(0.5, prev(fract(cx + dx), fract(cy - dy)))
+  d = step(0.5, prev(fract(cx - dx), cy))
+  e = step(0.5, prev(fract(cx + dx), cy))
+  f = step(0.5, prev(fract(cx - dx), fract(cy + dy)))
+  g = step(0.5, prev(cx, fract(cy + dy)))
+  j = step(0.5, prev(fract(cx + dx), fract(cy + dy)))
+  neighbours = a + b + c + d + e + f + g + j
+
+  # B3/S23 Life, with occasional B6 births in the brighter phase.
+  born3 = step(2.5, neighbours) * (1 - step(3.5, neighbours))
+  born6 = step(5.5, neighbours) * (1 - step(6.5, neighbours)) * mode
+  survives = step(1.5, neighbours) * (1 - step(3.5, neighbours))
+  next = max(born3, born6) * (1 - self) + survives * self
+  alive = mix(self, next, advance)
+
+  # An initial random colony and sparse periodic spore rings prevent extinction.
+  rr = len(u, v)
+  ring = exp(-abs(rr - (0.24 + 0.13 * sin(epoch * 1.9))) * 22)
+  random = hash(gx * 1.71 + gy * 97.31 + epoch * 337.7)
+  first = seed * step(0.71, hash(gx * 7.13 + gy * 113.7))
+  spore = burst * step(0.67, random) * step(0.16, ring)
+  alive = max(alive, max(first, spore))
+
+  # Red remains a clean binary state at every cell centre; blue is a fading trail.
+  trail = max(alive, oldTrail * 0.94)
+  lx = fract(x * cols) - 0.5
+  ly = fract(y * rows) - 0.5
+  tile = 1 - smooth(0.38, 0.68, len(lx, ly))
+  red = (alive * (0.74 + 0.10 * kickE) + trail * 0.12) * tile
+  green = (alive * (0.20 + 0.54 * hue + 0.12 * snE) + trail * 0.07) * tile
+  blue = trail * tile
+  rgb(red, green, blue)
+}

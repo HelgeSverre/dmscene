@@ -1,0 +1,121 @@
+# cells.dmt - electro funk over pulsing voronoi cells
+title CELLS
+song bpm=128 speed=6 rpb=4 channels=5 loop=0 volume=0.55
+order 0 1 0 2
+
+inst kick {
+  f = 55 + 600 * exp(-t * 40)
+  $p = $p + f / sr
+  out(dist(sin($p * tau) * exp(-t * 8) * 2.2, 1.5) * 0.85)
+}
+inst clap {
+  b = exp(-t * 70) + exp(-(t - 0.01) * 70) * step(0.01, t) + exp(-(t - 0.02) * 70) * step(0.02, t) + exp(-(t - 0.03) * 14) * step(0.03, t)
+  out(svf(noise(), 1300, 0.55) * 1.6 * b * 0.5)
+}
+inst zap {
+  e = env(0.001, 0.1, 0.0, 0.03)
+  f = freq * (1 + 3 * exp(-t * 40))
+  $p = $p + f / sr
+  s = sqr($p, 0.3 + 0.2 * sin(t * 30))
+  out(svf(s, 300 + 4000 * e, 0.6) * e * 0.3)
+}
+inst slap {
+  e = env(0.002, 0.2, 0.3, 0.06)
+  s = saw(ph) * 0.6 + sin(ph * tau) * 0.6 + sqr(ph * 2, 0.5) * 0.15 * exp(-t * 20)
+  s = svf(s, 250 + 2500 * e * (0.4 + 0.6 * vel), 0.5)
+  out(s * e * 0.5)
+}
+inst hat {
+  out(hp(noise(), 9000) * exp(-t * (50 + 120 * (1 - vel))) * 0.22)
+}
+
+master {
+  d = dly(l * 0.5 + r * 0.5, 0.3516, 0.35)
+  out(dist(l + d * 0.2, 1.3), dist(r - d * 0.2, 1.3))
+}
+
+# channels: 0 kick  1 clap  2 zap lead  3 slap bass  4 hats
+pattern 0 rows=16 {
+  C-2 1 40 | .        | .        | E-1 4 40     | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  .        | .        | E-4 3 28 | .            | C-6 5 14
+  C-2 1 30 | .        | .        | E-1 4 30     | C-6 5 26
+  .        | D-5 2 36 | .        | .            | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  C-2 1 40 | .        | G-4 3 28 | G-1 4 40     | C-6 5 14
+  .        | .        | .        | A-1 4 36 108 | C-6 5 26
+  .        | .        | .        | .            | C-6 5 14
+  .        | .        | E-4 3 24 | .            | C-6 5 26
+  C-2 1 40 | .        | .        | E-1 4 40     | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  .        | D-5 2 36 | B-4 3 28 | .            | C-6 5 14
+  .        | .        | .        | E-2 4 30 20C | C-6 5 26
+  C-2 1 34 | .        | .        | .            | C-6 5 14
+  .        | .        | E-5 3 20 | D-1 4 36     | C-6 5 30
+}
+pattern 1 rows=16 {
+  C-2 1 40 | .        | .        | A-1 4 40     | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  .        | .        | A-4 3 28 | .            | C-6 5 14
+  C-2 1 30 | .        | .        | A-1 4 30     | C-6 5 26
+  .        | D-5 2 36 | .        | .            | C-6 5 14
+  .        | .        | C-5 3 24 | .            | C-6 5 26
+  C-2 1 40 | .        | .        | C-2 4 40     | C-6 5 14
+  .        | .        | .        | B-1 4 36 20A | C-6 5 26
+  .        | .        | .        | .            | C-6 5 14
+  .        | .        | E-5 3 28 | .            | C-6 5 26
+  C-2 1 40 | .        | .        | A-1 4 40     | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  .        | D-5 2 36 | G-4 3 28 | .            | C-6 5 14
+  .        | .        | .        | G-1 4 34     | C-6 5 26
+  C-2 1 34 | .        | A-4 3 24 | .            | C-6 5 14
+  .        | D-5 2 20 | .        | A-2 4 30 20C | C-6 5 30
+}
+pattern 2 rows=16 {
+  C-2 1 40 | .        | E-4 3 28 | E-1 4 40     | C-6 5 14
+  .        | .        | E-4 3 20 | .            | C-6 5 26
+  .        | .        | E-5 3 28 | .            | C-6 5 14
+  C-2 1 30 | .        | .        | E-1 4 30     | C-6 5 26
+  .        | D-5 2 36 | D-5 3 26 | .            | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  C-2 1 40 | .        | B-4 3 26 | G-1 4 40     | C-6 5 14
+  .        | .        | .        | A-1 4 36 108 | C-6 5 26
+  .        | .        | G-4 3 26 | .            | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  C-2 1 40 | .        | E-4 3 28 | E-1 4 40     | C-6 5 14
+  .        | .        | .        | .            | C-6 5 26
+  .        | D-5 2 36 | .        | .            | C-6 5 14
+  .        | D-5 2 24 | B-3 3 28 | B-0 4 34     | C-6 5 26
+  C-2 1 34 | D-5 2 30 | .        | .            | C-6 5 14
+  C-2 1 40 | D-5 2 36 | E-4 3 30 | E-1 4 40 SFF | C-6 5 30
+}
+
+uniform kickE clapE zapE hue warp drift
+
+frame {
+  kickE = exp(-trig(0) * 9)
+  clapE = exp(-trig(1) * 8)
+  zapE = exp(-trig(2) * 7)
+  hue = bar * 0.08
+  warp = 0.15 + 0.1 * sin(beat * 0.2)
+  drift = beat * 0.12
+}
+pixel {
+  # domain warp the plane with fbm, then voronoi
+  wx = u * 2.2 + fbm(u * 1.5 + drift * 0.3, v * 1.5, 3) * warp * 4
+  wy = v * 2.2 + fbm(u * 1.5 + 9, v * 1.5 - drift * 0.2, 3) * warp * 4 + drift
+  d1 = vor(wx, wy)
+  id = r1
+  d2 = r2
+  edge = d2 - d1
+  # each cell pulses on its own phase, in time with the beat
+  pulse = 0.5 + 0.5 * sin(beat * pi + id * tau)
+  cellv = smooth(0, 0.6, d1) * (0.4 + 0.6 * pulse) * (0.6 + 0.6 * kickE)
+  hsv(hue + id * 0.35 + d1 * 0.1, 0.8, 1)
+  cmul(cellv * 0.9)
+  e = exp(-edge * 18) * (0.5 + 1.2 * zapE)
+  cadd(e, e * 0.9, e * 0.6)
+  flash = clapE * exp(-d1 * 3) * 0.6
+  cadd(flash, flash, flash)
+  cprev(x, y, 0.25)
+}
