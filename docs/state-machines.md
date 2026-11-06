@@ -356,13 +356,21 @@ Graphics selection is independent of transport controls:
 | Suspended | resume | new terminal instance and capability probe |
 
 Only two image ids are owned, acknowledgements are suppressed after probing,
-and each image/status update uses synchronized output. Auto resolution uses
+and each image/status update uses synchronized output. Opt-in `--adaptive` resolution uses
 render-plus-write timings with hysteresis; explicit `--size` is fixed. The
 native player binds compiled shaders before workers start. Watch reload stops
 audio and seek workers before changing the binding; a failed bytecode match
 clears it and selects interpretation, even when the module address is reused.
+The native launcher (default for repository-source play/watch) validates the
+demo name, locks the shared build cache, waits for make, then execs the
+specialized CLI with lock release on exec. Cache executables publish by rename.
+An automatic build failure falls back to interpretation; explicit `--native`
+returns failure before terminal mode. Concurrent launches wait for the same
+lock rather than overwriting each other's build products. `--interpreted`
+skips this state machine and native binding.
 Protocol and fallback tests: `term-graphics.c`, `scrub-live.c`,
-`play-transport.c`, `scene-workers.c`, `native-bind.c`, `native-player.sh`.
+`play-transport.c`, `scene-workers.c`, `native-bind.c`, `native-player.sh`,
+`native-launch.sh`.
 
 ## 11. Audio backend lifecycle
 

@@ -76,10 +76,10 @@ int main(int argc, char **argv) {
     const char *bin = argc > 1 ? argv[1] : "./dm";
     int low_fps = argc > 2 && !strcmp(argv[2], "low-fps");
     if (argc > 2 && !strcmp(argv[2], "kitty"))
-      execl(bin, bin, "play", "demos/showcase.dmt", "--mute", "--start", "30", "--size", "120x40", "--fps", "60", "--graphics", "kitty", (char *)NULL);
+      execl(bin, bin, "play", "demos/showcase.dmt", "--interpreted", "--mute", "--start", "30", "--size", "120x40", "--fps", "60", "--graphics", "kitty", (char *)NULL);
     if (argc > 2 && !low_fps)
-      execl(bin, bin, "play", "demos/showcase.dmt", "--start", "30", "--size", "120x40", "--fps", "60", (char *)NULL);
-    execl(bin, bin, "play", "demos/showcase.dmt", "--mute", "--start", "30", "--size", "120x40", "--fps", low_fps ? "2" : "60", (char *)NULL);
+      execl(bin, bin, "play", "demos/showcase.dmt", "--interpreted", "--start", "30", "--size", "120x40", "--fps", "60", (char *)NULL);
+    execl(bin, bin, "play", "demos/showcase.dmt", "--interpreted", "--mute", "--start", "30", "--size", "120x40", "--fps", low_fps ? "2" : "60", (char *)NULL);
     _exit(127);
   }
   atexit(cleanup); close(in[0]); close(out[1]); child_in = in[1]; child_out = out[0];

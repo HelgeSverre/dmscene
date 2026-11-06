@@ -48,7 +48,8 @@ native-export: build/native/$(notdir $(DEMO:.dmt=))
 # Compile this demo's shaders into a normal dm CLI; audio remains interpreted.
 build/native-player/%: build/native/%.c tools/dm.c $(filter-out build/obj/dm_vm.o,$(OBJ)) $(POBJ)
 	mkdir -p build/native-player
-	$(CC) $(CFLAGS) -I. -DDM_AOT -Wno-unused-variable -Wno-unused-label $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -I. -DDM_AOT -Wno-unused-variable -Wno-unused-label $(filter %.c %.o,$^) -o $@.tmp $(LDFLAGS) $(LDLIBS)
+	mv $@.tmp $@
 
 native-player: build/native-player/$(notdir $(DEMO:.dmt=))
 	@echo "Run $< play $(DEMO) [play options]"
@@ -59,6 +60,7 @@ play-native: build/native-player/$(notdir $(DEMO:.dmt=))
 test-native: avi-prototype build/dm-aot dm build/tests/scrub-live
 	sh tests/native-export.sh
 	sh tests/native-player.sh
+	sh tests/native-launch.sh
 	@if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then sh tests/qtrle-equivalence.sh; fi
 
 .PRECIOUS: build/native/%.c
@@ -73,7 +75,8 @@ build/obj build/modules build/audio build/video build/tests:
 	mkdir -p $@
 
 dm: tools/dm.c $(OBJ) $(POBJ)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o build/dm.tmp $(LDFLAGS) $(LDLIBS)
+	mv build/dm.tmp $@
 
 build/modules/%.dms: demos/%.dmt dm | build/modules
 	./dm compile $< -o $@

@@ -6,12 +6,21 @@ half blocks (one column and two vertical pixels per cell). There is no
 Ghostty-specific renderer or new demo format.
 
 ```sh
-./dm play demos/hakkuh.dmt                         # probe, then images or text
+./dm play demos/hakkuh.dmt                         # native shaders + detected graphics
 ./dm play demos/hakkuh.dmt --graphics text         # force half blocks
 ./dm play demos/hakkuh.dmt --graphics kitty --size 640x400
 make play-native DEMO=demos/hakkuh.dmt             # compile shaders, then play
 make play-native DEMO=demos/hakkuh.dmt PLAY_ARGS='--size 640x400 --fps 30'
 ```
+
+`play` and `watch` try native shaders automatically for `demos/NAME.dmt`
+sources when run from the repository root. They use make and the C compiler,
+reuse an up-to-date executable, and replace the current process with it while
+retaining all arguments. Build failure or unsupported input location falls
+back to the VM. `--interpreted` skips native builds; `--native` requires success
+and also enables acceleration for offline `render`. Concurrent launches
+serialize cache builds with a file lock held until executable load. Cache
+binaries are published by rename, keeping a running player intact on rebuild.
 
 `make native-player DEMO=demos/hakkuh.dmt` builds without launching. Its output,
 `build/native-player/hakkuh`, accepts the normal `dm` commands and flags.
@@ -39,7 +48,8 @@ used when pixel fields are absent. The initial framebuffer fits within
 640x400, retaining the viewport aspect ratio. The demo's `song scale` still
 applies; `--render-scale N` overrides it, with 1 meaning full detail.
 
-Without `--size`, Kitty playback measures render plus output time and adjusts
+Only with `--adaptive` and without `--size`, Kitty playback measures render
+plus output time and adjusts
 resolution toward `--fps` (30 by default), reserving 20% for other work. It
 reduces detail promptly after sustained overload and restores it gradually,
 with hysteresis to avoid oscillation. It never drops below one quarter of the
@@ -48,8 +58,9 @@ of frame rate under arbitrary CPU or network load. Feedback is resampled on
 resize so resolution changes preserve trails. The status line shows the
 actual internal dimensions.
 
-`--size WxH` fixes the image dimensions before demo scale and disables adaptive
-resolution. Use it for predictable quality and comparisons. In text mode it
+The default preserves resolution. `--size WxH` fixes the image dimensions
+before demo scale and also disables adaptive resolution when that flag is
+present. Use it for predictable quality and comparisons. In text mode it
 retains the existing column/half-block sizing behavior.
 
 ## Frame transport and lifecycle
@@ -91,7 +102,7 @@ That is about 7x less render time with the same dimensions. The output timing
 excludes terminal decoding/display and is not a Ghostty frame-rate claim.
 Other demo renders were active during this work, so these are directional
 measurements. Native compilation provides a speedup without lowering resolution;
-adaptive playback trades detail for responsiveness when rendering is too slow.
+opt-in adaptive playback trades detail for responsiveness when rendering is too slow.
 
 Shared memory, files, compression and GPU shader execution remain future
 options. File/shared-memory transport needs a separate successful capability
@@ -106,7 +117,8 @@ independent base64/RGB decoding, chunk boundaries, alternating ids and cleanup.
 `tests/scrub-live.c` exercises real Kitty-mode playback through a pipe, including
 scroll bursts, reversal, pause/resume, speed changes and quit. Frame-budget and
 feedback-resize regressions live in the transport and scene tests. The native
-suite checks specialized/fallback RGB and PCM, plus failed-rebind invalidation.
+suite checks specialized/fallback RGB and PCM, failed-rebind invalidation,
+concurrent cold-cache launches, build failure fallback and the VM override.
 Visual inspection in Ghostty was unavailable through the computer-use tool;
 manual checks of display, resizing and suspend/resume remain useful.
 

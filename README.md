@@ -123,14 +123,19 @@ Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
 a pipe to `aplay` elsewhere. Terminal video probes for Kitty graphics (including
 Ghostty), with ANSI truecolor `▀` half blocks as the fallback. Use
 `--graphics auto|kitty|text` to select the backend. Image mode starts within
-640×400 and adapts detail to the frame budget; `--size WxH` fixes resolution.
+640×400 and preserves that detail; `--size WxH` sets resolution. Optional
+`--adaptive` trades detail for frame rate.
 `--render-scale 1` overrides a demo's reduced-resolution setting. The `dm` binary
 only invokes `ffmpeg` for `--mp4`; AVI, MOV, PNG and WAV use built-in writers.
 The README animation target also requires ffmpeg.
 
-For expensive pixel programs, compile the shaders into a normal player:
+`play` and `watch` automatically compile/cache native shaders for
+`demos/NAME.dmt` when run from the repository root. If that build is unavailable,
+playback uses the VM. `--interpreted` forces the VM; `--native` requires a
+successful native build and also enables it for offline `render`:
 
 ```sh
+./dm play demos/hakkuh.dmt --size 640x400
 make play-native DEMO=demos/hakkuh.dmt
 make play-native DEMO=demos/hakkuh.dmt PLAY_ARGS='--size 640x400 --fps 30'
 make native-player DEMO=demos/hakkuh.dmt  # build without launching
@@ -212,6 +217,9 @@ dm COMMAND file [options]
 
 play options:
   --graphics auto|kitty|text  image protocol selection (default auto)
+  --native                   require native shaders (play/watch try automatically)
+  --interpreted              force the VM; skip native shader builds
+  --adaptive                 opt-in image resolution adjustment (without --size)
   --render-scale N           override demo pixel scale (1 = full detail)
   --fps N       target frame rate (default 30)      --size WxH   force framebuffer size
   --mute        no audio, wall-clock visuals         --start S    start S seconds in

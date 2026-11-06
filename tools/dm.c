@@ -6,12 +6,14 @@
 #include "dm_banner.h"
 #include <pthread.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <math.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -93,6 +95,9 @@ static void usage(int code) {
     "  --solo C      hear only channel C                  --threads N  pixel worker threads\n"
     "  --graphics auto|kitty|text   terminal images (default: probe, then text fallback)\n"
     "  --render-scale N            override demo pixel scale (1 = full detail)\n"
+    "  --native                    require compiled shaders (play/watch try this automatically)\n"
+    "  --interpreted               use the VM; skip native shader builds\n"
+    "  --adaptive                  trade image detail for frame rate (off by default; --size stays fixed)\n"
     "  keys: q quit, left/right seek 5s, mouse wheel/trackpad smooth scrub, up/down speed, space pause\n"
     "        1..8 toggle channel mute, 0 unmute all, r reload (watch), Ctrl-Z suspend\n"
     "env: DM_THREADS, DM_AUDIO_CMD, DM_AUDIO_LATENCY (pipe backend)\n");
@@ -321,7 +326,7 @@ static void audio_cb(void *user, float *lr, uint32_t frames) {
 
 typedef struct {
   const char *file, *png, *wav, *mp4, *avi, *mov;
-  int fps, W, H, mute, threads, solo, watch, render_scale, graphics;
+  int fps, W, H, mute, threads, solo, watch, render_scale, graphics, native, adaptive;
   double seconds, start;
 } opts;
 
@@ -361,6 +366,9 @@ static void parse_play_opts(int argc, char **argv, opts *o) {
     else if (!strcmp(argv[i], "--start") && i + 1 < argc) o->start = parse_double(argv[++i]);
     else if (!strcmp(argv[i], "--solo") && i + 1 < argc) o->solo = parse_int(argv[++i]);
     else if (!strcmp(argv[i], "--watch")) o->watch = 1;
+    else if (!strcmp(argv[i], "--native")) o->native = 1;
+    else if (!strcmp(argv[i], "--interpreted")) o->native = -1;
+    else if (!strcmp(argv[i], "--adaptive")) o->adaptive = 1;
     else if (!strcmp(argv[i], "--graphics") && i + 1 < argc) {
       const char *mode = argv[++i];
       if (!strcmp(mode, "auto")) o->graphics = DM_TERM_AUTO;
@@ -381,6 +389,54 @@ static void parse_play_opts(int argc, char **argv, opts *o) {
   for (size_t i = 0; i < sizeof out / sizeof *out; i++) for (size_t j = i + 1; j < sizeof out / sizeof *out; j++)
     if (out[i] && out[j] && !strcmp(out[i], out[j])) usage(2);
 }
+
+#ifndef DM_AOT
+/* Optional source-checkout accelerator. Pass argv directly to make/exec: no
+ * shell interpolation, generated source from verified bytecode only. */
+static int run_native(char **argv, const opts *o) {
+  const char *name = strrchr(o->file, '/'); name = name ? name + 1 : o->file;
+  size_t n = strlen(name);
+  if (n <= 4 || n > 128 || !ends_with(name, ".dmt")) goto unavailable;
+  for (size_t i = 0; i < n - 4; i++)
+    if (!((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') ||
+          (name[i] >= '0' && name[i] <= '9') || name[i] == '_' || name[i] == '-')) goto unavailable;
+  char source[160], target[192];
+  snprintf(source, sizeof source, "demos/%s", name);
+  struct stat requested, local, compiler;
+  if (stat(o->file, &requested) || stat(source, &local) || stat("tools/dm-aot.c", &compiler) ||
+      requested.st_dev != local.st_dev || requested.st_ino != local.st_ino) goto unavailable;
+  snprintf(target, sizeof target, "build/native-player/%.*s", (int)n - 4, name);
+  fprintf(stderr, "dm: preparing native shaders for %s (cached between runs)\n", name);
+  if (mkdir("build", 0777) && errno != EEXIST) { perror("dm: build directory"); return o->native > 0 ? 1 : -1; }
+  int lock = open("build/.native-build.lock", O_CREAT | O_RDWR, 0600);
+  if (lock < 0) { perror("dm: native build lock"); return o->native > 0 ? 1 : -1; }
+  while (flock(lock, LOCK_EX) < 0) if (errno != EINTR) { perror("dm: native build lock"); close(lock); return o->native > 0 ? 1 : -1; }
+  /* One cache build at a time, even for different demos sharing core objects.
+   * The make child inherits the lock until all compiler children have exited. */
+  pid_t child = fork();
+  if (child < 0) { perror("dm: native build"); close(lock); return o->native > 0 ? 1 : -1; }
+  if (!child) {
+    dup2(2, 1);
+    execlp("make", "make", "--no-print-directory", "-s", target, (char *)NULL);
+    perror("dm: make"); _exit(127);
+  }
+  int status;
+  while (waitpid(child, &status, 0) < 0) if (errno != EINTR) { perror("dm: wait for native build"); close(lock); return o->native > 0 ? 1 : -1; }
+  if (!WIFEXITED(status) || WEXITSTATUS(status)) {
+    close(lock);
+    fprintf(stderr, "dm: native build failed%s\n", o->native > 0 ? "; check the compiler/make output above" : "; using interpreter");
+    return o->native > 0 ? 1 : -1;
+  }
+  /* Release atomically with exec, not before: another launch must not rebuild
+   * this cache entry between our successful build and executable load. */
+  if (fcntl(lock, F_SETFD, FD_CLOEXEC) < 0) { perror("dm: native lock flags"); close(lock); return o->native > 0 ? 1 : -1; }
+  execv(target, argv);
+  perror("dm: launch native player"); close(lock); return o->native > 0 ? 1 : -1;
+ unavailable:
+  if (o->native > 0) fprintf(stderr, "dm: --native needs a demos/NAME.dmt source and the repository working directory; use normal playback elsewhere\n");
+  return o->native > 0 ? 2 : -1;
+}
+#endif
 
 static int mkdir_p(const char *path) {
   char *copy = strdup(path);
@@ -840,7 +896,7 @@ static int play_realtime(dm_module *mods, opts *o) {
     }
     int sc = o->render_scale ? o->render_scale : m->scale > 1 ? m->scale : 1;
     int fw = pw / sc > 1 ? pw / sc : 1, fh = ph / sc > 1 ? ph / sc : 2;
-    if (kitty && !o->W) {
+    if (kitty && !o->W && o->adaptive) {
       fw = (int)(fw * budget.scale); if (fw < 1) fw = 1;
       fh = (int)(fh * budget.scale); if (fh < 2) fh = 2;
     }
@@ -863,7 +919,7 @@ static int play_realtime(dm_module *mods, opts *o) {
       m->title[0] ? m->title : o->file, scrub.active ? "scrub @ " : waiting ? "seeking @ " : paused ? "pause @ " : "speed ",
       speeds[speed_i], (double)pos / DM_SR, dm_seq_beat(&clk), fps_est, chs, kitty ? "kitty" : "text", fw, fh, now < note_until ? note : "");
     dm_term_blit(term, &fb, cols, rows, status);
-    if (rendered && kitty && !o->W) budget_observe(&budget, dm_now() - render_start, o->fps);
+    if (rendered && kitty && !o->W && o->adaptive) budget_observe(&budget, dm_now() - render_start, o->fps);
     last_draw = now;
 
     int reload = k == 'r';
@@ -888,7 +944,7 @@ static int play_realtime(dm_module *mods, opts *o) {
         accept_audio(&ac, next, speeds[speed_i], 1);
         dm_scene_free(&scene); dm_module_free(m);
         which ^= 1; m = nm;
-        bind_native(m);
+        if (o->native >= 0) bind_native(m);
         budget = (play_budget){1, 0, 0};
         dm_scene_init(&scene, m); scene.nthreads = o->threads;
         dm_seq_init(&clk, m, DM_SR);
@@ -934,10 +990,16 @@ int main(int argc, char **argv) {
   if (!strcmp(cmd, "play") || !strcmp(cmd, "render") || !strcmp(cmd, "watch")) {
     opts o; memset(&o, 0, sizeof o); o.fps = 30; o.solo = -1;
     parse_play_opts(argc - base, argv + base, &o);
+#ifndef DM_AOT
+    if (o.native > 0 || (!o.native && strcmp(cmd, "render"))) {
+      int result = run_native(argv, &o);
+      if (result >= 0) return result;
+    }
+#endif
     if (!strcmp(cmd, "watch")) o.watch = 1;
     static dm_module mods[2];
     if (load_any(o.file, &mods[0])) { fprintf(stderr, "dm: %s\n", dm_error()); return 1; }
-    bind_native(&mods[0]);
+    if (o.native >= 0) bind_native(&mods[0]);
     if (o.png || o.wav || o.mp4 || o.avi || o.mov) return render_offline(&mods[0], &o);
     if (!strcmp(cmd, "render")) { fprintf(stderr, "dm render: give --mp4 FILE, --avi FILE, --mov FILE, --png DIR or --wav FILE\n"); return 2; }
     if (o.watch && !ends_with(o.file, ".dmt")) fprintf(stderr, "dm: --watch reloads a .dmt; a .dms will not change\n");
