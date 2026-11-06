@@ -413,6 +413,11 @@ into the macOS/Linux CI matrix; these local results do not imply Linux CI has
 already run. Existing live subprocess tests continue to cover scroll, reverse
 seek, pause and slow-frame-rate input wakeup. They also run with a real pipe
 backend whose player immediately exits, checking continued wall-clock playback.
+The first remote macOS run exposed a fixed-400-ms assumption in the existing
+speed-change test. The test now waits up to three seconds for **both** the
+reported running speed and new clock progress; it also detects an ignored speed
+key, which the old comparison against a much earlier timestamp could miss.
+The independent 250-ms maximum scroll-frame gap remains enforced.
 No claim is made that numeric fuzzing, allocation-failure injection at every
 allocation, hardware audio interruption, or every external encoder behavior
 has been exhaustively tested.

@@ -14,7 +14,8 @@ static pid_t child;
 static char pending[65536];
 static size_t used;
 static unsigned frames;
-static double last_frame, max_gap, seconds, beat;
+static double last_frame, max_gap, seconds, beat, rate;
+static int playing;
 
 static void cleanup(void) {
   if (child > 0) { kill(child, SIGKILL); waitpid(child, NULL, 0); }
@@ -40,10 +41,30 @@ static void read_for(double duration) {
       }
       if (used >= 2 && !memcmp(pending + used - 2, "ch", 2)) {
         char *label = strstr(pending, "x  ");
-        if (label) sscanf(label + 3, "%lfs  beat %lf", &seconds, &beat);
+        if (label) {
+          sscanf(label + 3, "%lfs  beat %lf", &seconds, &beat);
+          char *number = label;
+          while (number > pending && strchr("0123456789.", number[-1])) number--;
+          rate = strtod(number, NULL);
+          playing = strstr(pending, " speed ") != NULL;
+        }
       }
     }
   }
+}
+
+/* Resuming/speed changes include asynchronous audio preparation. Wait for the
+ * observable state transition rather than assuming a loaded CI runner finishes
+ * synthesis in 400 ms. Scroll responsiveness still has its separate 250 ms gate. */
+static void await_progress(double from, double expected_rate, const char *what) {
+  double deadline = dm_now() + 3;
+  do {
+    read_for(.05);
+    if (playing && rate == expected_rate && seconds > from + .1) return;
+  } while (dm_now() < deadline);
+  fprintf(stderr, "FAIL: %s (playing=%d rate=%.2f time=%.2f from=%.2f)\n",
+    what, playing, rate, seconds, from);
+  exit(1);
 }
 
 int main(int argc, char **argv) {
@@ -72,10 +93,9 @@ int main(int argc, char **argv) {
   CHECK(seconds < forward - .2 && beat < forward_beat, "reverse scrub did not rewind time and beat");
   double held = seconds;
   read_for(.15); CHECK(seconds == held, "paused scrub did not stay paused");
-  send_keys(" "); read_for(.8);
-  CHECK(seconds > held + .1, "audio/visual clock did not resume after scrub");
-  send_keys("\033[A"); read_for(.4);
-  CHECK(seconds > held + .4, "speed change stalled playback");
+  send_keys(" "); await_progress(held, 1, "audio/visual clock did not resume after scrub");
+  double before_speed = seconds;
+  send_keys("\033[A"); await_progress(before_speed, 1.25, "speed change stalled playback");
   send_keys("q");
   int status = 0;
   double deadline = dm_now() + 3;
