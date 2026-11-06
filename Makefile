@@ -27,6 +27,10 @@ SHOWCASE_CHAPTER := 5.328979592
 
 all: dm
 
+# Experimental native exporter. Kept out of the public CLI while evaluated.
+avi-prototype: tools/avi-prototype.c $(OBJ) $(POBJ)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
 build/obj/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h | build/obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -72,4 +76,4 @@ test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/
 clean:
 	rm -rf build dm
 
-.PHONY: all demo demos videos showcase showcase-preview run test clean
+.PHONY: all demo demos videos showcase showcase-preview run test clean avi-prototype
