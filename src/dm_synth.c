@@ -53,7 +53,15 @@ void dm_synth_tick(dm_synth *s, const dm_seq *q) {
     const dm_chan *ch = &q->ch[c];
     int vi = s->cur[c];
     dm_voice *v = vi >= 0 ? &s->v[vi] : NULL;
-    if (!v || v->serial != ch->trig_serial) {
+    /* A finished/stolen slot may now belong to another channel. Never touch it
+     * through this channel's old reference, even if trigger serials coincide. */
+    if (v && (v->chan != c || v->serial != s->trig_serial[c])) {
+      s->cur[c] = -1;
+      v = NULL;
+    }
+    /* Allocate only for a real new note-on. Silent channels need no voice, and
+     * losing a slot must not retrigger a note whose gate has already finished. */
+    if (s->trig_serial[c] != ch->trig_serial) {
       if (v && v->active) {
         const dm_inst *oi = v->inst >= 1 && v->inst <= m->ninst ? &m->inst[v->inst - 1] : NULL;
         if (oi && (oi->flags & DM_INST_NNA)) { if (v->rel < 0) v->rel = 0; }   /* let it ring out */
@@ -67,7 +75,9 @@ void dm_synth_tick(dm_synth *s, const dm_seq *q) {
       v->vel = ch->vel;
       v->rng = 0x1234567u + (uint32_t)c * 7919u + ch->trig_serial * 104729u;
       v->active = v->inst >= 1 && v->inst <= m->ninst && ch->trig_serial > 0;
+      s->trig_serial[c] = ch->trig_serial;
     }
+    if (!v) continue;
     if (!ch->gate && v->rel < 0) v->rel = 0;
     v->note = ch->pitch_now + 11.0f;
     v->freq = dm_note_freq(ch->pitch_now);

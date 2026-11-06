@@ -1,21 +1,111 @@
-```
-      _
-   __| |_ __ ___  ___  ___ ___ _ __   ___
-  / _` | '_ ` _ \/ __|/ __/ _ \ '_ \ / _ \
- | (_| | | | | | \__ \ (_|  __/ | | |  __/
-  \__,_|_| |_| |_|___/\___\___|_| |_|\___|  v3
-  ▀▄▀▄ one VM, six programs: inst  chan  master  frame  pixel  post
-  ▄▀▄▀ text -> byte-packed module -> tracker + fractals
-```
+![dmscene — one VM, six programs. Text to byte-packed module to tracker and fractals.](art/header.png)
 
 # dmscene
 
 A composable demoscene engine in pure C99 with no third-party libraries.
+Write the instruments, tracker score, visuals and effects in one text file.
+
+[Demo](#one-vm--no-sleep) · [Build and run](#build-and-run) · [How it works](#how-it-works) · [CLI](#cli) · [Demos](#demos) · [Text format](#the-text-format-dmt)
 
 ```
-demos/pulse.dmt  --dm compile-->  build/pulse.dms (2.4 KB)  --dm play-->    truecolor terminal + CoreAudio
-                                                            --dm render-->  H.264 via ffmpeg, PNG, WAV
+.dmt text  --dm compile-->  .dms module  --dm play-->    truecolor terminal + audio
+                                       --dm render-->  MP4 / PNG / WAV
 ```
+
+## ONE VM / NO SLEEP
+
+**FULL SEND.** A demo of dmscene, made in dmscene: **42.6 seconds of original
+180 BPM chip/rave**, eight visual chapters, and a tour of all seven CLI commands.
+Recursive word zooms, individually twisting and flipping letters, a live audio
+rotor, deep fractal zooms, a torus fly-through and spiralling feedback all run
+inside the same VM that plays the music. Command captions type themselves on
+while a sine scroller carries the CLI through the foreground.
+[The score and every scene](demos/showcase.dmt) are editable source; the synth
+and visual programs produce the soundtrack and frames at runtime.
+
+![Silent highlights: recursive logo zooms, flipping letters, live audio rotor, Mandelbrot zoom, torus fly-through, feedback text trails, hyperspace and kaleidoscopic finale.](art/showcase.gif)
+
+*Silent chapter highlights. Play the demo or render the full MP4 to hear the themesong.*
+
+```sh
+make
+make run                                  # live demo in your terminal; q quits
+./dm watch demos/showcase.dmt              # edit the score or visuals live
+make showcase                             # full 960x600 / 30 fps MP4 + stereo WAV
+```
+
+The render writes `build/video/showcase.mp4` and `build/audio/showcase.wav`.
+Install ffmpeg for MP4 export. `make showcase SIZE=1280x800` renders a larger
+copy; `make showcase-preview` regenerates the animated README highlights.
+Use `make run DEMO=demos/pulse.dmt` to launch another demo.
+
+| time | chapter | on screen |
+|------|---------|-----------|
+| 0:00.0 | Boot the rave | recursive logo copies rush toward the camera; bouncing extruded letters |
+| 0:05.3 | Compile / ignite | log-polar byte vortex; each letter flips and twists independently |
+| 0:10.7 | The code is the beat | rotating eight-channel audio rotor driven by actual channel levels |
+| 0:16.0 | Zoom until tomorrow | staggered Mandelbrot zooms, recursive rings and liquid type |
+| 0:21.3 | Through the donut | forward flight through a repeating chain of twisted tori |
+| 0:26.6 | Feed it back | the logo melts into the real rotating/zooming previous-frame buffer |
+| 0:32.0 | Export the damage | accelerating hyperspace rails, tiled walls, streaks and warped type |
+| 0:37.3 | One VM. Full send. | zooming kaleidoscopic field and independently flipping finale letters |
+
+The 180 BPM score starts with a four-on-the-floor kick, pushes the bass onto
+the offbeats, and adds rolling hats, fast bell replies, snare fills and a brighter
+pulse/FM hook. The final drop lifts the lead an octave. Delays follow the song
+tempo, and explicit note-offs control the short bass and lead phrases.
+The moving command deck covers all seven commands and the core engine
+features. [Research and engine notes](docs/research/music-findings.md) document
+the earlier composition work and the playback bug found along the way.
+
+The source uses all six program kinds, all eight pixel slots, `fn`, `repeat`,
+`sample`, `venv`, `nna`, `timeline`, `scale` and `dither`. Each chapter is
+four bars. The tracker quantises 180 BPM ticks to whole audio samples, giving
+a complete loop of approximately 42.632 seconds.
+
+The colorized ASCII header is included as [PNG](art/header.png) and editable
+[SVG](art/header.svg), both on a 2164 × 727 canvas.
+
+## Build and run
+
+```sh
+make                          # build dm on macOS or Linux
+./dm play demos/showcase.dmt   # compile in memory and play; q quits
+./dm play demos/pulse.dmt      # try another score
+./dm new mydemo               # create a minimal mydemo.dmt
+./dm watch mydemo.dmt          # play and recompile on save
+make demos                    # compile demos/*.dmt into build/modules/*.dms
+make test                     # engine, compiler, audio and all demos
+```
+
+Building needs a C99 compiler and make. Playback uses a truecolor terminal
+and CoreAudio on macOS, or the configured audio pipe on Linux (`aplay` by
+default). Offline rendering needs no terminal or audio device:
+
+```sh
+mkdir -p build/video build/audio build/frames/pulse
+./dm render demos/pulse.dmt --mp4 build/video/pulse.mp4 --wav build/audio/pulse.wav --seconds 30 --size 960x600 --fps 30
+./dm render demos/pulse.dmt --seconds 16 --png build/frames/pulse --wav build/audio/pulse.wav --size 640x400
+make videos SECONDS=30 SIZE=960x600    # build/video/*.mp4 + build/audio/*.wav
+```
+
+`--mp4` pipes raw RGB frames into `ffmpeg` (libx264 crf 18, yuv420p, AAC 192k,
+faststart). Without ffmpeg on `PATH` it writes `FILE.frames/` and `FILE.wav` and
+prints the command that finishes the job. The pixel loop runs on all cores.
+
+Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
+a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
+cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). `ffmpeg` is optional
+and only used by `--mp4`.
+
+Generated files stay grouped under `build/`: `obj/` for object files,
+`modules/` for compiled demos, `video/` for MP4s, `audio/` for WAVs,
+and `tests/` for test executables. `make videos` writes matching video/audio
+pairs. Put PNG sequences in `build/frames/` and image previews in
+`build/images/`. Test scratch files are removed on exit. `make clean` removes
+generated build output and the `dm` binary.
+
+## How it works
 
 One small stack VM runs every programmable part of a demo. Six program kinds
 share one bytecode segment inside a byte-packed `.dms` module:
@@ -34,34 +124,6 @@ publishes its clock to the visual programs. Sync is sample-accurate: the video
 thread owns a second sequencer instance seeked to the sample position CoreAudio
 reports as currently audible. The VM has counted loops but no branches, so the
 loader verifies every program exactly before it runs.
-
-## Build and run
-
-```sh
-make                          # builds dm (dmc and dmplay are aliases); macOS or Linux
-./dm play demos/pulse.dmt     # compiles in memory and plays in the terminal (q quits)
-./dm watch demos/pulse.dmt    # same, recompiling whenever the file changes
-./dm new mydemo               # writes mydemo.dmt, a minimal starting point
-make demos                    # compile every demos/*.dmt into build/*.dms
-make test                     # tests/run.sh: compile, round-trip, determinism, audio, errors, features, all demos
-```
-
-Offline rendering needs no terminal or audio device:
-
-```sh
-./dm render demos/pulse.dmt --mp4 pulse.mp4 --seconds 30 --size 960x600 --fps 30   # H.264 + AAC
-./dm render build/pulse.dms --seconds 16 --png frames/ --wav pulse.wav --size 640x400
-make videos SECONDS=30 SIZE=960x600                                                 # build/video/*.mp4
-```
-
-`--mp4` pipes raw RGB frames into `ffmpeg` (libx264 crf 18, yuv420p, AAC 192k,
-faststart). Without ffmpeg on `PATH` it writes `FILE.frames/` and `FILE.wav` and
-prints the command that finishes the job. The pixel loop runs on all cores.
-
-Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
-a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
-cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). `ffmpeg` is optional
-and only used by `--mp4`.
 
 ## CLI
 
@@ -82,10 +144,10 @@ play options:
   --solo C      hear only channel C                  --threads N  pixel worker threads
 ```
 
-`dmc` and `dmplay` are symlinks that behave like `dm compile` and `dm play`.
-`-h` prints the banner and this text. In the player `q` or `Esc` quits, `1`..`8`
-toggle channel mutes, `0` unmutes all, `r` forces a reload in watch mode. The
-status line shows title, bpm, order, row, beat, resolution, fps, channel flags
+`dm --help` (or `dm -h`) prints the banner and command reference. In the
+player, `q` or `Esc` quits, `1`..`8` toggle channel mutes, `0` unmutes all, and
+`r` forces a reload in watch mode. The status line shows title, bpm, order,
+row, beat, resolution, fps, channel flags
 and the last reload result or compile error. `watch` swaps the new module in at
 the same sample position; uniforms and feedback buffers restart.
 
@@ -111,13 +173,17 @@ src/dm_term.c       terminal blitter with nearest-neighbour scaling, raw keys, t
 src/dm_audio.c      AudioQueue backend / pipe backend
 tools/dm.c          the CLI
 demos/*.dmt         the demos (table below); demos/assets holds their WAV samples
-tests/run.sh        self-test; tests/features.dmt exercises every v3 feature
+tests/run.sh        compile, round-trip, determinism, audio, errors, features and every demo
+tests/synth-voices.c voice ownership, held notes, NNA tails, slot reuse and PCM isolation
+tests/showcase-gates.c bass/lead gate durations across breaks and song loops
+art/               README header (PNG + SVG) and animated demo highlights
 ```
 
 ## Demos
 
 | file | bpm | music | visual |
 |------|-----|-------|--------|
+| `showcase.dmt` | 180 | **ONE VM / NO SLEEP**: fast chip/rave, four-on-the-floor kick, offbeat bass, rolling hats, bell replies, octave-up pulse/FM drop | recursive word zooms, kinetic/flipping glyphs, live audio rotor, deep Mandelbrot zooms, torus fly-through, text feedback, hyperspace, kaleidoscopic finale; moving CLI tour |
 | `pulse.dmt` | 128 | house: FM kick, FM bass, pluck arps, pad, stereo echo | Julia set whose `c` orbits the cardioid; kaleidoscope fold; orbit-trap glow on the arp |
 | `acid.dmt` | 140 | 303 line (`svf` + tone portamento + accents), claps, stabs | Mandelbrot seahorse valley breathing in and out, feedback trails |
 | `kaleido.dmt` | 150 | chiptune: pulse arps via `0xy`, 25% pulse, bitcrushed triangle, noise drums | kaleidoscopic IFS through a 3/5/7/9-fold polar mirror |
@@ -137,8 +203,8 @@ tests/run.sh        self-test; tests/features.dmt exercises every v3 feature
 | `skyline.dmt` | 100 | cinematic: slow kick, industrial clank, growling bass, CS-80 style unison brass through a chan reverb, delayed arp, noise drone | raymarched night flight down a street of a procedural city: one domain-repeated box SDF with hashed heights, lit window grids flickering with the arp, rooftop neon, wet street grid, moon and stars, distance fog; rain streaks, bloom and snare chromatic split in post; camera path and rain from the timeline |
 | `oldskool.dmt` | 125 | Amiga-style 4-channel chip music: one drum instrument switched by velocity, triangle bass, `0xy` arpeggio chords, vibrato lead, everything bitcrushed and lowpassed | copper bars, bouncing bobs, a sine scroller, a rotozoomer, classic fire propagating through the feedback buffer with the logo burning in it, timeline-cut scenes, scanlines except where the fire lives |
 | `glitch.dmt` | 180 | breakcore: the sampled kit pitched by note, reversed snares via `Sxx`, `E9x` rolls, an `E6x` stutter loop, `EDx` delays, reese bass, FM screams, snare bitcrush and master drive opened by `Wxx` | datamosh over a pulsing Mandelbrot: hashed block displacement of the previous frame, row tearing and RGB split on the snare, posterisation that coarsens with the timeline, inverted kick flashes, noise snow on the screams |
-| `mycelium.dmt` | 92 | ambient: heartbeat kick, spores, root bass, breath pad, glints, rustle and wind (written outside this session) | a warped plane folded into mushroom-gill radials, branching filaments, a cellular spore layer and breathing colour feedback over a 64-beat arc |
-| `life.dmt` | 120 | kick, snare, hat, bass, glass, cloud pad (written outside this session) | Conway-style cellular automaton living in the previous-frame buffer: red is the live bit, blue the afterglow; one generation per 16th note, a ring of seeds every two bars |
+| `mycelium.dmt` | 92 | ambient: heartbeat kick, spores, root bass, breath pad, glints, rustle and wind | a warped plane folded into mushroom-gill radials, branching filaments, a cellular spore layer and breathing colour feedback over a 64-beat arc |
+| `life.dmt` | 120 | kick, snare, hat, bass, glass, cloud pad | Conway-style cellular automaton living in the previous-frame buffer: red is the live bit, blue the afterglow; one generation per 16th note, a ring of seeds every two bars |
 
 ## The text format (.dmt)
 

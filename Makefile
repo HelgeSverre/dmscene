@@ -13,48 +13,60 @@ endif
 
 ENGINE := src/dm_vm.c src/dm_font.c src/dm_seq.c src/dm_synth.c src/dm_module.c src/dm_compile.c src/dm_scene.c src/dm_io.c
 PLAT   := src/dm_term.c src/dm_audio.c
-OBJ    := $(ENGINE:src/%.c=build/%.o)
-POBJ   := $(PLAT:src/%.c=build/%.o)
+OBJ    := $(ENGINE:src/%.c=build/obj/%.o)
+POBJ   := $(PLAT:src/%.c=build/obj/%.o)
 
-DEMO   := demos/pulse.dmt
+DEMO   ?= demos/showcase.dmt
 DEMOS  := $(wildcard demos/*.dmt)
-DMS    := $(DEMOS:demos/%.dmt=build/%.dms)
+DMS    := $(DEMOS:demos/%.dmt=build/modules/%.dms)
 MP4    := $(DEMOS:demos/%.dmt=build/video/%.mp4)
 SECONDS ?= 30
 SIZE    ?= 960x600
+SHOWCASE_SECONDS := 42.631836735
+SHOWCASE_CHAPTER := 5.328979592
 
-all: dm dmc dmplay
+all: dm
 
-build/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h | build
+build/obj/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h | build/obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build:
-	mkdir -p build
+build/obj build/modules build/audio build/video build/tests:
+	mkdir -p $@
 
 dm: tools/dm.c $(OBJ) $(POBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-dmc dmplay: dm
-	ln -sf dm $@
-
-build/%.dms: demos/%.dmt dm
+build/modules/%.dms: demos/%.dmt dm | build/modules
 	./dm compile $< -o $@
 
-build/video/%.mp4: build/%.dms dm
-	@mkdir -p build/video
-	./dm render $< --mp4 $@ --seconds $(SECONDS) --size $(SIZE)
+build/video/%.mp4: build/modules/%.dms dm | build/video build/audio
+	./dm render $< --mp4 $@ --wav build/audio/$*.wav --seconds $(SECONDS) --size $(SIZE)
 
-demo: build/pulse.dms
+demo: build/modules/$(notdir $(DEMO:.dmt=.dms))
 demos: $(DMS)
 videos: $(MP4)
 
-run: dm
-	./dm play demos/pulse.dmt
+# 32 bars at 180 BPM. The tracker floors each tick to 612 samples at 44.1 kHz.
+showcase: build/modules/showcase.dms | build/video build/audio
+	./dm render $< --mp4 build/video/showcase.mp4 --wav build/audio/showcase.wav --seconds $(SHOWCASE_SECONDS) --size $(SIZE) --fps 30
 
-test: all demos
+# Silent chapter highlights for the README; the MP4 contains the themesong.
+showcase-preview: showcase
+	ffmpeg -y -hide_banner -loglevel error -i build/video/showcase.mp4 -filter_complex "[0:v]select='lt(mod(t,$(SHOWCASE_CHAPTER)),1.35)',setpts=N/30/TB,fps=8,scale=640:400:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" -loop 0 art/showcase.gif
+
+run: dm
+	./dm play $(DEMO)
+
+build/tests/showcase-gates: tests/showcase-gates.c $(OBJ) | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/synth-voices: tests/synth-voices.c $(OBJ) | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test: all demos build/tests/showcase-gates build/tests/synth-voices
 	./tests/run.sh
 
 clean:
-	rm -rf build dm dmc dmplay
+	rm -rf build dm
 
-.PHONY: all demo demos videos run test clean
+.PHONY: all demo demos videos showcase showcase-preview run test clean

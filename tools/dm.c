@@ -1,5 +1,5 @@
 /* dm - the dmscene command line: compile, check, disasm, play, render, watch, new.
- * Inputs may be .dmt (compiled in memory) or .dms.  dmc / dmplay are aliases. */
+ * Inputs may be .dmt (compiled in memory) or .dms. */
 #include "dm.h"
 #include "dm_banner.h"
 #include <pthread.h>
@@ -314,11 +314,9 @@ static int play_realtime(dm_module *mods, opts *o) {
 }
 
 int main(int argc, char **argv) {
-  const char *prog = strrchr(argv[0], '/'); prog = prog ? prog + 1 : argv[0];
-  const char *cmd = NULL; int base = 1;
-  if (!strcmp(prog, "dmc")) cmd = "compile";
-  else if (!strcmp(prog, "dmplay")) cmd = "play";
-  else { if (argc < 2) usage(2); cmd = argv[1]; base = 2; }
+  if (argc < 2) usage(2);
+  const char *cmd = argv[1];
+  const int base = 2;
   if (!strcmp(cmd, "-h") || !strcmp(cmd, "--help") || !strcmp(cmd, "help")) usage(0);
   for (int i = base; i < argc; i++) if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) usage(0);
   if (!strcmp(cmd, "compile")) return cmd_compile(argc - base, argv + base, 0, 0);

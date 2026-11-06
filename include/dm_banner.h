@@ -7,6 +7,6 @@
   "  / _` | '_ ` _ \\/ __|/ __/ _ \\ '_ \\ / _ \\   \n" \
   " | (_| | | | | | \\__ \\ (_|  __/ | | |  __/      \n" \
   "  \\__,_|_| |_| |_|___/\\___\\___|_| |_|\\___|  v3  \n" \
-  "  \xe2\x96\x80\xe2\x96\x84\xe2\x96\x80\xe2\x96\x84 one VM, four programs: inst  master  frame  pixel\n" \
+  "  \xe2\x96\x80\xe2\x96\x84\xe2\x96\x80\xe2\x96\x84 one VM, six programs: inst  chan  master  frame  pixel  post\n" \
   "  \xe2\x96\x84\xe2\x96\x80\xe2\x96\x84\xe2\x96\x80 text -> byte-packed module -> tracker + fractals\n\n"
 #endif

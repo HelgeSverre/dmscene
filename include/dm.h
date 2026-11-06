@@ -1,12 +1,14 @@
 /* dm.h - dmscene: a tiny composable demo engine.
  *
- *   text (.dmt)  --dmc-->  byte-packed module (.dms)  --dmplay-->  pixels + PCM
+ *   text (.dmt)  --dm compile-->  byte-packed module (.dms)  --dm play-->  pixels + PCM
  *
- * One stack VM runs four kinds of program that all live in one code segment:
+ * One stack VM runs six kinds of program that all live in one code segment:
  *   frame   : once per video frame, writes uniforms (camera, colour, envelopes)
  *   pixel   : once per pixel, reads uniforms, calls fractal intrinsics, emits colour
  *   inst    : once per sample per voice, turns (phase, time, velocity, params) into audio
+ *   chan    : once per sample on a channel's summed voices (insert effects)
  *   master  : once per sample on the stereo mix (delay lines live here)
+ *   post    : once per pixel after the selected pixel program (framebuffer effects)
  * An XM-style tracker (patterns, order list, effects) drives the voices and exposes
  * its clock (beat, row, per-channel trigger times) to the visual programs.
  *
@@ -244,6 +246,7 @@ typedef struct {
   int sr;
   dm_voice v[DM_MAX_VOICES];
   int cur[DM_MAX_CHANNELS];          /* voice currently owned by each channel, -1 none */
+  uint32_t trig_serial[DM_MAX_CHANNELS]; /* last note-on handled, independent of voice slot reuse */
   float in[DM_IN_COUNT];
   dm_vm vm;
   dm_fxunit master, chan[DM_MAX_CHANNELS];

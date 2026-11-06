@@ -2,7 +2,10 @@
 # dmscene self-test: compile, round-trip, deterministic offline render, audio sanity, error paths.
 set -e
 cd "$(dirname "$0")/.."
-T=build/test; rm -rf "$T"; mkdir -p "$T/a" "$T/b"
+T=$(mktemp -d "${TMPDIR:-/tmp}/dmscene-tests.XXXXXX")
+trap 'rm -rf "$T"' 0
+trap 'exit 1' HUP INT TERM
+mkdir -p "$T/a" "$T/b"
 fail() { echo "FAIL: $1"; exit 1; }
 
 ./dm compile demos/pulse.dmt -o "$T/pulse.dms" 2>/dev/null || fail "compile"
@@ -55,6 +58,9 @@ printf 'DMS\002' > "$T/old.dms"; ./dm play "$T/old.dms" --mute 2>"$T/err" >/dev/
 rm -f "$T/scaffold.dmt"; ./dm new "$T/scaffold" >/dev/null 2>&1 || fail "dm new"; ./dm check "$T/scaffold.dmt" >/dev/null 2>&1 || fail "dm new scaffold does not compile"
 
 # every demo compiles, loads and renders a second of audio + a frame
+./build/tests/showcase-gates || fail "showcase held notes"
+./build/tests/synth-voices || fail "synth voice ownership"
+
 for f in demos/*.dmt; do
   n=$(basename "$f" .dmt)
   ./dm compile "$f" -o "$T/$n.dms" 2>/dev/null || fail "compile $n"

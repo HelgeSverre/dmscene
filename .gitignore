@@ -1,8 +1,6 @@
 # build output
 build/
 /dm
-/dmc
-/dmplay
 *.o
 *.dms
 # rendered output anywhere except the shipped sample assets
@@ -11,5 +9,6 @@ build/
 *.wav
 !demos/assets/*.wav
 !tests/assets/*.wav
+!art/*.png
 # os
 .DS_Store
