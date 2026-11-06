@@ -1,3 +1,6 @@
+# @collection Demos
+# @music house: FM kick, FM bass, pluck arps, pad, stereo echo
+# @visual Julia set whose c orbits the cardioid; kaleidoscope fold; orbit-trap glow on the arp
 # pulse.dmt - a loopable fractal demo for dmscene.
 # Everything below compiles into one byte-packed .dms: five VM instruments,
 # four tracker patterns, a master effect, two palettes and a two-stage shader.

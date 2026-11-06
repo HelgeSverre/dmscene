@@ -1,10 +1,12 @@
 /* dm_scene.c - frame program, selected pixel program, optional post pass; worker threads;
  * previous-frame buffer for feedback; ordered dither. */
 #include "dm.h"
+#ifndef DM_NO_THREADS
 #include <pthread.h>
+#include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 int dm_fb_alloc(dm_fb *fb, int w, int h) {
   if (!fb || w < 1 || h < 1 || (size_t)w > SIZE_MAX / 3 / (size_t)h) return -1;
@@ -77,10 +79,15 @@ static void *run_rows(void *arg) {
 }
 
 static void run_pass(dm_scene *s, dm_fb *fb, const dm_prog *p, int post, float *state) {
+#ifdef DM_NO_THREADS
+  const int nt = 1;
+  job jobs[1];
+#else
   int nt = s->nthreads;
   if (nt <= 0) { const char *env = getenv("DM_THREADS"); nt = env ? atoi(env) : (int)sysconf(_SC_NPROCESSORS_ONLN); }
   if (nt < 1) nt = 1; if (nt > 64) nt = 64; if (nt > fb->h) nt = fb->h;
   job jobs[64]; pthread_t th[64]; int started[64] = {0};
+#endif
   for (int i = 0; i < nt; i++) {
     job *j = &jobs[i];
     j->s = s; j->fb = fb; j->y0 = i; j->step = nt; j->post = post;
@@ -94,12 +101,16 @@ static void run_pass(dm_scene *s, dm_fb *fb, const dm_prog *p, int post, float *
     j->vm.uni = j->uni;
     j->vm.prev = s->prev; j->vm.pw = s->pw; j->vm.ph = s->ph; j->vm.cur = s->cur;
   }
+#ifndef DM_NO_THREADS
   for (int i = 1; i < nt; i++) {
     if (pthread_create(&th[i], NULL, run_rows, &jobs[i]) == 0) started[i] = 1;
     else run_rows(&jobs[i]);
   }
+#endif
   run_rows(&jobs[0]);
+#ifndef DM_NO_THREADS
   for (int i = 1; i < nt; i++) if (started[i]) pthread_join(th[i], NULL);
+#endif
 }
 
 void dm_scene_render(dm_scene *s, const dm_seq *clk, const float *cenv, dm_fb *fb) {

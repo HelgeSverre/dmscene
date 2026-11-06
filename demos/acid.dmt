@@ -1,3 +1,6 @@
+# @collection Demos
+# @music 303 line (svf + tone portamento + accents), claps, stabs
+# @visual Mandelbrot seahorse valley breathing in and out, feedback trails
 # acid.dmt - 303 line over a breathing Mandelbrot with feedback trails
 title ACID
 song bpm=140 speed=6 rpb=4 channels=4 loop=0 volume=0.52

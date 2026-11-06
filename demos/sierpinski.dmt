@@ -1,3 +1,6 @@
+# @collection Demos
+# @music minimal techno: kick, rumble, clicks, bleeps into delay
+# @visual folding KIFS geometry, inverted flash every four bars
 # sierpinski.dmt - minimal techno over folding kaleidoscopic IFS geometry
 title SIERPINSKI
 song bpm=132 speed=6 rpb=4 channels=5 loop=0 volume=0.55

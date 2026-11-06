@@ -39,3 +39,29 @@ jobs:
             --seconds 2 --size 320x200 --fps 15
           test -s build/video/ci-smoke.mp4
           test -s build/audio/ci-smoke.wav
+
+      - name: Verify lossless containers and optional native shaders
+        if: runner.os == 'Linux'
+        run: |
+          sh tests/native-cli.sh
+          make test-native
+
+  wasm:
+    name: WebAssembly and source metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned Emscripten SDK
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$(cat .emscripten-version)"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$(cat .emscripten-version)"
+          echo "EMCC=$RUNNER_TEMP/emsdk/upstream/emscripten/emcc" >> "$GITHUB_ENV"
+      - name: Test metadata and build the actual browser engine
+        run: |
+          make test-web
+          make test-wasm
+          make web

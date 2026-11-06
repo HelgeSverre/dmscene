@@ -1,3 +1,6 @@
+# @collection Demos
+# @music kick, snare, hat, bass, glass, cloud pad
+# @visual Conway-style cellular automaton living in the previous-frame buffer: red is the live bit, blue the afterglow; one generation per 16th note, a ring of seeds every two bars
 # life.dmt - Conway-like cellular automata in the previous-frame buffer
 # Red encodes the live cell bit, blue carries its fading afterglow.
 # Every 16th note advances one generation; every two bars a ring of seeds arrives.

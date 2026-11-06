@@ -1,3 +1,6 @@
+# @collection Demos
+# @music Tron: slow heavy kick, 8th-note grid pulse, unison brass, driven 16th arp, PWM lead, long reverb
+# @visual top-down arena: three light cycles ride one grid cell per 16th, turn at cell boundaries, leave walls that persist in the feedback buffer re-projected through the moving camera; arena resets every 8 bars
 # lightwall.dmt - Tron. Three light cycles ride the grid on 16th notes and leave walls of light behind them.
 # The walls persist in the feedback buffer, re-projected through the moving camera every frame.
 title LIGHTWALL

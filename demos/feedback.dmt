@@ -1,3 +1,6 @@
+# @collection Demos
+# @music dub: 808 kick, rim, skank chords, long filtered delays
+# @visual tiny Julia seed smeared through a rotating zoom feedback loop
 # feedback.dmt - dub at 75 bpm; a tiny julia seed smeared through a rotating zoom feedback loop
 title FEEDBACK
 song bpm=75 speed=6 rpb=4 channels=5 loop=0 volume=0.48

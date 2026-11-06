@@ -1,3 +1,6 @@
+# @collection Demos
+# @music ambient: evolving pad, FM bells, sub, filtered air
+# @visual Newton fractal for z³-1, three shaded basins, slow drift
 # newton.dmt - slow ambient over a Newton fractal's three basins
 title NEWTON
 song bpm=90 speed=6 rpb=4 channels=4 loop=0 volume=0.72

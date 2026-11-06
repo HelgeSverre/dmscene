@@ -10,5 +10,21 @@ build/
 *.wav
 !demos/assets/*.wav
 !tests/assets/*.wav
+# Generated site/runtime; authoring sources live in web/_sitegen and web/_runtime.
+web/*.html
+web/*.css
+web/*.js
+web/*.mjs
+web/*.json
+web/favicon.svg
+web/demo/
+web/fonts/
+web/runtime/
+web/videos/
+web/posters/
+web/source/
+web/assets/demo/
 # os
 .DS_Store
+
+/avi-prototype

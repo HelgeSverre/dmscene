@@ -1,3 +1,6 @@
+# @collection Demos
+# @music drum & bass: two-step break, reese bass, filtered stabs
+# @visual burning ship, mirrored, fire palette, snare strobes
 # ship.dmt - drum & bass over the burning ship, mirrored and set on fire
 title BURNING SHIP
 song bpm=174 speed=6 rpb=4 channels=5 loop=0 volume=0.6

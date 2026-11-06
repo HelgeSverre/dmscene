@@ -1,3 +1,6 @@
+# @collection Demos
+# @music sampled drum kit (smp), band-limited bass, NNA pad and plucks with drawn envelopes, chan reverb and delay, E9x snare rolls, Wxx driving a wavefolder
+# @visual timeline-cut scenes: plasma title and scroller, raymarched twisted torus (repeat), spiral feedback, credits; post bloom, chromatic aberration, scanlines; scale=2 dither=1
 # megademo.dmt - one of everything: sampled drums, NNA pad with a drawn envelope, chan reverb,
 # timeline-driven scene cuts, title + scroller text, a raymarched torus (repeat), feedback, post bloom/CRT.
 title MEGADEMO

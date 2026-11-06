@@ -17,7 +17,8 @@ Write the instruments, tracker score, visuals and effects in one text file.
 
 ```
 .dmt text  --dm compile-->  .dms module  --dm play-->    truecolor terminal + audio
-                                       --dm render-->  MP4 / PNG / WAV
+                                       --dm render-->  MP4 / AVI / MOV / PNG / WAV
+                                       --make web-->   browser Wasm player + gallery
 ```
 
 ## Demo
@@ -67,6 +68,8 @@ envelopes and timeline events. Each chapter lasts four bars at 180 BPM.
 CI builds and runs `make test` and `make test-sanitize` on macOS and Linux,
 then does an ffmpeg MP4 render smoke test on Linux. Sanitizer checks cover
 address errors, undefined behavior and float-to-integer overflow.
+Separate jobs check the Emscripten browser engine and source metadata; Linux
+also checks lossless container decoding and optional AOT shader equivalence.
 
 ```sh
 make                          # build dm on macOS or Linux
@@ -107,10 +110,19 @@ demo's usual `scale=2`, with visibly coarser detail. Omit it for the intended
 render quality. Encoding is usually a small fraction of the total render time;
 the pixel programs dominate complex demos.
 
+For lossless export without an external encoder, use `--mov` (QTRLE RGB + PCM)
+or `--avi` (uncompressed BGR + PCM). Both preserve exact rendered pixels and
+support the usual size, start, duration, scale and thread options. Their files
+are much larger than MP4 and have a 4 GiB container limit. Native output is
+written to a temporary sibling and replaces the destination only after a
+successful close. MP4 remains the compact format for browser video playback.
+See [native export](docs/native-export.md) for the optional per-demo AOT shader
+compiler, benchmarks and limits.
+
 Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
 a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
 cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). The `dm` binary
-only invokes `ffmpeg` for `--mp4`; PNG and WAV export use built-in writers.
+only invokes `ffmpeg` for `--mp4`; AVI, MOV, PNG and WAV use built-in writers.
 The README animation target also requires ffmpeg.
 
 Generated files stay grouped under `build/`: `obj/` for object files,
@@ -119,6 +131,32 @@ and `tests/` for test executables. `make videos` writes matching video/audio
 pairs. Put PNG sequences in `build/frames/` and image previews in
 `build/images/`. Test scratch files are removed on exit. `make clean` removes
 generated build output and the `dm` binary.
+
+The static showcase gallery is generated from those renders and the `.dmt`
+sources. `web/` is the site root; the generator, assets and local preview server
+live in `web/_sitegen/`.
+
+```sh
+make wasm      # build the actual C engine with Emscripten
+make web       # build Wasm + generate gallery and live/Studio players
+make serve     # preview at http://127.0.0.1:8000/
+make videos    # optional: render MP4s for video mode
+make site      # regenerate pages/media using the existing runtime
+make test-web  # source metadata, highlighting and gallery tests
+make test-wasm # compile every demo and test the real Wasm engine
+```
+
+The browser target needs Node.js 22+ and Emscripten; the native build does not.
+`web-runtime` remains an alias for `wasm`. Build setup, deployment and runtime
+limits are documented in [Browser engine](docs/wasm.md). Browser workers run
+the same compiler/VM/synth/renderer as native `dm`; JavaScript handles the UI
+and source inspection. There is no JavaScript implementation of the demo VM.
+
+ffprobe supplies optional MP4 metadata and ffmpeg extracts posters. Without
+them, source/live pages still generate. Live playback loads `.dmt` and declared
+assets directly; it does not use an MP4. Credits, descriptions, custom tags
+and preview duration come from [metadata comments](docs/demo-metadata.md) in
+the `.dmt`, with no separate hand-maintained manifest or README entry.
 
 ## How it works
 
@@ -151,7 +189,7 @@ dm COMMAND file [options]
   disasm  IN                           print every program's bytecode
   play    IN [play options]            terminal + audio (IN may be .dmt or .dms)
   watch   IN [play options]            play, recompiling whenever the .dmt changes
-  render  IN [render options]          offline MP4, PNG sequence and/or WAV
+  render  IN [render options]          offline MP4, AVI, MOV, PNG sequence and/or WAV
   new     NAME                         write NAME.dmt, a minimal starting point
 
   --version, -V                       engine generation and DMS format version
@@ -163,6 +201,8 @@ play options:
 
 render options (at least one output required; outputs can be combined):
   --mp4 FILE    encode video with audio via ffmpeg
+  --avi FILE    lossless raw video + PCM, built in (large files)
+  --mov FILE    lossless QTRLE video + PCM, built in
   --png DIR     write numbered PNG frames to an existing directory
   --wav FILE    write 44.1 kHz stereo, 16-bit PCM WAV
   --seconds S   clip duration (default 8 seconds)
@@ -173,6 +213,9 @@ render options (at least one output required; outputs can be combined):
   --threads N   pixel worker threads
   --solo C      hear only channel C (zero-based)
 ```
+
+Choose at most one of `--mp4`, `--avi`, and `--mov`; any can be combined
+with `--png` and `--wav`.
 
 `dm --help` (or `dm -h`) prints the banner and command reference.
 `dm --version` reports `dmscene v4 (DMS format 4)`; this is the engine/module
@@ -377,6 +420,19 @@ Top level is line oriented. `#` (at line start or after whitespace, so `D#4`
 is a note) and `//` start comments. Blocks open with `{` at the end of the
 header line and close with a line containing only `}`; nested `{`/`}` lines
 (from `repeat` and `if`/`else`) are tracked.
+
+The gallery recognizes optional header comments before the first directive:
+
+```text
+# @author Your name
+# @description A short gallery description.
+# @tags ambient, feedback
+# @duration 48
+```
+
+`@model`, `@music`, `@visual`, `@collection`, `@license`, `@url`, and `@warning`
+are also supported. `title` and `song` retain their usual meanings. Metadata
+comments do not change the compiled module; see the [field reference](docs/demo-metadata.md).
 
 ```
 title PULSE
@@ -678,3 +734,6 @@ retry/concurrency behavior, confirmed fixes and the tests that exercise them.
 * New backend: implement the six audio/terminal functions at the bottom of `dm.h`.
 * The engine is a library: `dm_module_read`, `dm_player_render` (any audio
   callback) and `dm_scene_render` (any framebuffer) are the whole surface.
+
+The optional native exporter and shader AOT experiment are described in
+[native export](docs/native-export.md).

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music trance: gated supersaw, offbeat bass, claps
+# @visual perspective tunnel with voronoi wall tiles and kick rings
 # tunnel.dmt - trance gate down an infinite textured tunnel
 title TUNNEL
 song bpm=138 speed=6 rpb=4 channels=5 loop=0 volume=0.55

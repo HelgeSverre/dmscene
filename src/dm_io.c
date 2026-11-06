@@ -115,3 +115,123 @@ int dm_wav_close(dm_wav *w) {
   }
   return w->failed ? -1 : 0;
 }
+
+/* Experimental raw AVI: BGR frames and PCM audio, no external encoder. */
+typedef struct { uint32_t id, flags, off, size; } avi_idx;
+struct dm_avi {
+  FILE *f; int w, h, fps, sr; uint32_t frames, audio_frames;
+  long riff_size, avih_frames, vstrh_frames, astrh_frames, movi;
+  avi_idx *idx; size_t nidx, cap; uint8_t *pixels;
+  uint32_t stride, image;
+  int failed;
+};
+
+static void avi_u32(FILE *f, uint32_t v) { le32(f, v); }
+static void avi_id(FILE *f, const char *s) { fwrite(s, 1, 4, f); }
+static void avi_chunk(FILE *f, const char *id, uint32_t n) { avi_id(f, id); avi_u32(f, n); }
+static int avi_patch(dm_avi *a, long at, uint32_t v) {
+  long here = ftell(a->f);
+  if (here < 0 || at < 0 || fseek(a->f, at, SEEK_SET) || ferror(a->f)) { a->failed = 1; return -1; }
+  avi_u32(a->f, v);
+  if (fseek(a->f, here, SEEK_SET) || ferror(a->f)) { a->failed = 1; return -1; }
+  return 0;
+}
+static int avi_index(dm_avi *a, const char *id, uint32_t flags, uint32_t size) {
+  if (a->failed) return -1;
+  long pos = ftell(a->f);
+  if (pos < 0 || (uint64_t)pos + size + 16 * (uint64_t)(a->nidx + 1) + 16 > UINT32_MAX) { a->failed = 1; return -1; }
+  if (a->nidx == a->cap) {
+    size_t cap = a->cap ? a->cap * 2 : 256;
+    avi_idx *p = realloc(a->idx, cap * sizeof *p);
+    if (!p) { a->failed = 1; return -1; }
+    a->idx = p; a->cap = cap;
+  }
+  avi_idx *e = &a->idx[a->nidx++];
+  memcpy(&e->id, id, 4); e->flags = flags; e->off = (uint32_t)(pos - a->movi); e->size = size;
+  return 0;
+}
+
+dm_avi *dm_avi_open(const char *path, int w, int h, int fps, int sr) {
+  if (w < 1 || h < 1 || fps < 1 || sr < 1 || (((uint64_t)w * 3 + 3) & ~3ull) * h > UINT32_MAX) return NULL;
+  dm_avi *a = calloc(1, sizeof *a);
+  if (!a) return NULL;
+  a->f = fopen(path, "wb"); a->w = w; a->h = h; a->fps = fps; a->sr = sr;
+  a->stride = ((uint32_t)w * 3 + 3) & ~3u; a->image = a->stride * h;
+  a->pixels = calloc(a->image, 1);
+  if (!a->f || !a->pixels) { if (a->f) fclose(a->f); free(a->pixels); free(a); return NULL; }
+  setvbuf(a->f, NULL, _IOFBF, 1024 * 1024);
+  FILE *f = a->f; uint32_t image = a->image;
+  avi_id(f, "RIFF"); a->riff_size = ftell(f); avi_u32(f, 0); avi_id(f, "AVI ");
+  avi_id(f, "LIST"); long hdrl = ftell(f); avi_u32(f, 0); avi_id(f, "hdrl");
+  avi_chunk(f, "avih", 56);
+  avi_u32(f, 1000000u / (uint32_t)fps); avi_u32(f, image * (uint32_t)fps + (uint32_t)sr * 4); avi_u32(f, 0); avi_u32(f, 0x10);
+  a->avih_frames = ftell(f); avi_u32(f, 0); avi_u32(f, 0); avi_u32(f, 2); avi_u32(f, image); avi_u32(f, w); avi_u32(f, h);
+  for (int i = 0; i < 4; i++) avi_u32(f, 0);
+  avi_id(f, "LIST"); long vlist = ftell(f); avi_u32(f, 0); avi_id(f, "strl");
+  avi_chunk(f, "strh", 56); avi_id(f, "vids"); avi_id(f, "DIB "); avi_u32(f, 0); avi_u32(f, 0);
+  avi_u32(f, 0); avi_u32(f, 1); avi_u32(f, fps); avi_u32(f, 0); a->vstrh_frames = ftell(f); avi_u32(f, 0);
+  avi_u32(f, image); avi_u32(f, UINT32_MAX); avi_u32(f, 0); avi_u32(f, 0); avi_u32(f, ((uint32_t)h << 16) | (uint16_t)w);
+  avi_chunk(f, "strf", 40); avi_u32(f, 40); avi_u32(f, w); avi_u32(f, h); le16(f, 1); le16(f, 24); avi_u32(f, 0); avi_u32(f, image);
+  avi_u32(f, 0); avi_u32(f, 0); avi_u32(f, 0); avi_u32(f, 0); avi_patch(a, vlist, (uint32_t)(ftell(f) - vlist - 4));
+  avi_id(f, "LIST"); long alist = ftell(f); avi_u32(f, 0); avi_id(f, "strl");
+  avi_chunk(f, "strh", 56); avi_id(f, "auds"); avi_u32(f, 1); avi_u32(f, 0); avi_u32(f, 0); avi_u32(f, 0);
+  avi_u32(f, 1); avi_u32(f, sr); avi_u32(f, 0); a->astrh_frames = ftell(f); avi_u32(f, 0); avi_u32(f, 4096); avi_u32(f, UINT32_MAX); avi_u32(f, 4); avi_u32(f, 0); avi_u32(f, 0);
+  avi_chunk(f, "strf", 16); le16(f, 1); le16(f, 2); avi_u32(f, sr); avi_u32(f, sr * 4); le16(f, 4); le16(f, 16);
+  avi_patch(a, alist, (uint32_t)(ftell(f) - alist - 4)); avi_patch(a, hdrl, (uint32_t)(ftell(f) - hdrl - 4));
+  avi_id(f, "LIST"); long movi_size = ftell(f); avi_u32(f, 0); avi_id(f, "movi"); a->movi = ftell(f); (void)movi_size;
+  if (a->failed || a->movi < 0 || ferror(f)) { fclose(f); free(a->idx); free(a->pixels); free(a); return NULL; }
+  return a;
+}
+
+int dm_avi_video(dm_avi *a, const dm_fb *fb) {
+  if (!a || !fb || !fb->rgb || a->failed || fb->w != a->w || fb->h != a->h || a->frames == UINT32_MAX) return -1;
+  uint32_t bytes = a->image;
+  if (avi_index(a, "00db", 0x10, bytes)) return -1;
+  avi_chunk(a->f, "00db", bytes);
+  for (int y = a->h - 1; y >= 0; y--) {
+    const uint8_t *src = fb->rgb + (size_t)y * a->w * 3;
+    uint8_t *dst = a->pixels + (size_t)(a->h - 1 - y) * a->stride;
+    for (int x = 0; x < a->w; x++) { dst[x * 3] = src[x * 3 + 2]; dst[x * 3 + 1] = src[x * 3 + 1]; dst[x * 3 + 2] = src[x * 3]; }
+  }
+  if (fwrite(a->pixels, 1, bytes, a->f) != bytes || ferror(a->f)) { a->failed = 1; return -1; }
+  a->frames++;
+  return 0;
+}
+
+int dm_avi_audio(dm_avi *a, const float *lr, uint32_t frames) {
+  if (!a || !lr || a->failed || frames > UINT32_MAX - a->audio_frames || frames > UINT32_MAX / 4) return -1;
+  uint32_t bytes = frames * 4;
+  if (avi_index(a, "01wb", 0, bytes)) return -1;
+  avi_chunk(a->f, "01wb", bytes);
+  uint8_t pcm[8192];
+  for (uint32_t off = 0; off < frames;) {
+    uint32_t n = frames - off > 2048 ? 2048 : frames - off;
+    for (uint32_t i = 0; i < n * 2; i++) {
+      float x = lr[(size_t)off * 2 + i]; if (x != x) x = 0; if (x > 1) x = 1; if (x < -1) x = -1;
+      int v = (int)(x * 32767.0f); pcm[i*2] = (uint8_t)v; pcm[i*2+1] = (uint8_t)(v >> 8);
+    }
+    if (fwrite(pcm, 4, n, a->f) != n) { a->failed = 1; return -1; }
+    off += n;
+  }
+  if (ferror(a->f)) { a->failed = 1; return -1; }
+  a->audio_frames += frames;
+  return 0;
+}
+
+int dm_avi_close(dm_avi *a) {
+  if (!a) return -1;
+  FILE *f = a->f;
+  if (a->failed) { fclose(f); free(a->idx); free(a->pixels); free(a); return -1; }
+  long movi_end = ftell(f);
+  if (movi_end < 0) a->failed = 1;
+  avi_patch(a, a->movi - 8, (uint32_t)(movi_end - (a->movi - 8) - 4));
+  avi_chunk(f, "idx1", (uint32_t)(a->nidx * sizeof *a->idx));
+  for (size_t i = 0; i < a->nidx; i++) { fwrite(&a->idx[i].id, 1, 4, f); avi_u32(f, a->idx[i].flags); avi_u32(f, a->idx[i].off); avi_u32(f, a->idx[i].size); }
+  long end = ftell(f);
+  avi_patch(a, a->riff_size, (uint32_t)(end - 8));
+  avi_patch(a, a->avih_frames, a->frames); avi_patch(a, a->vstrh_frames, a->frames); avi_patch(a, a->astrh_frames, a->audio_frames);
+  int bad = a->failed || ferror(f) ? -1 : 0;
+  if (fclose(f)) bad = -1;
+  free(a->idx); free(a->pixels); free(a);
+  return bad;
+}

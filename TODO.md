@@ -1,7 +1,7 @@
 # dmscene TODO — gaps found by dogfooding
 
-Status: v4. Reviewed against `main` on 2026-11-06, after the state-machine
-audit and CLI reporting additions. Working-tree experiments are labelled separately.
+Status: v4. Updated 2026-11-07 after native export integration, the supported
+Wasm target and source metadata. Remaining experimental limitations are labelled separately.
 This is a working list, not a roadmap promise. It records what actually hurt
 while building 40+ demos, twelve model-authored demos, a four-model exquisite
 corpse, and five attempted ports of the Pouet all-time top five.
@@ -130,6 +130,9 @@ Write MP4 to a temporary sibling and rename on success so an interrupted
 render does not replace a good output. Write/flush failures now return nonzero
 and temporary WAV cleanup is fixed (`a1b8d3f`); atomic final MP4 replacement
 and resume are still missing.
+Native `--avi`/`--mov` now write without ffmpeg and atomically replace their
+destination after finalization. MP4 keeps the existing ffmpeg path; the native
+formats have larger files and a 4 GiB limit, so they do not replace resume.
 **Effort:** M. **Impact:** high for iteration and long demos.
 
 ### 9. No lint, bench or cost model
@@ -208,17 +211,16 @@ consider optional symbol metadata if named inspection of binaries is useful.
 **Effort:** S/M. **Impact:** medium for tooling; basic machine-readable output is done.
 
 ### 14. Demo manifest, gallery and contact sheets
-**In progress, not yet committed:** the current working tree has a static
-gallery, demo detail pages, metadata extraction and poster generation in
-`web/_sitegen/`, with `make site` / `make serve` targets. Do not rebuild this
-from scratch or count it as landed on `main` yet.
-**Remaining:** a durable machine-readable manifest, measured render/audio
-metrics, contact sheets, and a single source of truth for attribution and README
-rows. Much of the editorial metadata still lives in README/source comments.
-**Suggestion:** `demos/manifest.json` with file, title, author/model, prompt,
-duration, BPM, render time, audio stats, status. `make gallery` renders posters
-and a small `index.html` with `<video>` clips. Generate README rows from the
-manifest.
+**Delivered:** static gallery/detail pages, posters, source highlighting and
+live Wasm/Studio playback, with `make web` / `make site` / `make serve`.
+Optional `.dmt` header metadata supplies credits, descriptions, custom tags
+and duration; existing tracked-demo credits were migrated from README tables.
+Per-demo JSON is derived output; no separate editorial manifest is required.
+**Remaining:** measured render/audio metrics, contact sheets and optional
+generation of README rows from the source metadata.
+**Suggestion:** extend the generated reports with measured metrics; retain
+source comments as the editable metadata. Generate README rows/contact sheets
+from those reports rather than adding a second hand-maintained manifest.
 **Effort:** M. **Impact:** high for sharing and comparing.
 
 ### 15. Reference/fidelity harness
@@ -252,16 +254,18 @@ backend, or document Windows as unsupported. Add a deterministic cross-platform
 golden test.
 **Effort:** M/L. **Impact:** medium.
 
-### 18. Browser/WASM target
-**Gap:** demos are native only. Sharing requires MP4.
-**Suggestion:** an Emscripten/WASM build of the VM + tracker + a WebAudio
-backend and canvas blitter. Start with a "render one demo in the browser"
-target, not the full CLI.
-**Effort:** L. **Impact:** high for reach.
+### 18. Browser playback limits (remaining)
+**Delivered:** `make wasm` / `make web`, pinned Emscripten CI, a dedicated
+worker using the real compiler/VM/tracker/synth, Web Audio and canvas playback.
+Tests compile every demo and exercise synthesis, pixels, retry and nested assets.
+**Remaining:** audio is prepared up front (capped at 300 seconds); rendering
+uses one worker at preview resolution. Streaming synthesis, longer playback,
+and additional performance work remain optional follow-ups. See [Wasm](docs/wasm.md).
+**Effort:** M/L for streaming. **Impact:** high for long demos.
 
 ### 19. LSP, formatter, syntax highlighting and a tutorial
 **Gap:** `.dmt` has no editor/LSP integration, formatter, parser grammar package
-or step-by-step tutorial. The in-progress gallery has source highlighting, which
+or step-by-step tutorial. The gallery has source highlighting, which
 is distinct from editor support.
 The README is an excellent reference but a poor first lesson.
 **Suggestion:** a `tree-sitter-dmt` grammar + highlight queries, `dm fmt`, and a
@@ -525,11 +529,13 @@ Larger numbered items above retain only their unfinished scope.
 | Sanitizer CI, loop verifier hardening, numeric lookup guards | `a1b8d3f`; `make test-sanitize` |
 | Failed reload ownership, rapid-save detection, writer error propagation | `a1b8d3f` |
 | JSON validation, module/program statistics, version flag | `74e37da`; [reporting contract](docs/cli-reporting.md) |
+| Native AVI/MOV flags and optional AOT shader builds | [Native export](docs/native-export.md); lossless decode/failure regressions |
+| Supported Emscripten target and browser playback | `make wasm`, `make test-wasm`; [browser engine](docs/wasm.md) |
+| Source-owned demo metadata and gallery | `make test-web`; [metadata fields](docs/demo-metadata.md) |
 
-Native AVI/MOV export and shader AOT compilation remain experiments in
-`experiment/native-video-export` / `experiment/native-qtrle`; they are **not**
-merged into `main`. Their performance results should inform #8/#9/#31, but do
-not describe the default MP4 exporter yet.
+Native AVI/MOV export is integrated behind explicit flags. Shader AOT remains
+optional per-demo build tooling; its speedups do not describe the ordinary
+interpreted MP4 exporter. GPU rendering remains open (#31).
 
 ---
 

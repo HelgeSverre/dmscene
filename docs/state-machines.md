@@ -2,8 +2,8 @@
 
 Audit baseline: `ab790e4` (2026-11-06). Scope: the C99 application in `tools/`,
 `src/`, and `include/`, its command-line entry points and platform backends.
-The native video/AOT exporter in `experiment/native-video-export` is a separate,
-unmerged experiment and is outside this inventory. States below describe the
+Native AVI/MOV export is now integrated into the offline CLI; optional AOT
+shader builds and the browser adapter are described below. States describe the
 current implementation; the findings retain the baseline's failing traces.
 
 This is a code-and-regression audit, not a proof of all possible executions.
@@ -399,6 +399,58 @@ code). The fallback command shell-quotes filenames. Encoder exit status is
 checked even if every `fwrite` succeeded. The existing ffmpeg path can still
 block if an encoder never reads/exits; this audit's bounded-child change is
 currently limited to realtime audio.
+
+### Native containers and optional AOT
+
+`--avi` and `--mov` share the normal audio/visual render loops and accept one
+container per invocation. Native duration/size validation precedes rendering;
+WAV-only clips may be shorter than a video frame. The native output transition
+is destination unchanged → unique sibling opened → audio/video written →
+index/container finalized → rename to destination. A handled failure closes
+owned writers and removes the temporary sibling; the old destination survives.
+SIGKILL/power loss can leave an unpublished temporary. MP4 retains its existing
+ffmpeg path and does not yet provide atomic destination replacement.
+
+AVI/MOV writers retain failure state through finalization. Classic 32-bit
+container limits can reject a long export; AVI has a full-size preflight and
+MOV checks accumulation. `tests/native-cli.sh` covers the public flags,
+no-ffmpeg execution, start/scale/solo, combined outputs, path aliases and
+preflight preservation; `tests/native-writer-errors.c` exercises real file-size
+failures. Decode tests compare RGB/PCM, including odd dimensions and MOV deltas.
+The optional AOT renderer binds generated code only to matching module bytecode
+and otherwise refuses the module; it is not used by the normal CLI.
+
+## 13. Browser engine, source metadata and site generation
+
+The Emscripten adapter uses the native compiler/VM and an explicit single-worker
+scene build (`DM_NO_THREADS`). One engine instance owns one module/player/scene.
+`web_open` closes the previous demo before compiling; unlike native `watch`, a
+failed open leaves no active demo. Another open can recover. `web_close` releases
+all owned engine state. Each module factory instance has independent C globals.
+
+| State | Event | Transition |
+|---|---|---|
+| Unloaded | enter a live mode | fetch metadata/source/assets, create worker → loading |
+| Loading | verified source + prepared PCM | transfer stereo buffers and tracker samples → ready/paused |
+| Loading | fetch/compile/synthesis error | report, dispose worker/audio context, clear cached load promise → retryable |
+| Ready/paused | user play + audio context resumed | capture playback generation, start buffer clock → playing |
+| Playing | pause, hide, seek, or mode change | stop buffer; retain prepared PCM, update offset → paused/restart |
+| Ready/playing | frame request | seek native tracker, render RGB, transfer a copy; at most one frame in flight |
+| Any | page closes | terminate worker and close audio context → disposed |
+
+The UI owns browser audio/DOM state; the worker owns the engine and synthesis.
+Heap views must be reread after Wasm memory growth. Nested asset paths are
+preserved in the in-memory filesystem rather than flattened by basename.
+Source metadata is header-comment text and never changes native bytecode.
+The JS scanner drives highlighting and approximate static timelines, not VM
+execution. Live tracker positions come from the C sequencer.
+
+Site regeneration writes each HTML/JSON file to a temporary sibling and renames
+it into place; it no longer deletes all demo pages before generating replacements.
+This prevents transient missing/partial pages while previewing a rebuild; the
+whole site is not a single atomic transaction. `make test-web` and `make test-wasm`
+cover metadata, rendering, recovery and assets. Browser limits are documented in
+[Wasm](wasm.md); this addition is not an exhaustive browser lifecycle audit.
 
 ## Verification and limits
 

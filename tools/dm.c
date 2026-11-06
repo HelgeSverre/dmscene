@@ -1,6 +1,7 @@
 /* dm - the dmscene command line: compile, check, disasm, play, render, watch, new.
  * Inputs may be .dmt (compiled in memory) or .dms. */
 #include "dm.h"
+#include "dm_mov.h"
 #include "dm_seek.h"
 #include "dm_banner.h"
 #include <pthread.h>
@@ -73,7 +74,7 @@ static void usage(int code) {
     "  disasm  IN                           print every program's bytecode\n"
     "  play    IN [play options]            terminal + audio (IN may be .dmt or .dms)\n"
     "  watch   IN [play options]            play, recompiling whenever the .dmt changes\n"
-    "  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--render-scale N]\n"
+    "  render  IN --mp4 F | --avi F | --mov F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--render-scale N]\n"
     "  new     NAME                         write NAME.dmt, a minimal starting point\n\n"
     "  --version                            engine and module format version\n\n"
     "play options:\n"
@@ -248,6 +249,7 @@ static int cmd_new(const char *name) {
   if (!f) { fprintf(stderr, "dm: cannot create %s (exists?)\n", path); return 1; }
   fprintf(f,
     "# %s - a dmscene demo.  dm watch %s\n"
+    "# @description A short description of this demo.\n"
     "title %s\nsong bpm=125 speed=6 rpb=4 channels=3 loop=0 volume=0.7\norder 0\n\n"
     "palette glow {\n  0.0  0.0 0.0 0.1\n  0.5  1.0 0.3 0.0\n  1.0  1.0 1.0 0.8\n}\n\n"
     "inst kick {\n  f = 50 + 400 * exp(-t * 35)\n  $p = $p + f / sr\n  out(dist(sin($p * tau) * exp(-t * 6) * 2, 1.4) * 0.8)\n}\n"
@@ -306,7 +308,7 @@ static void audio_cb(void *user, float *lr, uint32_t frames) {
 }
 
 typedef struct {
-  const char *file, *png, *wav, *mp4;
+  const char *file, *png, *wav, *mp4, *avi, *mov;
   int fps, W, H, mute, threads, solo, watch, render_scale;
   double seconds, start;
 } opts;
@@ -340,6 +342,8 @@ static void parse_play_opts(int argc, char **argv, opts *o) {
     else if (!strcmp(argv[i], "--png") && i + 1 < argc) o->png = argv[++i];
     else if (!strcmp(argv[i], "--wav") && i + 1 < argc) o->wav = argv[++i];
     else if (!strcmp(argv[i], "--mp4") && i + 1 < argc) o->mp4 = argv[++i];
+    else if (!strcmp(argv[i], "--avi") && i + 1 < argc) o->avi = argv[++i];
+    else if (!strcmp(argv[i], "--mov") && i + 1 < argc) o->mov = argv[++i];
     else if (!strcmp(argv[i], "--threads") && i + 1 < argc) o->threads = parse_int(argv[++i]);
     else if (!strcmp(argv[i], "--render-scale") && i + 1 < argc) { o->render_scale = parse_int(argv[++i]); if (o->render_scale < 1) usage(2); }
     else if (!strcmp(argv[i], "--start") && i + 1 < argc) o->start = parse_double(argv[++i]);
@@ -352,7 +356,11 @@ static void parse_play_opts(int argc, char **argv, opts *o) {
       (o->W && (o->W < 2 || o->W > 16384)) || (o->H && (o->H < 2 || o->H > 16384)) ||
       !isfinite(o->seconds) || o->seconds < 0 || !isfinite(o->start) || o->start < 0 ||
       o->start > (double)UINT64_MAX / DM_SR || o->seconds > (double)(INT_MAX - 1) / o->fps ||
-      o->render_scale < 0 || o->render_scale > 64) usage(2);
+      o->render_scale < 0 || o->render_scale > 64 ||
+      (!!o->mp4 + !!o->avi + !!o->mov > 1)) usage(2);
+  const char *out[] = {o->mp4, o->avi, o->mov, o->wav};
+  for (size_t i = 0; i < sizeof out / sizeof *out; i++) for (size_t j = i + 1; j < sizeof out / sizeof *out; j++)
+    if (out[i] && out[j] && !strcmp(out[i], out[j])) usage(2);
 }
 
 static int mkdir_p(const char *path) {
@@ -428,24 +436,48 @@ static void print_shell_arg(FILE *f, const char *s) {
   fputc('\'', f);
 }
 
+static char *native_temp_path(const char *path) {
+  size_t n = strlen(path) + sizeof ".tmp.XXXXXX";
+  char *tmp = malloc(n);
+  if (!tmp) return NULL;
+  snprintf(tmp, n, "%s.tmp.XXXXXX", path);
+  int fd = mkstemp(tmp);
+  if (fd < 0) { free(tmp); return NULL; }
+  close(fd);
+  return tmp;
+}
+
 static int render_offline(dm_module *m, opts *o) {
   static audio_ctx ac;
   dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   dm_fb fb = {0}, big = {0};
+  dm_avi *avi = NULL;
+  dm_mov *movie = NULL;
+  dm_wav wv = {0};
+  int have_wav = 0;
+  const char *avi_path = o->avi, *mov_path = o->mov;
+  char *avi_tmp = NULL, *mov_tmp = NULL;
   char tmpwav[1100] = {0};
   FILE *vpipe = NULL;
   pid_t encoder = -1;
   int rc = 1, saved_pipe = 0, tmp_owned = 0;
   struct sigaction old_pipe;
+  double seconds = o->seconds > 0 ? o->seconds : 8;
+  int W = o->W ? o->W : 640, H = o->H ? o->H : 400, fps = o->fps;
+  const char *png = o->png, *wav = o->wav, *mp4 = o->mp4;
+  if (mp4) { W &= ~1; H &= ~1; }
+  uint64_t total = (uint64_t)(seconds * DM_SR);
+  int nframes = (int)(seconds * fps + 0.5);
+  uint64_t stride = (((uint64_t)W * 3 + 3) & ~3ull), image = stride * (uint64_t)H;
+  if ((avi_path || mov_path) && (nframes < 1 || total > UINT32_MAX)) { fprintf(stderr, "dm: export duration exceeds native container limits\n"); goto done; }
+  if (avi_path && (image > UINT32_MAX || (uint64_t)nframes * (image + 24) + total * 4 + ((total + 4095) / 4096) * 24 + 1024 > UINT32_MAX)) {
+    fprintf(stderr, "dm: AVI exceeds its 4 GiB container limit\n"); goto done;
+  }
   if (dm_player_init(&ac.p, m, DM_SR)) { fprintf(stderr, "dm: out of memory\n"); goto done; }
   if (o->solo >= 0) dm_player_solo(&ac.p, o->solo);
   dm_seq clk; dm_seq_init(&clk, m, DM_SR);
   uint64_t start_sample = (uint64_t)(o->start * DM_SR);
   if (start_sample) { float tmp[2 * 1024]; uint64_t left = start_sample; while (left) { uint32_t k = left > 1024 ? 1024 : (uint32_t)left; dm_player_render(&ac.p, tmp, k); left -= k; } }
-  double seconds = o->seconds > 0 ? o->seconds : 8;
-  int W = o->W ? o->W : 640, H = o->H ? o->H : 400, fps = o->fps;
-  const char *png = o->png, *wav = o->wav, *mp4 = o->mp4;
-  if (mp4) { W &= ~1; H &= ~1; }
   int sc = o->render_scale ? o->render_scale : (m->scale > 1 ? m->scale : 1);
   if (dm_fb_alloc(&fb, W / sc > 1 ? W / sc : 1, H / sc > 1 ? H / sc : 1) || dm_fb_alloc(&big, W, H)) goto done;
   static char fbwav[1100], dir[1100];
@@ -466,20 +498,29 @@ static int render_offline(dm_module *m, opts *o) {
       close(fd); tmp_owned = 1; wav = tmpwav;
     }
   }
-  uint64_t total = (uint64_t)(seconds * DM_SR);
+  if (avi_path) { avi_tmp = native_temp_path(avi_path); if (!avi_tmp) goto done; avi = dm_avi_open(avi_tmp, W, H, fps, DM_SR); }
+  if (mov_path) { mov_tmp = native_temp_path(mov_path); if (!mov_tmp) goto done; movie = dm_mov_open(mov_tmp, W, H, fps, DM_SR); }
+  if ((avi_path && !avi) || (mov_path && !movie)) { fprintf(stderr, "dm: cannot create native video output\n"); goto done; }
   if (wav) {
     if (total > (UINT32_MAX - 36) / 4) { fprintf(stderr, "dm: audio exceeds WAV size limit\n"); goto done; }
-    dm_wav wv = {0};
     if (dm_wav_open(&wv, wav, DM_SR)) { fprintf(stderr, "dm: cannot write %s\n", wav); goto done; }
+    have_wav = 1;
+  }
+  if (have_wav || avi || movie) {
     float *buf = malloc(sizeof(float) * 2 * 4096);
     int failed = !buf;
     for (uint64_t done = 0; !failed && done < total;) {
       uint32_t n = total - done > 4096 ? 4096 : (uint32_t)(total - done);
-      dm_player_render(&ac.p, buf, n); failed = dm_wav_write(&wv, buf, n); done += n;
+      dm_player_render(&ac.p, buf, n);
+      if (have_wav && dm_wav_write(&wv, buf, n)) failed = 1;
+      if (avi && dm_avi_audio(avi, buf, n)) failed = 1;
+      if (movie && dm_mov_audio(movie, buf, n)) failed = 1;
+      done += n;
     }
-    if (dm_wav_close(&wv)) failed = 1;
+    if (have_wav && dm_wav_close(&wv)) failed = 1;
+    have_wav = 0;
     free(buf);
-    if (failed) { fprintf(stderr, "dm: cannot finish %s\n", wav); goto done; }
+    if (failed) { fprintf(stderr, "dm: cannot finish audio output\n"); goto done; }
   }
   if (mp4 && have_ffmpeg) {
     struct sigaction ignore = {0}; ignore.sa_handler = SIG_IGN;
@@ -488,11 +529,12 @@ static int render_offline(dm_module *m, opts *o) {
     vpipe = start_ffmpeg(W, H, fps, wav, mp4, &encoder);
     if (!vpipe) { fprintf(stderr, "dm: cannot start ffmpeg\n"); goto done; }
   }
-  int frame = 0, nframes = (int)(seconds * fps + 0.5), render_error = 0;
-  if (png || vpipe) {
+  int frame = 0, render_error = 0;
+  if (png || vpipe || avi || movie) {
     /* offline the audio was rendered first, so level followers are replayed from a second player for the visuals */
     static audio_ctx vis;
     int vis_ready = dm_player_init(&vis.p, m, DM_SR) == 0;
+    if (vis_ready && o->solo >= 0) dm_player_solo(&vis.p, o->solo);
     float *scratch = vis_ready ? malloc(sizeof(float) * 2 * 8192) : NULL;
     if (!scratch) { fprintf(stderr, "dm: out of memory\n"); render_error = 1; }
     uint64_t vdone = 0;
@@ -509,6 +551,8 @@ static int render_offline(dm_module *m, opts *o) {
             dm_png_write(outfb, path)) { fprintf(stderr, "dm: cannot write frame %d in %s\n", frame, png); render_error = 1; break; }
       }
       if (vpipe && fwrite(outfb->rgb, 1, (size_t)outfb->w * outfb->h * 3, vpipe) != (size_t)outfb->w * outfb->h * 3) { render_error = 1; break; }
+      if (avi && dm_avi_video(avi, outfb)) { render_error = 1; break; }
+      if (movie && dm_mov_video(movie, outfb)) { render_error = 1; break; }
       if (vpipe && (frame % fps) == 0) { fprintf(stderr, "\r%s: %d/%d frames", mp4, frame, nframes); fflush(stderr); }
     }
     free(scratch); if (vis_ready) dm_player_free(&vis.p);
@@ -535,13 +579,28 @@ static int render_offline(dm_module *m, opts *o) {
     fputs(" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest ", stderr);
     print_shell_arg(stderr, mp4); fputc('\n', stderr);
     free(pattern);
-  } else fprintf(stderr, "rendered %.2fs: %d frame(s)%s%s\n", seconds, frame, wav ? ", wav " : "", wav ? wav : "");
+  }
+  if (avi && dm_avi_close(avi)) { avi = NULL; fprintf(stderr, "dm: AVI finalize failed\n"); goto done; }
+  avi = NULL;
+  if (avi_tmp && rename(avi_tmp, avi_path)) { fprintf(stderr, "dm: cannot publish %s\n", avi_path); goto done; }
+  free(avi_tmp); avi_tmp = NULL;
+  if (movie && dm_mov_close(movie)) { movie = NULL; fprintf(stderr, "dm: MOV finalize failed\n"); goto done; }
+  movie = NULL;
+  if (mov_tmp && rename(mov_tmp, mov_path)) { fprintf(stderr, "dm: cannot publish %s\n", mov_path); goto done; }
+  free(mov_tmp); mov_tmp = NULL;
+  if (!mp4) fprintf(stderr, "rendered %.2fs: %d frame(s)%s%s\n", seconds, frame, wav ? ", wav " : "", wav ? wav : "");
   rc = 0;
  done:
+  if (have_wav) dm_wav_close(&wv);
   if (vpipe) fclose(vpipe);
   if (encoder > 0) { kill(encoder, SIGTERM); while (waitpid(encoder, NULL, 0) < 0 && errno == EINTR) {} }
   if (tmp_owned) remove(tmpwav);
   if (saved_pipe) sigaction(SIGPIPE, &old_pipe, NULL);
+  if (avi) dm_avi_close(avi);
+  if (movie) dm_mov_close(movie);
+  if (avi_tmp) remove(avi_tmp);
+  if (mov_tmp) remove(mov_tmp);
+  free(avi_tmp); free(mov_tmp);
   dm_player_free(&ac.p); dm_scene_free(&scene); dm_fb_free(&fb); dm_fb_free(&big);
   return rc;
 }
@@ -822,8 +881,8 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "watch")) o.watch = 1;
     static dm_module mods[2];
     if (load_any(o.file, &mods[0])) { fprintf(stderr, "dm: %s\n", dm_error()); return 1; }
-    if (o.png || o.wav || o.mp4) return render_offline(&mods[0], &o);
-    if (!strcmp(cmd, "render")) { fprintf(stderr, "dm render: give --mp4 FILE, --png DIR or --wav FILE\n"); return 2; }
+    if (o.png || o.wav || o.mp4 || o.avi || o.mov) return render_offline(&mods[0], &o);
+    if (!strcmp(cmd, "render")) { fprintf(stderr, "dm render: give --mp4 FILE, --avi FILE, --mov FILE, --png DIR or --wav FILE\n"); return 2; }
     if (o.watch && !ends_with(o.file, ".dmt")) fprintf(stderr, "dm: --watch reloads a .dmt; a .dms will not change\n");
     return play_realtime(mods, &o);
   }

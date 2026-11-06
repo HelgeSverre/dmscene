@@ -1,3 +1,6 @@
+# @collection Demos
+# @music swung lo-fi hip-hop (F07/F05 swing), rhodes FM, vinyl crackle in master
+# @visual flight between three Mandelbrot boundary points, star traps, grain
 # mandel.dmt - swung lo-fi hip-hop while flying along the Mandelbrot boundary
 title MANDELFLIGHT
 song bpm=85 speed=6 rpb=4 channels=5 loop=0 volume=0.6

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music vocal formant synthesis: glottal source through three resonant bandpasses morphing A/E/I/O/U via Wxx (choir, soprano with per-note vowels, unvoiced whisper), sub, soft percussion, chan reverbs
+# @visual spectral envelope with the three formant peaks sweeping across a log-frequency stage, a mouth whose opening follows F1 and width F2 (teeth on spread vowels), current vowel letter, bloom
 # vowels.dmt - vocal formant synthesis.  Glottal source -> three resonant bandpasses.
 # The vowel morph (A E I O U) is the master param mp0, set with Wxx in the patterns,
 # so the choir, the soprano and the picture all read the same value.

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music pulse, snare, bass and FM glints with a branched kick attack
+# @visual a moving portal into a warped embedded PPM nebula; nested if/else selects the expensive inner field, a dim outer sky, selective edge glow and post bloom
 # threshold.dmt — a portal cut through an embedded PPM starfield.
 # The inside uses a warped texture and geometric detail; the outside skips that
 # work entirely. Branches also choose the sound of the opening transient.

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music cinematic: slow kick, industrial clank, growling bass, CS-80 style unison brass through a chan reverb, delayed arp, noise drone
+# @visual raymarched night flight down a street of a procedural city: one domain-repeated box SDF with hashed heights, lit window grids flickering with the arp, rooftop neon, wet street grid, moon and stars, distance fog; rain streaks, bloom and snare chromatic split in post; camera path and rain from the timeline
 # skyline.dmt - night flight over a procedural neon city.  Raymarched with repeat; the city is
 # one box SDF domain-repeated on a 2x2 grid with hashed heights, windows and rooftop neon.
 title SKYLINE

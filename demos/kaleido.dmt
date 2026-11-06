@@ -1,3 +1,6 @@
+# @collection Demos
+# @music chiptune: pulse arps via 0xy, 25% pulse, bitcrushed triangle, noise drums
+# @visual kaleidoscopic IFS through a 3/5/7/9-fold polar mirror
 # kaleido.dmt - chiptune arps over a kaleidoscopic IFS
 title KALEIDO
 song bpm=150 speed=6 rpb=4 channels=4 loop=0 volume=0.68

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music breakcore: the sampled kit pitched by note, reversed snares via Sxx, E9x rolls, an E6x stutter loop, EDx delays, reese bass, FM screams, snare bitcrush and master drive opened by Wxx
+# @visual datamosh over a pulsing Mandelbrot: hashed block displacement of the previous frame, row tearing and RGB split on the snare, posterisation that coarsens with the timeline, inverted kick flashes, noise snow on the screams
 # glitch.dmt - breakcore at 180 bpm over datamoshed Mandelbrot video.
 # Drums are the sampled kit, pitched by note, chopped with E9x rolls, E6x pattern loops and EDx delays.
 title GLITCH

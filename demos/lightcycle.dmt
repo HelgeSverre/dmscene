@@ -1,3 +1,6 @@
+# @collection Demos
+# @music Berlin school: 16th-note sequence with slow filter sweep, gated snare, unison pads, vibrato lead
+# @visual synthwave horizon: striped sun, fbm mountains, perspective grid pulsing on the kick, light-cycle trails that turn on grid blocks
 # lightcycle.dmt - Berlin school sequence meets synthwave, riding light cycles down an endless grid
 title LIGHTCYCLE
 song bpm=118 speed=6 rpb=4 channels=6 loop=0 volume=0.6

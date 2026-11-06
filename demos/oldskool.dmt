@@ -1,3 +1,6 @@
+# @collection Demos
+# @music Amiga-style 4-channel chip music: one drum instrument switched by velocity, triangle bass, 0xy arpeggio chords, vibrato lead, everything bitcrushed and lowpassed
+# @visual copper bars, bouncing bobs, a sine scroller, a rotozoomer, classic fire propagating through the feedback buffer with the logo burning in it, timeline-cut scenes, scanlines except where the fire lives
 # oldskool.dmt - an Amiga demo: copper bars, rotozoomer, fire, sine scroller, bobs, 4-channel chip music.
 title OLDSKOOL
 song bpm=125 speed=6 rpb=4 channels=4 loop=0 volume=0.62 scale=2

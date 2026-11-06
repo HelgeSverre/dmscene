@@ -1,3 +1,6 @@
+# @collection Demos
+# @music electro funk: slap bass with 1xx/2xx bends, zap lead, claps
+# @visual domain-warped voronoi cells pulsing on their own beat phase
 # cells.dmt - electro funk over pulsing voronoi cells
 title CELLS
 song bpm=128 speed=6 rpb=4 channels=5 loop=0 volume=0.55

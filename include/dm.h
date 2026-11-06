@@ -317,6 +317,14 @@ int  dm_wav_open(dm_wav *w, const char *path, int sr);
 int  dm_wav_write(dm_wav *w, const float *lr, uint32_t frames);
 int  dm_wav_close(dm_wav *w);
 
+/* Experimental dependency-free AVI writer: raw BGR video plus PCM audio.
+ * Files are widely playable but large; AVI's classic 4 GiB limit applies. */
+typedef struct dm_avi dm_avi;
+dm_avi *dm_avi_open(const char *path, int w, int h, int fps, int sr);
+int     dm_avi_video(dm_avi *a, const dm_fb *fb);
+int     dm_avi_audio(dm_avi *a, const float *lr, uint32_t frames);
+int     dm_avi_close(dm_avi *a);
+
 /* ---------------------------------------------------------------- platform: audio */
 typedef void (*dm_audio_cb)(void *user, float *lr, uint32_t frames);
 typedef struct dm_audio dm_audio;

@@ -1,3 +1,6 @@
+# @collection Demos
+# @music NES: 50%/25% pulses, triangle bass, 1-bit noise drums
+# @visual low-res sine plasma, ordered dither, 7-colour hard palette
 # plasma.dmt - NES-style chiptune over a dithered palette plasma
 title PLASMA
 song bpm=160 speed=6 rpb=4 channels=4 loop=0 volume=0.75
