@@ -1,6 +1,6 @@
 /* dm_module.c - the .dms byte-packed container.
  *
- *   "DMS" 0x01
+ *   "DMS" 0x04
  *   chunk*   := tag(u8) len(varint) payload
  *     'T' title      utf8
  *     'G' song       bpm speed rpb channels loop norder nuniform vol(u8/255) order[norder]
@@ -11,6 +11,7 @@
  *     'I' inst       id namelen name prog flags
  *     'X' text       id namelen name len(u16) bytes
  *     'W' sample     id namelen name rate(u16) len(u32) int8 pcm
+ *     'Q' texture    id namelen name width(u16) height(u16) RGB8 pixels
  *     'V' envelope   id namelen name npts sustain (ms u16, level u8)*
  *     'E' timeline   nnames (namelen name)* nev(u16) (order row id f32)*
  *     'P' pattern    id rows(u16) channels cells*  (cell := mask fields | 0x80|skip)
@@ -31,6 +32,7 @@ void dm_module_free(dm_module *m) {
   for (int i = 0; i < DM_MAX_PATTERNS; i++) { free(m->pat[i].cells); m->pat[i].cells = NULL; }
   for (int i = 0; i < DM_MAX_TEXTS; i++) { free(m->text[i].s); m->text[i].s = NULL; }
   for (int i = 0; i < DM_MAX_SAMPLES; i++) { free(m->smp[i].pcm); m->smp[i].pcm = NULL; }
+  for (int i = 0; i < DM_MAX_TEXTURES; i++) { free(m->tex[i].rgb); m->tex[i].rgb = NULL; }
 }
 
 void dm_palette_build(dm_palette *p) {
@@ -49,6 +51,7 @@ void dm_palette_build(dm_palette *p) {
 }
 
 int dm_module_verify(dm_module *m) {
+  if (m->ntex < 0 || m->ntex > DM_MAX_TEXTURES) { dm_set_error("bad texture count"); return -1; }
   if (m->channels < 1 || m->channels > DM_MAX_CHANNELS) { dm_set_error("bad channel count %d", m->channels); return -1; }
   if (m->norder < 1) { dm_set_error("empty order list"); return -1; }
   for (int i = 0; i < m->norder; i++) {
@@ -62,6 +65,13 @@ int dm_module_verify(dm_module *m) {
       if (p->cells[k].inst > m->ninst) { dm_set_error("pattern %d uses instrument %d but only %d defined", i, p->cells[k].inst, m->ninst); return -1; }
   }
   for (int i = 0; i < m->npal; i++) dm_palette_build(&m->pal[i]);
+  size_t texbytes = 0;
+  for (int i = 0; i < m->ntex; i++) {
+    const dm_texture *t = &m->tex[i];
+    if (!t->rgb || !t->w || !t->h || t->w > DM_MAX_TEX_DIM || t->h > DM_MAX_TEX_DIM) { dm_set_error("bad texture %d", i); return -1; }
+    texbytes += (size_t)t->w * t->h * 3;
+  }
+  if (texbytes > DM_MAX_TEX_BYTES) { dm_set_error("texture data too large"); return -1; }
   m->cumrows[0] = 0;
   for (int i = 0; i < m->norder; i++) m->cumrows[i + 1] = m->cumrows[i] + m->pat[m->order[i]].rows;
   if (m->scale < 1) m->scale = 1;
@@ -135,6 +145,11 @@ int dm_module_write(const dm_module *m, const char *path) {
     c.n = 0; b8(&c, i); b8(&c, (unsigned)strlen(sm->name)); bput(&c, sm->name, strlen(sm->name)); b16(&c, sm->rate);
     b16(&c, sm->len & 0xffff); b16(&c, sm->len >> 16); bput(&c, sm->pcm, sm->len); bchunk(&out, 'W', &c);
   }
+  for (int i = 0; i < m->ntex; i++) {
+    const dm_texture *t = &m->tex[i];
+    c.n = 0; b8(&c, i); b8(&c, (unsigned)strlen(t->name)); bput(&c, t->name, strlen(t->name));
+    b16(&c, t->w); b16(&c, t->h); bput(&c, t->rgb, (size_t)t->w * t->h * 3); bchunk(&out, 'Q', &c);
+  }
   for (int i = 0; i < m->nvenv; i++) {
     const dm_venv *v = &m->venv[i];
     c.n = 0; b8(&c, i); b8(&c, (unsigned)strlen(v->name)); bput(&c, v->name, strlen(v->name)); b8(&c, v->npts); b8(&c, v->sustain);
@@ -172,7 +187,16 @@ int dm_module_write(const dm_module *m, const char *path) {
 typedef struct { const uint8_t *p, *end; int err; } rd;
 static unsigned r8(rd *r) { if (r->p >= r->end) { r->err = 1; return 0; } return *r->p++; }
 static unsigned r16(rd *r) { unsigned a = r8(r); return a | (r8(r) << 8); }
-static size_t rvar(rd *r) { size_t v = 0; int sh = 0; for (;;) { unsigned b = r8(r); v |= (size_t)(b & 0x7f) << sh; if (!(b & 0x80) || r->err) break; sh += 7; } return v; }
+static size_t rvar(rd *r) {
+  size_t v = 0; unsigned sh = 0, bits = (unsigned)(sizeof(size_t) * 8);
+  for (;;) {
+    unsigned b = r8(r), payload = b & 0x7f;
+    if (r->err || sh >= bits || (size_t)payload > SIZE_MAX >> sh) { r->err = 1; return 0; }
+    v |= (size_t)payload << sh;
+    if (!(b & 0x80)) return v;
+    sh += 7;
+  }
+}
 static void rprog(rd *r, dm_prog *p) { p->off = r16(r); p->len = r16(r); p->nlocals = r8(r); p->nstate = r8(r); p->ndelay = r8(r); p->nverb = r8(r); }
 static void rname(rd *r, char *dst, size_t cap) {
   unsigned n = r8(r); size_t i;
@@ -190,7 +214,7 @@ int dm_module_load(dm_module *m, const uint8_t *data, size_t len) {
   while (r.p < r.end && !r.err) {
     unsigned tag = r8(&r);
     size_t n = rvar(&r);
-    if (r.err || r.p + n > r.end) { dm_set_error("truncated chunk '%c'", tag); return -1; }
+    if (r.err || n > (size_t)(r.end - r.p)) { dm_set_error("truncated chunk '%c'", tag); return -1; }
     rd c = { r.p, r.p + n, 0 };
     r.p += n;
     switch (tag) {
@@ -233,6 +257,18 @@ int dm_module_load(dm_module *m, const uint8_t *data, size_t len) {
         if (c.p + len > c.end || len < 2) { dm_set_error("truncated sample"); return -1; }
         free(sm->pcm); sm->pcm = malloc(len); memcpy(sm->pcm, c.p, len); sm->len = len; c.p += len;
         if ((int)id + 1 > m->nsmp) m->nsmp = id + 1; break; }
+      case 'Q': { unsigned id = r8(&c);
+        if (id >= DM_MAX_TEXTURES) { dm_set_error("bad texture id"); return -1; }
+        dm_texture *t = &m->tex[id];
+        if (t->rgb || id != (unsigned)m->ntex) { dm_set_error("duplicate or out-of-order texture"); return -1; }
+        rname(&c, t->name, DM_NAME_LEN); t->w = r16(&c); t->h = r16(&c);
+        if (c.err || !t->w || !t->h || t->w > DM_MAX_TEX_DIM || t->h > DM_MAX_TEX_DIM) { dm_set_error("bad texture dimensions"); return -1; }
+        size_t bytes = (size_t)t->w * t->h * 3;
+        if ((size_t)(c.end - c.p) != bytes) { dm_set_error("bad texture pixel data"); return -1; }
+        t->rgb = malloc(bytes);
+        if (!t->rgb) { dm_set_error("out of memory loading texture"); return -1; }
+        memcpy(t->rgb, c.p, bytes); c.p += bytes;
+        m->ntex++; break; }
       case 'V': { unsigned id = r8(&c);
         if (id >= DM_MAX_VENVS) { dm_set_error("bad envelope id"); return -1; }
         dm_venv *v = &m->venv[id]; rname(&c, v->name, DM_NAME_LEN); v->npts = r8(&c); v->sustain = r8(&c);

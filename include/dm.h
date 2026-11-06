@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include "dm_ops.h"
 
-#define DM_VERSION          3
+#define DM_VERSION          4
 #define DM_SR               44100
 #define DM_MAX_CHANNELS     8
 #define DM_MAX_INST         32
@@ -42,6 +42,9 @@
 #define DM_MAX_TEXTS        16
 #define DM_MAX_TEXT_LEN     1024
 #define DM_MAX_SAMPLES      16
+#define DM_MAX_TEXTURES     8
+#define DM_MAX_TEX_DIM      1024
+#define DM_MAX_TEX_BYTES    (24u * 1024u * 1024u)
 #define DM_MAX_VENVS        16
 #define DM_MAX_VENV_PTS     12
 #define DM_MAX_EVNAMES      32
@@ -105,6 +108,7 @@ enum { DM_INST_NNA = 1 };                                   /* new note lets the
 typedef struct { char name[DM_NAME_LEN]; dm_prog prog; uint8_t flags; } dm_inst;
 typedef struct { char name[DM_NAME_LEN]; char *s; uint16_t len; } dm_text;
 typedef struct { char name[DM_NAME_LEN]; int8_t *pcm; uint32_t len; uint16_t rate; } dm_sample;
+typedef struct { char name[DM_NAME_LEN]; uint8_t *rgb; uint16_t w, h; } dm_texture;
 typedef struct { char name[DM_NAME_LEN]; uint8_t npts, sustain; float t[DM_MAX_VENV_PTS], v[DM_MAX_VENV_PTS]; } dm_venv;
 typedef struct { uint8_t order, row, id; float value; } dm_event;
 typedef struct {
@@ -128,6 +132,7 @@ typedef struct dm_module {
   dm_prog chanfx[DM_MAX_CHANNELS]; uint8_t has_chanfx;        /* bit mask */
   dm_text text[DM_MAX_TEXTS]; int ntext;
   dm_sample smp[DM_MAX_SAMPLES]; int nsmp;
+  dm_texture tex[DM_MAX_TEXTURES]; int ntex;
   dm_venv venv[DM_MAX_VENVS]; int nvenv;
   char evname[DM_MAX_EVNAMES][DM_NAME_LEN]; int nevname;
   dm_event ev[DM_MAX_EVENTS]; int nev;
@@ -164,7 +169,7 @@ typedef struct dm_vm {
   uint32_t *rng;
   const uint8_t *prev; int pw, ph;     /* previous frame (pixel programs), NULL elsewhere */
   const uint8_t *cur;                  /* current frame for tap() in post programs */
-  const struct dm_module *m;           /* text, samples, envelopes */
+  const struct dm_module *m;           /* text, samples, textures, envelopes */
   const float *evhold, *evlerp;        /* timeline values by event name id */
   int scene;                           /* written by select() */
   float out[4];

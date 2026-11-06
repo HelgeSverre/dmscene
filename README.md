@@ -3,7 +3,7 @@
    __| |_ __ ___  ___  ___ ___ _ __   ___
   / _` | '_ ` _ \/ __|/ __/ _ \ '_ \ / _ \
  | (_| | | | | | \__ \ (_|  __/ | | |  __/
-  \__,_|_| |_| |_|___/\___\___|_| |_|\___|  v3
+  \__,_|_| |_| |_|___/\___\___|_| |_|\___|  v4
   ▀▄▀▄ one VM, six programs: inst  chan  master  frame  pixel  post
   ▄▀▄▀ text -> byte-packed module -> tracker + fractals
 ```
@@ -116,8 +116,8 @@ share one bytecode segment inside a byte-packed `.dms` module:
 An XM-style tracker (patterns, order list, effects) drives the voices and
 publishes its clock to the visual programs. Sync is sample-accurate: the video
 thread owns a second sequencer instance seeked to the sample position CoreAudio
-reports as currently audible. The VM has counted loops but no branches, so the
-loader verifies every program exactly before it runs.
+reports as currently audible. The VM has counted loops and structured branches;
+the loader verifies their targets and stack joins before running a program.
 
 ## CLI
 
@@ -155,21 +155,22 @@ pipe backend (default `aplay -q -t raw -f S16_LE -r 44100 -c 2`),
 include/dm_ops.h    instruction set (X-macro: one table drives VM, compiler, verifier, disassembler)
 include/dm.h        public API, limits, all structs
 include/dm_banner.h --help header shared by the tools
-src/dm_vm.c         VM dispatch, intrinsics, loops, static verifier, disassembler
+src/dm_vm.c         VM dispatch, intrinsics, loops, branches, verifier, disassembler
 src/dm_font.c       5x7 ASCII font for glyph()
 src/dm_seq.c        tracker: rows, ticks, effects, beat clock, timeline lookup (no audio; reused as the video clock)
 src/dm_synth.c      32-voice pool with NNA, chan fx programs, level followers, master program, player loop
 src/dm_module.c     .dms writer/reader, palette LUTs, module verification
-src/dm_compile.c    .dmt text -> module (line-oriented top level, Pratt expression parser, fn inlining, WAV loader)
+src/dm_compile.c    .dmt text -> module (line-oriented top level, Pratt expression parser, fn inlining, WAV/PPM loaders)
 src/dm_scene.c      frame, selected pixel program, post pass; worker threads; previous-frame buffer; ordered dither
 src/dm_io.c         PNG (stored deflate, own CRC/Adler), PPM, WAV writers
 src/dm_term.c       terminal blitter with nearest-neighbour scaling, raw keys, timing
 src/dm_audio.c      AudioQueue backend / pipe backend
 tools/dm.c          the CLI
-demos/*.dmt         the demos (table below); demos/assets holds their WAV samples
+demos/*.dmt         the demos (table below); demos/assets holds WAV samples and PPM textures
 tests/run.sh        compile, round-trip, determinism, audio, errors, features and every demo
 tests/synth-voices.c voice ownership, held notes, NNA tails, slot reuse and PCM isolation
 tests/showcase-gates.c bass/lead gate durations across breaks and song loops
+tests/branch-texture.c branch execution and verification, PPM sampling and module round trip
 art/               README artwork and animated demo highlights
 ```
 
@@ -199,6 +200,17 @@ art/               README artwork and animated demo highlights
 | `glitch.dmt` | 180 | breakcore: the sampled kit pitched by note, reversed snares via `Sxx`, `E9x` rolls, an `E6x` stutter loop, `EDx` delays, reese bass, FM screams, snare bitcrush and master drive opened by `Wxx` | datamosh over a pulsing Mandelbrot: hashed block displacement of the previous frame, row tearing and RGB split on the snare, posterisation that coarsens with the timeline, inverted kick flashes, noise snow on the screams |
 | `mycelium.dmt` | 92 | ambient: heartbeat kick, spores, root bass, breath pad, glints, rustle and wind | a warped plane folded into mushroom-gill radials, branching filaments, a cellular spore layer and breathing colour feedback over a 64-beat arc |
 | `life.dmt` | 120 | kick, snare, hat, bass, glass, cloud pad | Conway-style cellular automaton living in the previous-frame buffer: red is the live bit, blue the afterglow; one generation per 16th note, a ring of seeds every two bars |
+| `threshold.dmt` | 112 | pulse, snare, bass and FM glints with a branched kick attack | a moving portal into a warped embedded PPM nebula; nested `if/else` selects the expensive inner field, a dim outer sky, selective edge glow and post bloom |
+
+`threshold.dmt` demonstrates v4 branches and textures together:
+
+```sh
+./dm play demos/threshold.dmt
+mkdir -p build/video
+./dm render demos/threshold.dmt --mp4 build/video/threshold.mp4 --seconds 17.14 --size 480x300
+```
+
+![Threshold demo at 12 seconds](art/threshold.png)
 
 ### Written by the models
 
@@ -250,6 +262,7 @@ palette NAME {                           # one key per line: pos r g b, sorted b
 }
 text NAME "a string for glyph()/str()"
 sample NAME "file.wav" [rate=11025]      # 8/16-bit PCM WAV, relative to the .dmt; stored as 8-bit mono
+texture NAME "file.ppm"                # P6 RGB image embedded in the module
 venv NAME [sustain=K] {                  # volume envelope points: seconds level
   0.00 0
   0.01 1
@@ -278,6 +291,7 @@ frame { program }   pixel [NAME] { program }   post { program }   master { progr
 | `palette NAME { pos r g b }` | up to 16 keys, linear LUT of 256 entries; equal positions make hard steps |
 | `text NAME "..."` | string resource for `glyph`/`str`/`strlen`, up to 1024 chars |
 | `sample NAME "f.wav" [rate=N]` | loads and optionally resamples a WAV to 8-bit mono; path relative to the `.dmt` |
+| `texture NAME "f.ppm"` | embeds a P6 RGB texture (max 1024×1024); path relative to the `.dmt` |
 | `venv NAME [sustain=K] { t v }` | drawn volume envelope; `sustain` is the point index held while the key is down |
 | `timeline { O:R name=v }` | events at song positions; names become `evt()`/`evtl()` inputs. Positions are order:row, so the timeline loops with the song |
 | `fn NAME(params) { ... }` | compile-time inlined function (see below) |
@@ -286,7 +300,7 @@ frame { program }   pixel [NAME] { program }   post { program }   master { progr
 | `pattern N rows=R { }` | tracker pattern, 1..256 rows |
 | `frame`, `pixel [NAME]`, `post`, `master` | the scene programs; `pixel` may appear up to 8 times with different names |
 
-Order of definition: `song` before patterns; `fn`, `text`, `sample`, `venv`,
+Order of definition: `song` before patterns; `fn`, `text`, `sample`, `texture`, `venv`,
 `palette` before their first use; pixel names and timeline event names may be
 used before they are defined (the compiler pre-scans them). Instruments are
 numbered 1..n in definition order.
@@ -294,7 +308,7 @@ numbered 1..n in definition order.
 Limits: 8 channels, 32 instruments, 32 voices, 64 patterns of up to 256 rows,
 128 order entries, 8 palettes of 16 keys, 64 uniforms, 32 state slots and 200
 locals per program, 32 fns with up to 8 parameters, 8 pixel programs, 16 texts,
-16 samples, 16 envelopes of 12 points, 32 event names, 512 events, 4 delay lines
+16 samples, 8 textures (24 MiB combined), 16 envelopes of 12 points, 32 event names, 512 events, 4 delay lines
 and 4 reverbs per master/chan program, loops 4 deep, 64 KB of bytecode.
 
 ### Programs
@@ -306,11 +320,19 @@ x = expr        x += expr   (-= *= /=)      $name = expr       stmt(args)
 repeat i 36 {                                # counted loop, i = 0..35; nests 4 deep
   ...
 }
+if (condition) {                             # only the selected body runs
+  ...
+}
+else {
+  ...
+}
 ```
 
 * Locals are created on first assignment and must be assigned before they are
-  read. `$name` is a state slot that persists between runs (per voice, per chan,
-  per program); voices zero it on trigger.
+  read. A local first assigned inside an `if` arm stays inside that arm; assign
+  it before the `if` if both arms need to update it. `$name` is a state slot
+  that persists between runs (per voice, per chan, per program); voices zero it
+  on trigger.
 * Uniforms persist across frames, so `frame` can read last frame's value before
   overwriting it (lightwall uses this to re-project the wall buffer).
 * Expressions: `+ - * / %`, `^` (power, right associative), `< <= > >= == !=`,
@@ -321,12 +343,14 @@ repeat i 36 {                                # counted loop, i = 0..35; nests 4 
 * `r1 r2 r3` hold secondary results of the last multi-result intrinsic.
 * Loops run in the VM (`loop`/`endl`); the verifier checks the stack depth is
   unchanged across the body. There is no `break`: mask with `step()`.
+* `if`/`else` may nest inside loops and each other. The verifier checks both
+  paths meet at the same stack depth and cannot jump across loop boundaries.
 * `fn name(a, b) { ... return expr }` defines a function. Calls are inlined at
   compile time; each call site gets its own parameter and local slots, released
   after the call. A fn sees its parameters, its own locals, inputs and uniforms;
   parameters shadow inputs. A fn without `return` can only be used as a
-  statement. Passing a bare resource name (text, sample, palette, venv, event,
-  pixel) binds the parameter as a name, so `fn textline(s, ...)` can call
+  statement. Passing a bare resource name (text, sample, texture, palette,
+  venv, event, pixel) binds the parameter as a name, so `fn textline(s, ...)` can call
   `str(s, i)`.
 
 ### Inputs
@@ -366,6 +390,7 @@ Every callable in the VM. "kinds" says where it is allowed; blank means anywhere
 | `smp(NAME,sec)` | sample value at a time, linear interpolation, 0 past the end | |
 | `smplen(NAME)` | sample length in seconds | |
 | `wave(NAME,ph)` | reads the whole sample as one wavetable cycle | |
+| `tex(NAME,u,v)` | bilinear RGB sample at 0..1 coordinates, clamped at edges; returns red, `r1` = green, `r2` = blue | pixel, post |
 | `mandel(cx,cy,it) julia(zx,zy,cx,cy,it) ship(cx,cy,it)` | smooth iteration count (escape radius 16); `r1` = min orbit distance to origin, `r2` = min cross-trap distance, `r3` = final angle | |
 | `newton(zx,zy,it)` | root index 0..2 of z³-1; `r1` = iterations, `r2` = distance to the root, `r3` = angle | |
 | `kali(x,y,kx,ky,n)` | kaleidoscopic IFS min length; `r1` = mean length, `r2 r3` final point | |
@@ -436,7 +461,7 @@ last non-zero value when given 00.
 ## The binary format (.dms)
 
 ```
-"DMS" 0x03, then chunks: tag(u8) length(LEB128 varint) payload
+"DMS" 0x04, then chunks: tag(u8) length(LEB128 varint) payload
   T  title                 utf8
   G  song                  bpm speed rpb channels loop norder nuniform volume(u8) order[norder] scale dither pan[8](u8)
   C  code                  bytecode, shared by every program, max 64 KB
@@ -448,6 +473,7 @@ last non-zero value when given 00.
   L  palette               id namelen name nkeys (pos r g b)* as u8
   X  text                  id namelen name len(u16) bytes
   W  sample                id namelen name rate(u16) len(u32) int8 pcm
+  Q  texture               id namelen name width(u16) height(u16) RGB8 pixels
   V  envelope              id namelen name npts sustain (ms u16, level u8)*
   E  timeline              nnames (namelen name)* nev(u16) (order row id f32)*
 ```

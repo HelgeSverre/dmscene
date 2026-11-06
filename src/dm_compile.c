@@ -184,6 +184,7 @@ static int find_input(ec *e, const char *name) {
 static int find_uniform(cc *c, const char *name) { return find_name(c->uni, c->m->nuniform, name); }
 static int find_text(cc *c, const char *name) { for (int i = 0; i < c->m->ntext; i++) if (!strcmp(c->m->text[i].name, name)) return i; return -1; }
 static int find_sample(cc *c, const char *name) { for (int i = 0; i < c->m->nsmp; i++) if (!strcmp(c->m->smp[i].name, name)) return i; return -1; }
+static int find_texture(cc *c, const char *name) { for (int i = 0; i < c->m->ntex; i++) if (!strcmp(c->m->tex[i].name, name)) return i; return -1; }
 static int find_venv(cc *c, const char *name) { for (int i = 0; i < c->m->nvenv; i++) if (!strcmp(c->m->venv[i].name, name)) return i; return -1; }
 static int find_evname(cc *c, const char *name) { for (int i = 0; i < c->m->nevname; i++) if (!strcmp(c->m->evname[i], name)) return i; return -1; }
 static int find_pixel(cc *c, const char *name) { for (int i = 0; i < c->m->npixel; i++) if (!strcmp(c->m->pixelname[i], name)) return i; return -1; }
@@ -192,7 +193,7 @@ static int find_palette(cc *c, const char *name) {
   return -1;
 }
 static int is_resource(cc *c, const char *name) {
-  return find_palette(c, name) >= 0 || find_text(c, name) >= 0 || find_sample(c, name) >= 0 || find_venv(c, name) >= 0 ||
+  return find_palette(c, name) >= 0 || find_text(c, name) >= 0 || find_sample(c, name) >= 0 || find_texture(c, name) >= 0 || find_venv(c, name) >= 0 ||
          find_evname(c, name) >= 0 || find_pixel(c, name) >= 0;
 }
 /* a fn parameter bound to a resource name resolves to that name inside the body */
@@ -331,9 +332,10 @@ static void parse_call(ec *e, const char *name, int line, int as_statement) {
   if (opcode < 0) fail(c, line, "unknown function '%s'", name);
   const dm_opinfo *oi = &dm_ops[opcode];
   /* ops whose first argument is a resource name resolved at compile time */
-  if (opcode == DM_OP_STR || opcode == DM_OP_STRLEN || opcode == DM_OP_SMP || opcode == DM_OP_SMPLEN || opcode == DM_OP_WAVE ||
+  if (opcode == DM_OP_STR || opcode == DM_OP_STRLEN || opcode == DM_OP_SMP || opcode == DM_OP_SMPLEN || opcode == DM_OP_WAVE || opcode == DM_OP_TEX ||
       opcode == DM_OP_VENV || opcode == DM_OP_EVT || opcode == DM_OP_EVTL || opcode == DM_OP_SCENE) {
     if (opcode == DM_OP_VENV && e->kind != DM_PK_INST) fail(c, line, "venv() only exists inside inst programs");
+    if (opcode == DM_OP_TEX && e->kind != DM_PK_PIXEL && e->kind != DM_PK_POST) fail(c, line, "tex() only exists inside pixel and post programs");
     expect(e, T_LP, "'('");
     tok t = next(e);
     if (t.type != T_IDENT) fail(c, t.line, "%s(NAME, ...): first argument is a name", name);
@@ -342,6 +344,7 @@ static void parse_call(ec *e, const char *name, int line, int as_statement) {
     switch (opcode) {
       case DM_OP_STR: case DM_OP_STRLEN: id = find_text(c, rn); what = "text"; break;
       case DM_OP_SMP: case DM_OP_SMPLEN: case DM_OP_WAVE: id = find_sample(c, rn); what = "sample"; break;
+      case DM_OP_TEX: id = find_texture(c, rn); what = "texture"; break;
       case DM_OP_VENV: id = find_venv(c, rn); what = "venv"; break;
       case DM_OP_EVT: case DM_OP_EVTL: id = find_evname(c, rn); what = "timeline event"; break;
       default: id = find_pixel(c, rn); what = "pixel program"; break;
@@ -450,6 +453,48 @@ static void parse_expr(ec *e, int minbp) {
 
 static void parse_block(ec *e, int line);
 
+static void parse_if(ec *e, int line) {
+  parse_expr(e, 0);
+  expect(e, T_LB, "'{' after if condition");
+  dm_module *m = e->c->m;
+  emit8(e->c, line, DM_OP_IFZ);
+  uint32_t if_at = m->codelen;
+  emit8(e->c, line, 0); emit8(e->c, line, 0);
+  push_depth(e, -1);
+  int base = e->nlocals;
+  parse_block(e, line);
+  if (e->nlocals > e->maxlocals) e->maxlocals = e->nlocals;
+  e->nlocals = base; /* locals first assigned inside a branch stay inside it */
+
+  /* Look past blank lines for else, without consuming the statement delimiter
+   * when there is no else. */
+  size_t saved_p = e->p; int saved_line = e->line, saved_paren = e->paren, saved_peeked = e->peeked;
+  tok saved_cur = e->cur;
+  while (peek(e)->type == T_NL) next(e);
+  if (peek(e)->type == T_IDENT && !strcmp(peek(e)->text, "else")) {
+    next(e); expect(e, T_LB, "'{' after else");
+    emit8(e->c, line, DM_OP_ELSE);
+    uint32_t else_at = m->codelen;
+    emit8(e->c, line, 0); emit8(e->c, line, 0);
+    uint32_t jump = m->codelen - (if_at + 2);
+    if (jump > 65535) fail(e->c, line, "if body too large");
+    m->code[if_at] = jump & 255; m->code[if_at + 1] = jump >> 8;
+    parse_block(e, line);
+    if (e->nlocals > e->maxlocals) e->maxlocals = e->nlocals;
+    e->nlocals = base;
+    emit8(e->c, line, DM_OP_ENDIF);
+    jump = m->codelen - (else_at + 2);
+    if (jump > 65535) fail(e->c, line, "else body too large");
+    m->code[else_at] = jump & 255; m->code[else_at + 1] = jump >> 8;
+  } else {
+    e->p = saved_p; e->line = saved_line; e->paren = saved_paren; e->peeked = saved_peeked; e->cur = saved_cur;
+    emit8(e->c, line, DM_OP_ENDIF);
+    uint32_t jump = m->codelen - (if_at + 2);
+    if (jump > 65535) fail(e->c, line, "if body too large");
+    m->code[if_at] = jump & 255; m->code[if_at + 1] = jump >> 8;
+  }
+}
+
 static void parse_repeat(ec *e, int line) {
   /* repeat NAME COUNT { ... } : counted loop, NAME is a local holding 0..COUNT-1 */
   tok nm = next(e);
@@ -496,6 +541,7 @@ static void parse_block(ec *e, int line) {
 static void parse_statement(ec *e) {
   tok t = next(e);
   e->line = t.line;
+  if (t.type == T_IDENT && !strcmp(t.text, "if")) { parse_if(e, t.line); return; }
   if (t.type == T_IDENT && !strcmp(t.text, "repeat")) { parse_repeat(e, t.line); return; }
   if (t.type == T_IDENT && peek(e)->type == T_LP) { parse_call(e, t.text, t.line, 1); return; }
   if (t.type != T_IDENT && t.type != T_STATE) fail(e->c, t.line, "expected a statement");
@@ -603,7 +649,8 @@ static char *read_block(cc *c, int *first_line) {
     if (!get_line(c, line, sizeof line)) fail(c, start, "unterminated block (missing '}')");
     char tmp[1024]; strcpy(tmp, line); strip_comment(tmp);
     char *argv[64]; int argc = split(tmp, argv, 64);
-    if (argc == 1 && !strcmp(argv[0], "}")) { if (depth == 0) break; depth--; }
+    if (argc == 3 && !strcmp(argv[0], "}") && !strcmp(argv[1], "else") && !strcmp(argv[2], "{")) { /* same nesting depth */ }
+    else if (argc == 1 && !strcmp(argv[0], "}")) { if (depth == 0) break; depth--; }
     else if (argc >= 1 && !strcmp(argv[argc - 1], "{")) depth++;
     size_t l = strlen(line);
     if (n + l + 2 > cap) { cap = (cap + l) * 2; body = realloc(body, cap); }
@@ -760,6 +807,62 @@ static int load_wav(cc *c, int line, const char *path, int rate, dm_sample *out)
   return 0;
 }
 
+static int ppm_token(const uint8_t **at, const uint8_t *end, char *out, size_t cap) {
+  const uint8_t *p = *at;
+  for (;;) {
+    while (p < end && isspace(*p)) p++;
+    if (p < end && *p == '#') { while (p < end && *p != '\n') p++; continue; }
+    break;
+  }
+  size_t n = 0;
+  while (p < end && !isspace(*p) && *p != '#') {
+    if (n + 1 >= cap) return -1;
+    out[n++] = (char)*p++;
+  }
+  if (!n || p == end || *p == '#') return -1;
+  out[n] = 0;
+  int sep = *p++;
+  if (sep == '\r' && p < end && *p == '\n') p++;
+  *at = p;
+  return 0;
+}
+
+static void load_ppm(cc *c, int line, const char *path, dm_texture *out) {
+  char full[2048];
+  if (path[0] == '/' || !c->srcdir[0]) snprintf(full, sizeof full, "%s", path);
+  else snprintf(full, sizeof full, "%s/%s", c->srcdir, path);
+  FILE *f = fopen(full, "rb");
+  if (!f) fail(c, line, "cannot open texture '%s'", full);
+  if (fseek(f, 0, SEEK_END)) { fclose(f); fail(c, line, "cannot read texture '%s'", full); }
+  long size = ftell(f);
+  if (size < 0 || size > 3L * DM_MAX_TEX_DIM * DM_MAX_TEX_DIM + 4096) {
+    fclose(f); fail(c, line, "texture '%s' is too large", path);
+  }
+  rewind(f);
+  uint8_t *data = malloc((size_t)size + 1);
+  if (!data) { fclose(f); fail(c, line, "out of memory loading texture"); }
+  size_t got = fread(data, 1, (size_t)size, f); fclose(f);
+  if (got != (size_t)size) { free(data); fail(c, line, "cannot read texture '%s'", full); }
+  const uint8_t *p = data, *end = data + got;
+  char word[32]; long dims[3];
+  if (ppm_token(&p, end, word, sizeof word) || strcmp(word, "P6")) { free(data); fail(c, line, "texture '%s': expected P6 PPM", path); }
+  for (int i = 0; i < 3; i++) {
+    if (ppm_token(&p, end, word, sizeof word)) { free(data); fail(c, line, "texture '%s': bad PPM header", path); }
+    char *tail; dims[i] = strtol(word, &tail, 10);
+    if (*tail) { free(data); fail(c, line, "texture '%s': bad PPM header", path); }
+  }
+  if (dims[0] < 1 || dims[0] > DM_MAX_TEX_DIM || dims[1] < 1 || dims[1] > DM_MAX_TEX_DIM || dims[2] != 255) {
+    free(data); fail(c, line, "texture '%s': expected 1..%d pixels and maxval 255", path, DM_MAX_TEX_DIM);
+  }
+  size_t bytes = (size_t)dims[0] * (size_t)dims[1] * 3;
+  if ((size_t)(end - p) < bytes) { free(data); fail(c, line, "texture '%s': truncated pixels", path); }
+  out->rgb = malloc(bytes);
+  if (!out->rgb) { free(data); fail(c, line, "out of memory loading texture"); }
+  memcpy(out->rgb, p, bytes);
+  out->w = (uint16_t)dims[0]; out->h = (uint16_t)dims[1];
+  free(data);
+}
+
 static char *quoted(cc *c, int line, const char *raw) {
   const char *q = strchr(raw, '"');
   if (!q) fail(c, line, "expected a \"quoted string\"");
@@ -857,6 +960,16 @@ int dm_compile(const char *src, const char *srcname, dm_module *m) {
       load_wav(&c, ln, path, rate, sm);
       free(path);
       m->nsmp++;
+    } else if (!strcmp(k, "texture")) {
+      if (argc < 3) fail(&c, ln, "usage: texture NAME \"file.ppm\"");
+      if (m->ntex >= DM_MAX_TEXTURES) fail(&c, ln, "too many textures");
+      dm_texture *tx = &m->tex[m->ntex];
+      set_name(&c, ln, tx->name, argv[1]);
+      if (find_texture(&c, tx->name) >= 0) fail(&c, ln, "texture '%s' defined twice", tx->name);
+      char *path = quoted(&c, ln, raw);
+      load_ppm(&c, ln, path, tx);
+      free(path);
+      m->ntex++;
     } else if (!strcmp(k, "venv")) {
       if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: venv NAME [sustain=K] {");
       if (m->nvenv >= DM_MAX_VENVS) fail(&c, ln, "too many envelopes");

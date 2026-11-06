@@ -8,8 +8,8 @@
  * immbytes: number of immediate operand bytes following the opcode.
  *
  * Stack effect of F/S ops is (1 - nargs) / (-nargs); internal ops are listed
- * in dm_vm.c (dm_op_stack_effect).  The VM has no branches: every program is a
- * straight line, which makes static verification exact.
+ * in dm_vm.c (dm_op_stack_effect).  Structured if/else and counted loops are
+ * verified at their joins before bytecode is executed.
  */
 #ifndef DM_OPS_H
 #define DM_OPS_H
@@ -127,7 +127,12 @@
   X(EVT,    "evt",    0, 'F', 1) \
   X(EVTL,   "evtl",   0, 'F', 1) \
   X(SCENE,  "scene",  0, 'F', 1) \
-  X(SELECT, "select", 1, 'S', 0)
+  X(SELECT, "select", 1, 'S', 0) \
+  /* ---- v4: structured branches and embedded RGB textures ---- */ \
+  X(IFZ,    "ifz",    0, 'I', 2) \
+  X(ELSE,   "else",   0, 'I', 2) \
+  X(ENDIF,  "endif",  0, 'I', 0) \
+  X(TEX,    "tex",    2, 'F', 1)
 
 enum {
 #define X(id, name, n, k, imm) DM_OP_##id,

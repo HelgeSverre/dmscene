@@ -6,6 +6,7 @@ build/
 # rendered output anywhere except the shipped sample assets
 *.mp4
 *.png
+!art/threshold.png
 *.wav
 !demos/assets/*.wav
 !tests/assets/*.wav

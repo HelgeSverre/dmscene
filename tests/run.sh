@@ -60,6 +60,7 @@ rm -f "$T/scaffold.dmt"; ./dm new "$T/scaffold" >/dev/null 2>&1 || fail "dm new"
 # every demo compiles, loads and renders a second of audio + a frame
 ./build/tests/showcase-gates || fail "showcase held notes"
 ./build/tests/synth-voices || fail "synth voice ownership"
+./build/tests/branch-texture || fail "branches and textures"
 
 for f in demos/*.dmt; do
   n=$(basename "$f" .dmt)

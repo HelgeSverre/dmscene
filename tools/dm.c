@@ -60,8 +60,8 @@ static void disasm_all(const dm_module *m) {
 static void stats(const char *in, const dm_module *m) {
   int npat = 0, cells = 0;
   for (int i = 0; i < DM_MAX_PATTERNS; i++) if (m->pat[i].cells) { npat++; cells += m->pat[i].rows * m->pat[i].channels; }
-  fprintf(stderr, "%s: %d inst, %d pattern(s), %d cells, %d pixel program(s), %d palette(s), %d text(s), %d sample(s), %d event(s), %u bytes of code\n",
-          in, m->ninst, npat, cells, m->npixel, m->npal, m->ntext, m->nsmp, m->nev, m->codelen);
+  fprintf(stderr, "%s: %d inst, %d pattern(s), %d cells, %d pixel program(s), %d palette(s), %d text(s), %d sample(s), %d texture(s), %d event(s), %u bytes of code\n",
+          in, m->ninst, npat, cells, m->npixel, m->npal, m->ntext, m->nsmp, m->ntex, m->nev, m->codelen);
 }
 static int cmd_compile(int argc, char **argv, int check, int disasm) {
   const char *in = NULL, *out = NULL;

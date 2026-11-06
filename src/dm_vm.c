@@ -1,4 +1,4 @@
-/* dm_vm.c - straight-line float stack machine + intrinsics + verifier. */
+/* dm_vm.c - float stack machine + intrinsics + structured-control verifier. */
 #include "dm.h"
 #include <math.h>
 #include <string.h>
@@ -26,7 +26,7 @@ int dm_op_stack_effect(int op) {
   switch (op) {
     case DM_OP_PUSHK: case DM_OP_PUSHB: case DM_OP_LDL: case DM_OP_LDI:
     case DM_OP_LDU: case DM_OP_LDS: case DM_OP_DUP: return 1;
-    case DM_OP_STL: case DM_OP_STU: case DM_OP_STS: case DM_OP_POP: return -1;
+    case DM_OP_STL: case DM_OP_STU: case DM_OP_STS: case DM_OP_POP: case DM_OP_IFZ: return -1;
     case DM_OP_ADD: case DM_OP_SUB: case DM_OP_MUL: case DM_OP_DIV: case DM_OP_MOD:
     case DM_OP_LT: case DM_OP_LE: case DM_OP_GT: case DM_OP_GE: case DM_OP_EQ: case DM_OP_NE:
     case DM_OP_AND: case DM_OP_OR: return -1;
@@ -163,19 +163,21 @@ static float frac_kifs(dm_vm *vm, float x, float y, float scale, float ang, int 
   vm->r[1] = trap; vm->r[2] = x; vm->r[3] = y;
   return sqrtf(x * x + y * y) * powf(scale, -(float)n);
 }
-static void sample_prev(const dm_vm *vm, float x, float y, float *o) {
-  if (!vm->prev || vm->pw < 1 || vm->ph < 1) { o[0] = o[1] = o[2] = 0; return; }
-  float fx = x * (float)vm->pw - 0.5f, fy = y * (float)vm->ph - 0.5f;
-  if (fx < 0) fx = 0; if (fy < 0) fy = 0;
-  if (fx > vm->pw - 1.001f) fx = vm->pw - 1.001f; if (fy > vm->ph - 1.001f) fy = vm->ph - 1.001f;
+static void sample_rgb(const uint8_t *rgb, int w, int h, float x, float y, float *o) {
+  if (!rgb || w < 1 || h < 1 || !isfinite(x) || !isfinite(y)) { o[0] = o[1] = o[2] = 0; return; }
+  float fx = clampf(x * w - 0.5f, 0, (float)(w - 1));
+  float fy = clampf(y * h - 0.5f, 0, (float)(h - 1));
   int ix = (int)fx, iy = (int)fy; float kx = fx - ix, ky = fy - iy;
-  int ix1 = ix + 1 < vm->pw ? ix + 1 : ix, iy1 = iy + 1 < vm->ph ? iy + 1 : iy;
-  const uint8_t *a = vm->prev + ((size_t)iy * vm->pw + ix) * 3, *b = vm->prev + ((size_t)iy * vm->pw + ix1) * 3;
-  const uint8_t *c = vm->prev + ((size_t)iy1 * vm->pw + ix) * 3, *d = vm->prev + ((size_t)iy1 * vm->pw + ix1) * 3;
+  int ix1 = ix + 1 < w ? ix + 1 : ix, iy1 = iy + 1 < h ? iy + 1 : iy;
+  const uint8_t *a = rgb + ((size_t)iy * w + ix) * 3, *b = rgb + ((size_t)iy * w + ix1) * 3;
+  const uint8_t *c = rgb + ((size_t)iy1 * w + ix) * 3, *d = rgb + ((size_t)iy1 * w + ix1) * 3;
   for (int i = 0; i < 3; i++) {
     float top = a[i] + (b[i] - a[i]) * kx, bot = c[i] + (d[i] - c[i]) * kx;
     o[i] = (top + (bot - top) * ky) * (1.0f / 255.0f);
   }
+}
+static void sample_prev(const dm_vm *vm, float x, float y, float *o) {
+  sample_rgb(vm->prev, vm->pw, vm->ph, x, y, o);
 }
 
 static float sample_read(const dm_module *m, int id, double pos_samples) {
@@ -259,6 +261,9 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
       case DM_OP_NOT: TOP = TOP == 0.0f ? 1.0f : 0.0f; break;
       case DM_OP_SEL: c = POP(); b = POP(); TOP = TOP != 0.0f ? b : c; break;
       case DM_OP_RET: return;
+      case DM_OP_IFZ: { int skip = pc[0] | (pc[1] << 8); pc += 2; if (POP() == 0.0f) pc += skip; break; }
+      case DM_OP_ELSE: { int skip = pc[0] | (pc[1] << 8); pc += 2 + skip; break; }
+      case DM_OP_ENDIF: break;
 
       case DM_OP_SIN: TOP = sinf(TOP); break;
       case DM_OP_COS: TOP = cosf(TOP); break;
@@ -398,6 +403,10 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
       case DM_OP_NEWTON: c = POP(); b = POP(); a = TOP; TOP = frac_newton(vm, a, b, (int)clampf(c, 1, 256)); break;
       case DM_OP_KIFS: { float it = POP(); d = POP(); c = POP(); b = POP(); a = TOP; TOP = frac_kifs(vm, a, b, c, d, (int)clampf(it, 1, 32)); break; }
       case DM_OP_PREV: { float col[3]; b = POP(); a = TOP; sample_prev(vm, a, b, col); TOP = col[0]; vm->r[1] = col[1]; vm->r[2] = col[2]; break; }
+      case DM_OP_TEX: { uint8_t id = IMM8(); float col[3]; b = POP(); a = TOP;
+        const dm_texture *tx = vm->m && id < vm->m->ntex ? &vm->m->tex[id] : NULL;
+        sample_rgb(tx ? tx->rgb : NULL, tx ? tx->w : 0, tx ? tx->h : 0, a, b, col);
+        TOP = col[0]; vm->r[1] = col[1]; vm->r[2] = col[2]; break; }
       case DM_OP_CPREV: { float col[3]; c = POP(); b = POP(); a = POP(); sample_prev(vm, a, b, col);
         vm->out[0] += (col[0] - vm->out[0]) * c; vm->out[1] += (col[1] - vm->out[1]) * c; vm->out[2] += (col[2] - vm->out[2]) * c; break; }
 
@@ -483,7 +492,7 @@ static int op_pops(int op) {
   if (o->kind != 'I') return o->nargs;
   switch (op) {
     case DM_OP_STL: case DM_OP_STU: case DM_OP_STS: case DM_OP_POP:
-    case DM_OP_NEG: case DM_OP_NOT: case DM_OP_DUP: return 1;
+    case DM_OP_NEG: case DM_OP_NOT: case DM_OP_DUP: case DM_OP_IFZ: return 1;
     case DM_OP_ADD: case DM_OP_SUB: case DM_OP_MUL: case DM_OP_DIV: case DM_OP_MOD:
     case DM_OP_LT: case DM_OP_LE: case DM_OP_GT: case DM_OP_GE: case DM_OP_EQ: case DM_OP_NE:
     case DM_OP_AND: case DM_OP_OR: return 2;
@@ -499,12 +508,15 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
   }
   const uint8_t *pc = m->code + p->off, *end = pc + p->len;
   int depth = 0, maxd = 0;
-  const uint8_t *lstart[DM_MAX_LOOP_DEPTH]; int ldepth[DM_MAX_LOOP_DEPTH]; int lsp = 0;
+  const uint8_t *lstart[DM_MAX_LOOP_DEPTH], *lend[DM_MAX_LOOP_DEPTH];
+  int ldepth[DM_MAX_LOOP_DEPTH], lifsp[DM_MAX_LOOP_DEPTH], lsp = 0;
+  struct { const uint8_t *target, *end; int depth, loop, has_else; } branch[32];
+  int bsp = 0;
   while (pc < end) {
     int op = *pc++;
     if (op >= DM_OP_COUNT) { dm_set_error("%s: bad opcode %d", what, op); return -1; }
     const dm_opinfo *o = &dm_ops[op];
-    if (pc + o->imm > end) { dm_set_error("%s: truncated immediate", what); return -1; }
+    if ((size_t)(end - pc) < o->imm) { dm_set_error("%s: truncated immediate", what); return -1; }
     uint32_t imm = o->imm == 1 ? pc[0] : 0;
     switch (op) {
       case DM_OP_LDL: case DM_OP_STL: if (imm >= p->nlocals) { dm_set_error("%s: local %u out of range", what, imm); return -1; } break;
@@ -519,6 +531,7 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
       case DM_OP_DLY: if (imm >= p->ndelay) { dm_set_error("%s: delay line %u out of range", what, imm); return -1; } break;
       case DM_OP_STR: case DM_OP_STRLEN: if ((int)pc[0] >= m->ntext) { dm_set_error("%s: text %u out of range", what, pc[0]); return -1; } break;
       case DM_OP_SMP: case DM_OP_SMPLEN: case DM_OP_WAVE: if ((int)pc[0] >= m->nsmp) { dm_set_error("%s: sample %u out of range", what, pc[0]); return -1; } break;
+      case DM_OP_TEX: if ((int)pc[0] >= m->ntex) { dm_set_error("%s: texture %u out of range", what, pc[0]); return -1; } break;
       case DM_OP_VENV: if ((int)pc[0] >= m->nvenv) { dm_set_error("%s: envelope %u out of range", what, pc[0]); return -1; } break;
       case DM_OP_EVT: case DM_OP_EVTL: if ((int)pc[0] >= m->nevname) { dm_set_error("%s: event %u out of range", what, pc[0]); return -1; } break;
       case DM_OP_SCENE: if ((int)pc[0] >= m->npixel) { dm_set_error("%s: scene %u out of range", what, pc[0]); return -1; } break;
@@ -526,16 +539,49 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
         if (pc[0] >= p->nlocals) { dm_set_error("%s: loop counter local out of range", what); return -1; }
         if (lsp >= DM_MAX_LOOP_DEPTH) { dm_set_error("%s: loops nested too deep", what); return -1; }
         int skip = pc[3] | (pc[4] << 8);
-        if (pc + 5 + skip > end) { dm_set_error("%s: loop skip out of range", what); return -1; }
-        lstart[lsp] = pc + 5; ldepth[lsp] = depth; lsp++;
+        if ((size_t)(end - (pc + 5)) < (size_t)skip) { dm_set_error("%s: loop skip out of range", what); return -1; }
+        lstart[lsp] = pc + 5; lend[lsp] = pc + 5 + skip; ldepth[lsp] = depth; lifsp[lsp] = bsp; lsp++;
         break;
       }
       case DM_OP_ENDL: {
         if (lsp == 0) { dm_set_error("%s: endl without loop", what); return -1; }
         int back = pc[1] | (pc[2] << 8);
         lsp--;
-        if (pc + 3 - back != lstart[lsp]) { dm_set_error("%s: loop back offset mismatch", what); return -1; }
+        if (bsp != lifsp[lsp] || pc + 3 != lend[lsp]) { dm_set_error("%s: loop crosses a branch or skip offset mismatch", what); return -1; }
+        if ((size_t)back > (size_t)(pc + 3 - (m->code + p->off)) || pc + 3 - back != lstart[lsp]) { dm_set_error("%s: loop back offset mismatch", what); return -1; }
         if (depth != ldepth[lsp]) { dm_set_error("%s: stack depth changes across loop body", what); return -1; }
+        break;
+      }
+      case DM_OP_IFZ: {
+        if (bsp >= 32) { dm_set_error("%s: if blocks nested too deep", what); return -1; }
+        int skip = pc[0] | (pc[1] << 8);
+        if ((size_t)(end - (pc + 2)) < (size_t)skip) { dm_set_error("%s: if target out of range", what); return -1; }
+        branch[bsp].target = pc + 2 + skip;
+        branch[bsp].end = NULL;
+        branch[bsp].depth = depth - 1;
+        branch[bsp].loop = lsp;
+        branch[bsp].has_else = 0;
+        bsp++;
+        break;
+      }
+      case DM_OP_ELSE: {
+        if (!bsp || branch[bsp - 1].has_else || branch[bsp - 1].loop != lsp || branch[bsp - 1].target != pc + 2) {
+          dm_set_error("%s: malformed else target", what); return -1;
+        }
+        if (depth != branch[bsp - 1].depth) { dm_set_error("%s: stack depth differs at else", what); return -1; }
+        int skip = pc[0] | (pc[1] << 8);
+        if ((size_t)(end - (pc + 2)) < (size_t)skip) { dm_set_error("%s: else target out of range", what); return -1; }
+        branch[bsp - 1].end = pc + 2 + skip;
+        branch[bsp - 1].has_else = 1;
+        break;
+      }
+      case DM_OP_ENDIF: {
+        if (!bsp || branch[bsp - 1].loop != lsp ||
+            (branch[bsp - 1].has_else ? branch[bsp - 1].end : branch[bsp - 1].target) != pc) {
+          dm_set_error("%s: malformed endif target", what); return -1;
+        }
+        if (depth != branch[bsp - 1].depth) { dm_set_error("%s: stack depth differs at endif", what); return -1; }
+        bsp--;
         break;
       }
       default: break;
@@ -548,6 +594,8 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
     if (maxd > DM_MAX_STACK) { dm_set_error("%s: expression too deep", what); return -1; }
   }
   if (lsp) { dm_set_error("%s: unterminated loop", what); return -1; }
+  if (bsp) { dm_set_error("%s: unterminated if", what); return -1; }
+  if (depth) { dm_set_error("%s: stack depth %d at program end", what, depth); return -1; }
   return 0;
 }
 
@@ -564,6 +612,7 @@ void dm_disasm(const dm_module *m, const dm_prog *p, FILE *f) {
     else if (op == DM_OP_LDI) fprintf(f, " %s", dm_input_name(pc[1]));
     else if (op == DM_OP_LOOP) fprintf(f, " i=%u count=%u skip=%u", pc[1], pc[2] | (pc[3] << 8), pc[4] | (pc[5] << 8));
     else if (op == DM_OP_ENDL) fprintf(f, " i=%u back=%u", pc[1], pc[2] | (pc[3] << 8));
+    else if (op == DM_OP_IFZ || op == DM_OP_ELSE) fprintf(f, " skip=%u", pc[1] | (pc[2] << 8));
     else if (o->imm == 1) fprintf(f, " %u", pc[1]);
     fputc('\n', f);
     pc += 1 + o->imm;
