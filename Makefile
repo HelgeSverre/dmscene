@@ -45,8 +45,20 @@ build/native/%: build/native/%.c tools/avi-prototype.c include/dm_mov.h $(filter
 native-export: build/native/$(notdir $(DEMO:.dmt=))
 	@echo "Run $< $(DEMO) output.avi [--seconds S] [--size WxH] [--threads N]"
 
-test-native: avi-prototype build/dm-aot dm
+# Compile this demo's shaders into a normal dm CLI; audio remains interpreted.
+build/native-player/%: build/native/%.c tools/dm.c $(filter-out build/obj/dm_vm.o,$(OBJ)) $(POBJ)
+	mkdir -p build/native-player
+	$(CC) $(CFLAGS) -I. -DDM_AOT -Wno-unused-variable -Wno-unused-label $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+
+native-player: build/native-player/$(notdir $(DEMO:.dmt=))
+	@echo "Run $< play $(DEMO) [play options]"
+
+play-native: build/native-player/$(notdir $(DEMO:.dmt=))
+	$< play $(DEMO) $(PLAY_ARGS)
+
+test-native: avi-prototype build/dm-aot dm build/tests/scrub-live
 	sh tests/native-export.sh
+	sh tests/native-player.sh
 	@if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then sh tests/qtrle-equivalence.sh; fi
 
 .PRECIOUS: build/native/%.c
@@ -121,8 +133,11 @@ build/tests/branch-texture: tests/branch-texture.c $(OBJ) | build/tests
 build/tests/scene-workers: tests/scene-workers.c $(OBJ) | build/tests
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-build/tests/term-input: tests/term-input.c src/dm_term.c include/dm.h | build/tests
-	$(CC) $(CFLAGS) tests/term-input.c src/dm_term.c -o $@ $(LDFLAGS) $(LDLIBS)
+build/tests/term-input build/tests/term-graphics: build/tests/%: tests/%.c src/dm_term.c include/dm.h | build/tests
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/native-bind: tests/native-bind.c build/native/hakkuh.c $(filter-out build/obj/dm_vm.o,$(OBJ)) $(POBJ) | build/tests
+	$(CC) $(CFLAGS) -I. -Wno-unused-variable -Wno-unused-label $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 build/tests/play-transport: tests/play-transport.c tools/dm.c $(OBJ) $(POBJ) | build/tests
 	$(CC) $(CFLAGS) tests/play-transport.c $(OBJ) $(POBJ) -o $@ $(LDFLAGS) $(LDLIBS)
@@ -151,14 +166,14 @@ build/tests/audio-pipe: tests/audio-pipe.c src/dm_audio.c src/dm_term.c include/
 build/tests/dm-pipe: tools/dm.c src/dm_audio.c $(OBJ) build/obj/dm_term.o build/obj/dm_seek.o | build/tests
 	$(CC) $(CFLAGS) -DDM_AUDIO_PIPE $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport build/tests/seek build/tests/scrub-live build/tests/dm-audio-clock build/tests/state-safety build/tests/output-errors build/tests/compile-retry build/tests/watch-state build/tests/audio-pipe build/tests/vm-numeric build/tests/dm-pipe build/tests/native-writer-errors
+test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/term-graphics build/tests/play-transport build/tests/seek build/tests/scrub-live build/tests/dm-audio-clock build/tests/state-safety build/tests/output-errors build/tests/compile-retry build/tests/watch-state build/tests/audio-pipe build/tests/vm-numeric build/tests/dm-pipe build/tests/native-writer-errors
 	./tests/run.sh
 
 # Separate objects keep sanitizer flags out of the normal dm binary.
 SANFLAGS := $(CFLAGS) -O1 -g -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all
 SANOBJ := $(ENGINE:src/%.c=build/sanitize/%.o)
 SANPOBJ := $(PLAT:src/%.c=build/sanitize/%.o)
-SAN_TESTS := state-safety vm-numeric compile-retry watch-state seek native-writer-errors
+SAN_TESTS := state-safety vm-numeric compile-retry watch-state seek native-writer-errors term-graphics scene-workers
 
 build/sanitize build/sanitize/tests:
 	mkdir -p $@
@@ -166,7 +181,10 @@ build/sanitize build/sanitize/tests:
 build/sanitize/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_seek.h | build/sanitize
 	$(CC) $(SANFLAGS) -c $< -o $@
 
-build/sanitize/tests/state-safety build/sanitize/tests/vm-numeric build/sanitize/tests/seek build/sanitize/tests/native-writer-errors: build/sanitize/tests/%: tests/%.c $(SANOBJ) $(SANPOBJ) | build/sanitize/tests
+build/sanitize/tests/state-safety build/sanitize/tests/vm-numeric build/sanitize/tests/seek build/sanitize/tests/native-writer-errors build/sanitize/tests/scene-workers: build/sanitize/tests/%: tests/%.c $(SANOBJ) $(SANPOBJ) | build/sanitize/tests
+	$(CC) $(SANFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/sanitize/tests/term-graphics: tests/term-graphics.c build/sanitize/dm_term.o | build/sanitize/tests
 	$(CC) $(SANFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 build/sanitize/tests/watch-state: tests/watch-state.c tools/dm.c $(SANOBJ) $(SANPOBJ) | build/sanitize/tests
@@ -181,4 +199,4 @@ test-sanitize: $(addprefix build/sanitize/tests/,$(SAN_TESTS))
 clean:
 	rm -rf build dm
 
-.PHONY: all demo demos videos showcase showcase-preview run site wasm web web-runtime serve test-web test-wasm clean-wasm test test-sanitize clean avi-prototype native-export test-native
+.PHONY: all demo demos videos showcase showcase-preview run site wasm web web-runtime serve test-web test-wasm clean-wasm test test-sanitize clean avi-prototype native-export native-player play-native test-native

@@ -15,6 +15,16 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* Binding changes only before workers start or after they have all stopped. */
+static void bind_native(const dm_module *m) {
+#ifdef DM_AOT
+  extern int dm_aot_bind(const dm_module *);
+  (void)dm_aot_bind(m); /* edited / different demos use the interpreter */
+#else
+  (void)m;
+#endif
+}
+
 static char *slurp(const char *path) {
   FILE *f = fopen(path, "rb");
   if (!f) return NULL;
@@ -81,6 +91,8 @@ static void usage(int code) {
     "  --fps N       target frame rate (default 30)      --size WxH   force framebuffer size\n"
     "  --mute        no audio, wall-clock visuals         --start S    start S seconds in\n"
     "  --solo C      hear only channel C                  --threads N  pixel worker threads\n"
+    "  --graphics auto|kitty|text   terminal images (default: probe, then text fallback)\n"
+    "  --render-scale N            override demo pixel scale (1 = full detail)\n"
     "  keys: q quit, left/right seek 5s, mouse wheel/trackpad smooth scrub, up/down speed, space pause\n"
     "        1..8 toggle channel mute, 0 unmute all, r reload (watch), Ctrl-Z suspend\n"
     "env: DM_THREADS, DM_AUDIO_CMD, DM_AUDIO_LATENCY (pipe backend)\n");
@@ -309,7 +321,7 @@ static void audio_cb(void *user, float *lr, uint32_t frames) {
 
 typedef struct {
   const char *file, *png, *wav, *mp4, *avi, *mov;
-  int fps, W, H, mute, threads, solo, watch, render_scale;
+  int fps, W, H, mute, threads, solo, watch, render_scale, graphics;
   double seconds, start;
 } opts;
 
@@ -349,6 +361,13 @@ static void parse_play_opts(int argc, char **argv, opts *o) {
     else if (!strcmp(argv[i], "--start") && i + 1 < argc) o->start = parse_double(argv[++i]);
     else if (!strcmp(argv[i], "--solo") && i + 1 < argc) o->solo = parse_int(argv[++i]);
     else if (!strcmp(argv[i], "--watch")) o->watch = 1;
+    else if (!strcmp(argv[i], "--graphics") && i + 1 < argc) {
+      const char *mode = argv[++i];
+      if (!strcmp(mode, "auto")) o->graphics = DM_TERM_AUTO;
+      else if (!strcmp(mode, "text")) o->graphics = DM_TERM_TEXT;
+      else if (!strcmp(mode, "kitty")) o->graphics = DM_TERM_KITTY;
+      else usage(2);
+    }
     else if (argv[i][0] == '-') usage(2);
     else o->file = argv[i];
   }
@@ -645,6 +664,21 @@ static void reset_scene_after_seek(dm_scene *scene, const dm_module *m, const op
   scene->frame = (int)frame;
 }
 
+typedef struct { double scale, full_cost; unsigned settled; } play_budget;
+static void budget_observe(play_budget *b, double cost, int fps) {
+  if (!(cost > 0) || !isfinite(cost) || fps < 1) return;
+  double full = cost / (b->scale * b->scale), target = .8 / fps;
+  b->full_cost = b->full_cost ? .75 * b->full_cost + .25 * full : full;
+  double wanted = sqrt(target / b->full_cost);
+  if (wanted < .25) wanted = .25;
+  if (wanted > 1) wanted = 1;
+  b->settled++;
+  if (b->settled >= 3 && wanted < b->scale * .90) { b->scale = wanted; b->full_cost = 0; b->settled = 0; }
+  else if (b->settled >= 60 && (wanted > b->scale * 1.15 || (wanted == 1 && b->scale < 1))) {
+    b->scale = fmin(wanted, b->scale * 1.10); b->full_cost = 0; b->settled = 0;
+  }
+}
+
 static int play_realtime(dm_module *mods, opts *o) {
   static const double speeds[] = {0.5, 0.75, 1.0, 1.25, 1.5, 2.0};
   dm_module *m = &mods[0];
@@ -673,12 +707,14 @@ static int play_realtime(dm_module *mods, opts *o) {
   dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   dm_term *term = dm_term_open();
   dm_fb fb = {0}; dm_scrub scrub = {0};
+  play_budget budget = {1, 0, 0};
   double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, last_draw = 0;
   file_stamp srcm = mtime(o->file);
   char note[160] = ""; double note_until = 0;
   int frames = 0, frame_dirty = 1, restore_tstp = 0;
   struct sigaction saved_tstp;
   if (!term) { fprintf(stderr, "dm: cannot open terminal\n"); rc = 1; goto done; }
+  dm_term_graphics(term, o->graphics);
   if (!au && !o->mute) {
     snprintf(note, sizeof note, "audio unavailable; wall-clock playback");
     note_until = epoch + 3;
@@ -734,6 +770,7 @@ static int play_realtime(dm_module *mods, opts *o) {
       signal(SIGTSTP, SIG_DFL); raise(SIGTSTP);
       term = dm_term_open();
       if (!term) { fprintf(stderr, "dm: cannot restore terminal\n"); rc = 1; break; }
+      dm_term_graphics(term, o->graphics);
       au = o->mute ? NULL : dm_audio_open(DM_SR, audio_cb, &ac);
       waiting = au != NULL;
       dm_seek_request(seeker, base, mute, waiting);
@@ -788,28 +825,45 @@ static int play_realtime(dm_module *mods, opts *o) {
      * tracker clock when scrubbing backwards; never replay audio on this path. */
     if (pos < clk.sample) dm_seq_init(&clk, m, DM_SR);
     dm_seq_seek(&clk, pos);
-    int cols, rows;
-    if (!o->W) { dm_term_size(term, &cols, &rows); rows = rows > 1 ? rows - 1 : 1; }
+    int cols, rows, pw, ph, kitty = dm_term_is_kitty(term);
+    if (kitty || !o->W) { dm_term_size(term, &cols, &rows); rows = rows > 1 ? rows - 1 : 1; }
     else { cols = o->W; rows = (o->H + 1) / 2; }
-    int sc = m->scale > 1 ? m->scale : 1;
-    int fw = cols / sc > 1 ? cols / sc : 1, fh = rows * 2 / sc > 1 ? rows * 2 / sc : 2;
+    pw = cols; ph = rows * 2;
+    if (kitty) {
+      if (o->W) { pw = o->W; ph = o->H; }
+      else {
+        dm_term_pixels(term, &pw, &ph);
+        ph = (int)((int64_t)ph * rows / (rows + 1)); /* reserve status row */
+        double down = fmax((double)pw / 640, (double)ph / 400);
+        if (down > 1) { pw = (int)(pw / down); ph = (int)(ph / down); }
+      }
+    }
+    int sc = o->render_scale ? o->render_scale : m->scale > 1 ? m->scale : 1;
+    int fw = pw / sc > 1 ? pw / sc : 1, fh = ph / sc > 1 ? ph / sc : 2;
+    if (kitty && !o->W) {
+      fw = (int)(fw * budget.scale); if (fw < 1) fw = 1;
+      fh = (int)(fh * budget.scale); if (fh < 2) fh = 2;
+    }
     if (fb.w != fw || fb.h != fh) frame_dirty = 1;
     if (dm_fb_alloc(&fb, fw, fh)) { rc = 1; break; }
     float env[DM_MAX_CHANNELS];
     if (au && !waiting && !scrub.active) {
       pthread_mutex_lock(&ac.mu); memcpy(env, ac.p.synth.cenv, sizeof env); pthread_mutex_unlock(&ac.mu);
     } else dm_seek_env(seeker, env);
-    if ((!paused && !waiting) || frame_dirty) {
+    int rendered = (!paused && !waiting) || frame_dirty;
+    double render_start = dm_now();
+    if (rendered) {
       dm_scene_render(&scene, &clk, env, &fb); frame_dirty = 0;
     }
     char chs[DM_MAX_CHANNELS + 1];
     for (int c = 0; c < m->channels; c++) chs[c] = mute[c] ? '.' : (char)('1' + c);
     chs[m->channels] = 0;
     char status[320];
-    snprintf(status, sizeof status, " %s  %s%.3gx  %.2fs  beat %6.2f  %.0ffps  ch %s  %s",
+    snprintf(status, sizeof status, " %s  %s%.3gx  %.2fs  beat %6.2f  %.0ffps  ch %s  %s %dx%d  %s",
       m->title[0] ? m->title : o->file, scrub.active ? "scrub @ " : waiting ? "seeking @ " : paused ? "pause @ " : "speed ",
-      speeds[speed_i], (double)pos / DM_SR, dm_seq_beat(&clk), fps_est, chs, now < note_until ? note : "");
+      speeds[speed_i], (double)pos / DM_SR, dm_seq_beat(&clk), fps_est, chs, kitty ? "kitty" : "text", fw, fh, now < note_until ? note : "");
     dm_term_blit(term, &fb, cols, rows, status);
+    if (rendered && kitty && !o->W) budget_observe(&budget, dm_now() - render_start, o->fps);
     last_draw = now;
 
     int reload = k == 'r';
@@ -834,6 +888,8 @@ static int play_realtime(dm_module *mods, opts *o) {
         accept_audio(&ac, next, speeds[speed_i], 1);
         dm_scene_free(&scene); dm_module_free(m);
         which ^= 1; m = nm;
+        bind_native(m);
+        budget = (play_budget){1, 0, 0};
         dm_scene_init(&scene, m); scene.nthreads = o->threads;
         dm_seq_init(&clk, m, DM_SR);
         base = pos; scrub.active = 0; frame_dirty = 1;
@@ -881,6 +937,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "watch")) o.watch = 1;
     static dm_module mods[2];
     if (load_any(o.file, &mods[0])) { fprintf(stderr, "dm: %s\n", dm_error()); return 1; }
+    bind_native(&mods[0]);
     if (o.png || o.wav || o.mp4 || o.avi || o.mov) return render_offline(&mods[0], &o);
     if (!strcmp(cmd, "render")) { fprintf(stderr, "dm render: give --mp4 FILE, --avi FILE, --mov FILE, --png DIR or --wav FILE\n"); return 2; }
     if (o.watch && !ends_with(o.file, ".dmt")) fprintf(stderr, "dm: --watch reloads a .dmt; a .dms will not change\n");

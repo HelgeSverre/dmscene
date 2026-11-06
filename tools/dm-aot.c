@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
   if (m.has_post) emit(&m, &m.post);
   puts("static const dm_module *bound_module;\n"
        "int dm_aot_bind(const dm_module *m) {\n"
+       "bound_module=0;\n"
        "if(m->codelen!=sizeof aot_code || memcmp(m->code,aot_code,sizeof aot_code)) return -1;\n"
        "bound_module=m; return 0; }\n"
        "void dm_vm_run(dm_vm *vm,const uint8_t *code,uint32_t len) {\n"

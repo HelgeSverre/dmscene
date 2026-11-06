@@ -58,6 +58,18 @@ static int rate_case(dm_module *m, double rate) {
 }
 
 int main(void) {
+  /* A slow 640x400 shader should converge to its frame budget without
+   * oscillating resolution. A lighter scene may gradually regain detail. */
+  play_budget budget = {1, 0, 0};
+  for (int i = 0; i < 90; i++) budget_observe(&budget, .108 * budget.scale * budget.scale + .001, 30);
+  if (budget.scale < .35 || budget.scale > .55) return fail("adaptive playback missed its frame budget");
+  double settled = budget.scale;
+  for (int i = 0; i < 90; i++) budget_observe(&budget, .108 * budget.scale * budget.scale + .001, 30);
+  if (fabs(budget.scale - settled) > .01) return fail("adaptive resolution oscillates at steady load");
+  for (int i = 0; i < 900; i++) budget_observe(&budget, .008 * budget.scale * budget.scale + .001, 30);
+  if (budget.scale < .95 || budget.scale > 1) return fail("adaptive playback never restores detail");
+  budget_observe(&budget, INFINITY, 30);
+  if (!isfinite(budget.scale)) return fail("invalid timing corrupted adaptive resolution");
   dm_module m = {0};
   if (load_any("demos/pulse.dmt", &m)) return fail("load pulse");
 

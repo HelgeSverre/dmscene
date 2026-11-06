@@ -337,9 +337,13 @@ const char *dm_audio_backend(dm_audio *a);
 /* ---------------------------------------------------------------- platform: terminal */
 typedef struct dm_term dm_term;
 enum { DM_KEY_UP = 0x101, DM_KEY_DOWN, DM_KEY_LEFT, DM_KEY_RIGHT, DM_KEY_SUSPEND, DM_KEY_SCRUB_BACK, DM_KEY_SCRUB_FORWARD };
+enum { DM_TERM_AUTO, DM_TERM_TEXT, DM_TERM_KITTY };
 
 dm_term *dm_term_open(void);
+void     dm_term_graphics(dm_term *t, int mode); /* auto probes asynchronously; text is the fallback */
+int      dm_term_is_kitty(const dm_term *t);
 void     dm_term_size(dm_term *t, int *cols, int *rows);
+void     dm_term_pixels(dm_term *t, int *width, int *height); /* full viewport; cell estimate if unavailable */
 void     dm_term_blit(dm_term *t, const dm_fb *fb, int cols, int rows, const char *status);
 int      dm_term_key(dm_term *t);           /* -1 if none */
 void     dm_term_wait(dm_term *t, double seconds); /* wait for input or frame deadline */

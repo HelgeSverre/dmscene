@@ -4,6 +4,11 @@
 The optional specialized renderer uses the same C compiler and make setup as
 the engine.
 
+The same shader compiler also supports terminal playback through
+`make play-native DEMO=demos/hakkuh.dmt`, or `make native-player` to build only.
+The resulting normal CLI can export as well as play, and safely falls back to
+the interpreter for edited/different bytecode. See [terminal graphics](terminal-graphics.md).
+
 ```sh
 mkdir -p build/frames
 ./dm render demos/showcase.dmt --mov build/showcase.mov --seconds 30 --size 960x600

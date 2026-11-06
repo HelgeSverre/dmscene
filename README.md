@@ -120,10 +120,26 @@ See [native export](docs/native-export.md) for the optional per-demo AOT shader
 compiler, benchmarks and limits.
 
 Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
-a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
-cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). The `dm` binary
+a pipe to `aplay` elsewhere. Terminal video probes for Kitty graphics (including
+Ghostty), with ANSI truecolor `▀` half blocks as the fallback. Use
+`--graphics auto|kitty|text` to select the backend. Image mode starts within
+640×400 and adapts detail to the frame budget; `--size WxH` fixes resolution.
+`--render-scale 1` overrides a demo's reduced-resolution setting. The `dm` binary
 only invokes `ffmpeg` for `--mp4`; AVI, MOV, PNG and WAV use built-in writers.
 The README animation target also requires ffmpeg.
+
+For expensive pixel programs, compile the shaders into a normal player:
+
+```sh
+make play-native DEMO=demos/hakkuh.dmt
+make play-native DEMO=demos/hakkuh.dmt PLAY_ARGS='--size 640x400 --fps 30'
+make native-player DEMO=demos/hakkuh.dmt  # build without launching
+```
+
+The output is `build/native-player/hakkuh`. It keeps the usual controls and
+automatically uses the interpreter for changed/different demo bytecode.
+See [terminal graphics](docs/terminal-graphics.md) for detection, performance
+measurements and resolution tradeoffs.
 
 Generated files stay grouped under `build/`: `obj/` for object files,
 `modules/` for compiled demos, `video/` for MP4s, `audio/` for WAVs,
@@ -195,6 +211,8 @@ dm COMMAND file [options]
   --version, -V                       engine generation and DMS format version
 
 play options:
+  --graphics auto|kitty|text  image protocol selection (default auto)
+  --render-scale N           override demo pixel scale (1 = full detail)
   --fps N       target frame rate (default 30)      --size WxH   force framebuffer size
   --mute        no audio, wall-clock visuals         --start S    start S seconds in
   --solo C      hear only channel C                  --threads N  pixel worker threads
@@ -731,7 +749,7 @@ retry/concurrency behavior, confirmed fixes and the tests that exercise them.
   a resource name as their first argument are listed in `parse_call`.
 * New top-level resource: a chunk tag in `dm_module.c`, a table in `dm_module`, a
   directive in `dm_compile.c`.
-* New backend: implement the six audio/terminal functions at the bottom of `dm.h`.
+* New backend: implement the audio/terminal interfaces at the bottom of `dm.h`.
 * The engine is a library: `dm_module_read`, `dm_player_render` (any audio
   callback) and `dm_scene_render` (any framebuffer) are the whole surface.
 

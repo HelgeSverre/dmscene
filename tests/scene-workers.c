@@ -39,6 +39,18 @@ int main(void) {
   dm_fb_free(&fa); dm_fb_free(&fb); dm_fb_free(&fr);
   dm_scene_free(&a); dm_scene_free(&b); dm_scene_free(&ref);
   dm_module_free(&m);
+  const char *feedback = "song channels=1\norder 0\npattern 0 rows=1 {\n .\n}\n"
+    "pixel {\n if (frame < 1) {\n rgb(0.2, 0.4, 0.6)\n } else {\n cprev(x, y, 1)\n }\n}\n";
+  if (dm_compile(feedback, "resize-feedback", &m)) return 1;
+  dm_scene_init(&a, &m); a.nthreads = 2; dm_seq_init(&clk, &m, DM_SR);
+  if (dm_fb_alloc(&fa, 2, 2)) return 1;
+  dm_scene_render(&a, &clk, NULL, &fa);
+  if (dm_fb_alloc(&fa, 7, 5)) return 1;
+  dm_scene_render(&a, &clk, NULL, &fa);
+  for (int i = 0; i < 7 * 5 * 3; i++) if (fa.rgb[i] != (i % 3 + 1) * 51) {
+    fprintf(stderr, "resizing cleared feedback history\n"); return 1;
+  }
+  dm_scene_free(&a); dm_fb_free(&fa); dm_module_free(&m);
   puts("ok: scene worker isolation and framebuffer allocation");
   return 0;
 }

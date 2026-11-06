@@ -532,6 +532,7 @@ Larger numbered items above retain only their unfinished scope.
 | Native AVI/MOV flags and optional AOT shader builds | [Native export](docs/native-export.md); lossless decode/failure regressions |
 | Supported Emscripten target and browser playback | `make wasm`, `make test-wasm`; [browser engine](docs/wasm.md) |
 | Source-owned demo metadata and gallery | `make test-web`; [metadata fields](docs/demo-metadata.md) |
+| Kitty/Ghostty images, capability detection, adaptive preview, native shader playback | [Terminal graphics](docs/terminal-graphics.md); protocol, scrubbing, feedback-resize and AOT fallback tests |
 
 Native AVI/MOV export is integrated behind explicit flags. Shader AOT remains
 optional per-demo build tooling; its speedups do not describe the ordinary

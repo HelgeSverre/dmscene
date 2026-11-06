@@ -135,7 +135,16 @@ void dm_scene_render(dm_scene *s, const dm_seq *clk, const float *cenv, dm_fb *f
   if (m->npixel) {
     size_t bytes = (size_t)fb->w * fb->h * 3;
     if (!s->prev || s->pw != fb->w || s->ph != fb->h) {
-      free(s->prev); s->prev = calloc(bytes, 1); free(s->cur); s->cur = calloc(bytes, 1); s->pw = fb->w; s->ph = fb->h;
+      uint8_t *prev = calloc(bytes, 1), *cur = calloc(bytes, 1);
+      if (!prev || !cur) { free(prev); free(cur); return; }
+      /* Resizing an interactive preview must not wipe feedback trails. */
+      if (s->prev) {
+        dm_fb old = {0}, next = {0};
+        old.w = s->pw; old.h = s->ph; old.rgb = s->prev;
+        next.w = fb->w; next.h = fb->h; next.rgb = prev;
+        dm_fb_upscale(&old, &next);
+      }
+      free(s->prev); s->prev = prev; free(s->cur); s->cur = cur; s->pw = fb->w; s->ph = fb->h;
     }
     const dm_prog *p = &m->pixel[s->scene < m->npixel ? s->scene : 0];
     run_pass(s, fb, p, 0, s->pstate);

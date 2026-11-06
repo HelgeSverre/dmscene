@@ -341,6 +341,29 @@ its time limit. SIGINT/TERM/HUP/QUIT/PIPE set quit, SIGTSTP requests the UI's su
 transaction. The parser never treats an arbitrary escape-sequence byte as q.
 Raw mode retains ISIG, so Ctrl-C/Ctrl-Z retain normal terminal semantics.
 
+Graphics selection is independent of transport controls:
+
+| State | Event | Next / invariant |
+|---|---|---|
+| Text | auto selected with both descriptors TTYs | send one 1px query → probing; keep drawing text |
+| Text | forced text / non-TTY auto | remain text; no capability query |
+| Text | forced Kitty | Kitty ready without a query |
+| Probing | complete matching APC OK within 1 second | Kitty ready |
+| Probing | late, malformed, unrelated or absent response | retain text; never interpret payload as keys |
+| Kitty ready / displayed A | new RGB frame | finish all chunks and display B, then delete A's data |
+| Kitty displayed | viewport/adaptive resolution changes | resample feedback, replace placement next frame |
+| Kitty displayed | suspend / quit | terminate any partial APC, delete both owned ids, leave alternate screen |
+| Suspended | resume | new terminal instance and capability probe |
+
+Only two image ids are owned, acknowledgements are suppressed after probing,
+and each image/status update uses synchronized output. Auto resolution uses
+render-plus-write timings with hysteresis; explicit `--size` is fixed. The
+native player binds compiled shaders before workers start. Watch reload stops
+audio and seek workers before changing the binding; a failed bytecode match
+clears it and selects interpretation, even when the module address is reused.
+Protocol and fallback tests: `term-graphics.c`, `scrub-live.c`,
+`play-transport.c`, `scene-workers.c`, `native-bind.c`, `native-player.sh`.
+
 ## 11. Audio backend lifecycle
 
 Code: `src/dm_audio.c`. macOS: allocate AudioQueue → allocate/prefill three
