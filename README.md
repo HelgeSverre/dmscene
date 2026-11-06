@@ -1,4 +1,12 @@
-![dmscene — one VM, six programs. Text to byte-packed module to tracker and fractals.](art/header.png)
+```
+      _
+   __| |_ __ ___  ___  ___ ___ _ __   ___
+  / _` | '_ ` _ \/ __|/ __/ _ \ '_ \ / _ \
+ | (_| | | | | | \__ \ (_|  __/ | | |  __/
+  \__,_|_| |_| |_|___/\___\___|_| |_|\___|  v3
+  ▀▄▀▄ one VM, six programs: inst  chan  master  frame  pixel  post
+  ▄▀▄▀ text -> byte-packed module -> tracker + fractals
+```
 
 # dmscene
 
@@ -62,9 +70,6 @@ The source uses all six program kinds, all eight pixel slots, `fn`, `repeat`,
 `sample`, `venv`, `nna`, `timeline`, `scale` and `dither`. Each chapter is
 four bars. The tracker quantises 180 BPM ticks to whole audio samples, giving
 a complete loop of approximately 42.632 seconds.
-
-The colorized ASCII header is included as [PNG](art/header.png) and editable
-[SVG](art/header.svg), both on a 2164 × 727 canvas.
 
 ## Build and run
 
@@ -176,7 +181,7 @@ demos/*.dmt         the demos (table below); demos/assets holds their WAV sample
 tests/run.sh        compile, round-trip, determinism, audio, errors, features and every demo
 tests/synth-voices.c voice ownership, held notes, NNA tails, slot reuse and PCM isolation
 tests/showcase-gates.c bass/lead gate durations across breaks and song loops
-art/               README header (PNG + SVG) and animated demo highlights
+art/               README artwork and animated demo highlights
 ```
 
 ## Demos

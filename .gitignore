@@ -9,6 +9,5 @@ build/
 *.wav
 !demos/assets/*.wav
 !tests/assets/*.wav
-!art/*.png
 # os
 .DS_Store
