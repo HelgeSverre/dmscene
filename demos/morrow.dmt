@@ -1,0 +1,416 @@
+# morrow.dmt - a seed of light in the dark: it grows, storms, and becomes the morning.
+# One continuous field: the seed, its veins and the dawn are mixed by timeline ramps,
+# never cut. 96 BPM, 20 bars of 16 rows = 50 seconds.
+title MORROW
+song bpm=96 speed=6 rpb=4 channels=8 loop=18 volume=0.55
+order 0 1 1 2 2 3 4 5 5 4 6 6 7 7 8 8 7 8 9 9
+pan 0.5 0.5 0.5 0.46 0.62 0.40 0.56 0.5
+
+text tlabel "MORROW"
+
+timeline {
+  0:00  brV=0.00 skyV=0.00 growV=0.06 turmV=0.00 zoomV=1.60 spinV=0.00 warmV=0.00 trailV=0.00 titleV=0
+  1:00  growV=0.20 warmV=0.03
+  2:00  growV=0.34 brV=0.25
+  3:00  growV=0.48 brV=0.55 warmV=0.07 zoomV=1.45
+  4:00  growV=0.62 brV=0.80
+  5:00  growV=0.78 brV=0.95 zoomV=1.30 warmV=0.12
+  6:00  growV=0.92 brV=1.00
+  7:00  growV=1.05 zoomV=1.15 warmV=0.18
+  8:00  growV=1.18 turmV=0.10
+  9:00  growV=1.30 turmV=0.18 zoomV=1.05 spinV=0.10
+  10:00 turmV=0.40 warmV=0.25 trailV=0.15 spinV=0.18 zoomV=0.95
+  11:00 turmV=0.85 trailV=0.30 spinV=0.40 zoomV=0.82 warmV=0.32
+  12:00 turmV=1.00 spinV=0.60 zoomV=0.72 trailV=0.40 warmV=0.40
+  13:00 turmV=1.05 spinV=0.85 trailV=0.38 warmV=0.48
+  14:00 turmV=0.95 spinV=1.05 zoomV=0.68
+  15:00 turmV=0.80 spinV=1.20 trailV=0.35 warmV=0.56
+  16:00 turmV=0.60 spinV=1.30 zoomV=0.80
+  17:00 skyV=0.20 turmV=0.40 spinV=1.20 warmV=0.68 trailV=0.30
+  18:00 skyV=0.60 turmV=0.15 spinV=0.45 warmV=0.80 zoomV=1.00 trailV=0.28
+  18:08 titleV=0
+  19:00 skyV=1.00 turmV=0.00 brV=0.10 spinV=0.00 warmV=0.95 zoomV=1.05 trailV=0.22 titleV=0.90
+}
+
+# ------------------------------------------------------------------ instruments
+inst sub {
+  e = env(0.06, 0.7, 0.85, 1.0)
+  s = sin(ph * tau) * 0.9 + sin(ph * tau * 2) * 0.07
+  out(dist(s * e, 1.1) * 0.5)
+}
+inst pad nna=continue {
+  e = env(0.9, 1.4, 0.80, 2.6)
+  s = usaw(freq, 0.16) + usaw(freq * 1.5, 0.11) * 0.30 + sin(ph * tau * 0.5) * 0.18
+  s = svf(s, 300 + 900 * e * (0.35 + 0.65 * mp1) + 180 * sin(t * 0.31), 0.15)
+  out(s * e * 0.17)
+}
+inst kick {
+  f = 43 + 400 * exp(-t * 28)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 5.2)
+  click = hp(noise(), 1800) * exp(-t * 95) * 0.22
+  out(dist(body * 1.55 + click, 1.22) * 0.74)
+}
+inst bass {
+  e = env(0.008, 0.13, 0.55, 0.14)
+  s = sin(ph * tau) * 0.8 + saw(ph) * 0.34 + sqr(ph * 0.5, 0.42) * 0.18
+  s = svf(s, 190 + 850 * e, 0.35)
+  out(dist(s * e, 1.3) * 0.42)
+}
+inst arp {
+  e = exp(-t * 2.8)
+  m = sin(ph * tau * 2.0 + 0.9 * sin(t * 5.5)) * exp(-t * 4.5) * 0.9
+  out((sin(ph * tau + m * 1.2) + 0.25 * sin(ph * tau * 2.02)) * e * 0.21)
+}
+inst bell {
+  e = exp(-t * 2.1)
+  m = sin(ph * tau * 3.01 + 0.8 * sin(t * 6.0)) * exp(-t * 4.2)
+  out((sin(ph * tau + m * 1.3) + 0.3 * sin(ph * tau * 2.01)) * e * 0.22)
+}
+inst hat {
+  out(hp(noise(), 7200) * exp(-t * (48 + 80 * (1 - vel))) * 0.20)
+}
+inst air {
+  # filtered noise swell; the Sxx parameter opens the filter
+  e = env(0.8, 1.5, 0.72, 2.2)
+  s = svf(noise(), 240 + 4300 * p0 * e + 160 * sin(t * 0.6), 0.62)
+  out(s * e * 0.24)
+}
+
+master {
+  dl = dly(l, 0.42, 0.42)
+  dr = dly(r, 0.56, 0.42)
+  w = verb(l * 0.5 + r * 0.5, 0.86, 0.40)
+  out(dist(l + dr * 0.24 + w * 0.22, 1.06), dist(r + dl * 0.24 + w * 0.22, 1.06))
+}
+
+# --------------------------------------------------------------- 0: drone, Dm
+pattern 0 rows=16 {
+  . | D-1 1 30 | D-3 2 26 | . | . | A-4 6 14
+  .
+  .
+  . | . | A-3 2 20
+  .
+  .
+  . | . | . | . | . | D-5 6 10
+  .
+  . | D-1 1 26 | F-3 2 22
+  .
+  .
+  . | . | A-3 2 18
+  .
+  .
+  . | . | . | . | . | F-5 6 9
+}
+# --------------------------------------------------------------- 1: heartbeat
+pattern 1 rows=16 {
+  C-2 3 30 | D-1 1 34 | D-3 2 26 | . | . | .
+  .
+  .
+  . | . | A-3 2 20
+  .
+  .
+  . | . | . | . | . | A-4 6 14
+  .
+  C-2 3 24 | D-1 1 28 | F-3 2 20
+  .
+  .
+  . | . | A-3 2 18
+  .
+  .
+  . | . | . | . | . | D-5 6 12
+}
+# --------------------------------------------------------------- 2: Bb, growing
+pattern 2 rows=16 {
+  C-2 3 32 | A#1 1 36 | A#2 2 26 | . | . | . | C-6 7 8
+  . | . | . | . | . | . | .
+  . | . | D-3 2 22 | A#1 4 28 | . | . | C-6 7 14
+  . | . | . | . | . | . | .
+  C-2 3 26 | A#1 1 30 | . | . | . | . | C-6 7 8
+  . | . | . | A#2 4 26
+  . | . | F-3 2 22 | . | . | D-5 5 16 | C-6 7 14
+  . | . | . | . | . | . | .
+  C-2 3 32 | A#1 1 34 | A#2 2 24 | . | . | . | C-6 7 8
+  . | . | . | . | . | . | .
+  . | . | D-3 2 20 | A#1 4 28 | . | . | C-6 7 14
+  . | . | . | . | . | . | .
+  C-2 3 26 | A#1 1 28 | . | . | . | F-5 5 14 | C-6 7 8
+  . | . | . | F-2 4 26
+  . | . | F-3 2 20 | . | . | . | C-6 7 14
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 3: F, arps
+pattern 3 rows=16 {
+  C-2 3 34 | F-1 1 34 | F-3 2 26 | F-1 4 30 | C-5 5 20 | . | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | F-2 4 26 | A-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 28 | F-1 1 28 | C-4 2 20 | . | F-5 5 20 | . | C-6 7 10
+  . | . | . | F-1 4 26 | . | . | .
+  . | . | . | . | C-6 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 34 | F-1 1 32 | F-3 2 24 | F-2 4 28 | A-5 5 20 | . | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | F-1 4 26 | F-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 28 | F-1 1 28 | A-4 2 20 | . | C-6 5 20 | . | C-6 7 10
+  . | . | . | F-2 4 26 | . | . | .
+  . | . | . | . | A-5 5 18 | D-5 6 12 | C-6 7 16
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 4: C, full
+pattern 4 rows=16 {
+  C-2 3 34 | C-2 1 34 | C-3 2 26 | C-2 4 30 | G-5 5 20 | . | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | C-3 4 26 | E-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 28 | C-2 1 28 | G-3 2 20 | . | C-6 5 20 | . | C-6 7 10
+  . | . | . | G-2 4 26 | . | . | .
+  . | . | . | . | G-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 34 | C-2 1 32 | C-3 2 24 | C-3 4 28 | E-5 5 20 | . | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | C-2 4 26 | C-6 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 28 | C-2 1 28 | E-4 2 20 | . | G-5 5 20 | . | C-6 7 10
+  . | . | . | G-2 4 26 | . | . | .
+  . | . | . | . | E-5 5 18 | G-5 6 12 | C-6 7 16
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 5: Dm, full
+pattern 5 rows=16 {
+  C-2 3 36 | D-1 1 36 | D-3 2 28 | D-2 4 32 | A-4 5 20 | . | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | A-1 4 28 | D-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 30 | D-1 1 30 | A-3 2 22 | . | F-5 5 20 | . | C-6 7 10
+  . | . | . | D-2 4 28 | . | . | .
+  . | . | . | . | A-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 36 | D-1 1 34 | D-3 2 26 | D-1 4 30 | D-5 5 20 | A-5 6 14 | C-6 7 10
+  . | . | . | . | . | . | .
+  . | . | . | A-1 4 28 | F-5 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+  C-2 3 30 | D-1 1 30 | F-4 2 22 | . | A-5 5 20 | . | C-6 7 10
+  . | . | . | D-2 4 28 | . | . | .
+  . | . | . | . | D-6 5 18 | . | C-6 7 16
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 6: the turn
+pattern 6 rows=16 {
+  . | D-1 1 30 | D-3 2 28 | . | . | . | . | G#4 8 30 S80
+  . | . | . | . | . | . | . | .
+  . | . | G#3 2 22 | . | . | . | . | .
+  . | . | . | . | . | . | . | .
+  . | D-1 1 26 | D-3 2 24 | . | . | G#5 6 14 | . | G#4 8 26 S90
+  . | . | . | . | . | . | . | .
+  . | . | C-4 2 20 | . | . | . | . | .
+  . | . | . | . | . | . | . | .
+  . | D-1 1 30 | D-3 2 28 | . | . | . | . | G#4 8 30 SA0
+  . | . | . | . | . | . | . | .
+  . | . | G#3 2 22 | . | . | . | . | .
+  . | . | . | . | . | . | . | .
+  . | D-1 1 26 | D-3 2 24 | . | . | A-5 6 12 | . | G#4 8 26 SB0
+  . | . | . | . | . | . | . | .
+  . | . | C-4 2 20 | . | . | . | . | .
+  . | . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 7: climax Bb
+pattern 7 rows=16 {
+  C-2 3 38 | A#1 1 38 | A#3 2 28 | A#1 4 34 | D-5 5 22 | . | C-6 7 12
+  . | . | . | . | . | . | .
+  . | . | D-4 2 24 | A#2 4 30 | F-5 5 18 | . | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 32 | A#1 1 32 | F-4 2 24 | . | A#5 5 20 | . | C-6 7 12
+  . | . | . | A#1 4 30 | . | . | .
+  . | . | . | . | D-6 5 18 | A#5 6 14 | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 38 | A#1 1 36 | A#3 2 26 | A#2 4 32 | F-5 5 22 | . | C-6 7 12
+  . | . | . | . | . | . | .
+  . | . | D-4 2 24 | A#1 4 30 | A#5 5 18 | . | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 32 | A#1 1 32 | F-4 2 24 | . | D-6 5 20 | . | C-6 7 12
+  . | . | . | A#2 4 30 | . | . | .
+  . | . | . | . | F-5 5 18 | D-6 6 14 | C-6 7 20
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 8: climax F
+pattern 8 rows=16 {
+  C-2 3 38 | F-1 1 38 | F-3 2 28 | F-1 4 34 | C-5 5 22 | . | C-6 7 12
+  . | . | . | . | . | . | .
+  . | . | C-4 2 24 | F-2 4 30 | F-5 5 18 | . | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 32 | F-1 1 32 | A-4 2 24 | . | A-5 5 20 | . | C-6 7 12
+  . | . | . | F-1 4 30 | . | . | .
+  . | . | . | . | C-6 5 18 | A-5 6 14 | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 38 | F-1 1 36 | F-3 2 26 | F-2 4 32 | F-5 5 22 | . | C-6 7 12
+  . | . | . | . | . | . | .
+  . | . | C-4 2 24 | F-1 4 30 | A-5 5 18 | . | C-6 7 20
+  . | . | . | . | . | . | .
+  C-2 3 32 | F-1 1 32 | A-4 2 24 | . | C-6 5 20 | . | C-6 7 12
+  . | . | . | F-2 4 30 | . | . | .
+  . | . | . | . | F-5 5 18 | C-6 6 14 | C-6 7 20
+  . | . | . | . | . | . | .
+}
+# --------------------------------------------------------------- 9: dawn, D major
+pattern 9 rows=16 {
+  C-2 3 24 | D-1 1 30 | D-3 2 30 | . | . | D-5 6 18
+  .
+  . | . | F#3 2 24
+  .
+  . | . | A-3 2 24 | . | . | A-5 6 16
+  .
+  .
+  .
+  . | D-1 1 24 | D-3 2 26 | . | . | D-6 6 14 | . | G-4 8 12 S40
+  .
+  . | . | F#3 2 22
+  .
+  . | . | A-3 2 22 | . | . | F#5 6 12
+  .
+  .
+  .
+}
+
+# ------------------------------------------------------------------ visuals
+uniform wBranch wSky grow storm camZ camA warm trail titleA kickE arpE bellE padE
+
+fn titleline(s, py, sz) {
+  n = strlen(s)
+  cx = (u + n * sz * 0.5) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  g = glyph(str(s, i), fract(cx), fract(cy))
+  return g * step(0, cx) * step(cx, n) * step(0, cy) * step(cy, 1)
+}
+
+frame {
+  kickE = exp(-trig(0) * 6.5) * step(0.5, vel(0))
+  arpE = exp(-trig(4) * 4.5)
+  bellE = exp(-trig(5) * 3.0)
+  padE = exp(-trig(2) * 2.2)
+  wBranch = evtl(brV)
+  wSky = evtl(skyV)
+  grow = evtl(growV)
+  storm = evtl(turmV)
+  camZ = evtl(zoomV)
+  camA = evtl(spinV)
+  warm = evtl(warmV)
+  trail = evtl(trailV)
+  titleA = evtl(titleV)
+}
+
+pixel world {
+  # ---------------- one camera for the whole piece: a slow, continuous push-in
+  z = camZ * (1 + 0.035 * padE - 0.030 * kickE + 0.030 * sin(time * 0.21))
+  rc = rot(u + 0.03 * sin(time * 0.11), v + 0.02 * sin(time * 0.07), camA + 0.10 * storm * sin(time * 0.7))
+  cx = rc * z
+  cy = r1 * z
+
+  # ---------------- A. the seed: a cold nucleus with a breathing shell
+  rs = len(cx, cy)
+  R = 0.30 + 0.045 * sin(time * 0.85) + 0.020 * kickE
+  lump = fbm(cx * 2.4 + time * 0.09, cy * 2.4 - time * 0.06, 3)
+  Rs = R + 0.07 * (lump - 0.5)
+  shell = exp(-abs(rs - Rs) * 16)
+  sang = atan2(cy, cx)
+  swirl = fbm(sang * 1.7 + time * 0.10, rs * 4.6 - time * 0.22, 3)
+  seed = shell * (0.75 + 0.35 * sin(time * 1.6 + rs * 18)) + exp(-rs * 3.0) * (0.45 + 0.75 * swirl) * 0.60
+
+  # ---------------- B. the growth: veins unfolding from the nucleus
+  wn = fbm(cx * 1.5 + time * 0.045, cy * 1.5 - time * 0.035, 3)
+  bx = cx + (wn - 0.5) * (0.30 + 0.55 * storm)
+  by = cy + (wn - 0.5) * (0.30 + 0.55 * storm)
+  # the storm shears the network
+  bx = bx + storm * (0.055 * sin(by * 7.0 - time * 2.6 + wn * 6.0) + 0.018 * sin(by * 23.0 + time * 5.0))
+  by = by + storm * 0.045 * sin(bx * 6.0 + time * 2.1)
+
+  dv = vor(bx * 2.4 + 7.0, by * 2.4 - 3.0)
+  id = r1
+  vein = exp(-(r2 - dv) * 22)
+  # half the veins tear away in the storm
+  vein = vein * (1 - 0.55 * storm * step(0.5, sin(id * 31.0 + time * 3.0)))
+  dv2 = vor(bx * 6.5 - 2.0 + wn, by * 6.5 + 5.0 - wn)
+  vein = vein + exp(-(r2 - dv2) * 26) * 0.38
+
+  rr = len(bx, by)
+  inside = 1 - smooth(grow, grow + 0.30, rr)
+  front = exp(-abs(rr - grow) * 9) * (0.35 + 0.35 * sin(time * 2.0))
+  branch = (vein * inside * 1.30 + front) * (0.60 + 0.45 * bellE)
+  branch = branch * (1 + 0.35 * storm * kickE)
+
+  # the heart of the seed survives inside every form
+  heart = exp(-rs * 5.5) * (0.30 + 0.40 * padE)
+
+  # ---------------- C. the dawn: the same matter becomes a sunrise
+  hy = cy + 0.06 * sin(cx * 1.4 + time * 0.10)
+  ground = 1 - smooth(-0.65, 0.55, hy)
+  sun = exp(-len(cx * 0.50, (cy + 0.30 - 0.10 * wSky) * 1.45) * 2.1)
+  band = exp(-abs(cy + 0.26) * 22) * 0.55
+  clouds = fbm(cx * 1.7 + time * 0.02, cy * 3.5 - time * 0.03, 4)
+  sky = ground * (0.20 + 0.75 * clouds) * 0.75 + sun * 0.72 + band * 0.30
+
+  # ---------------- blend the three states: intensities first, then colour
+  val = mix(seed, branch, wBranch)
+  val = mix(val, sky, wSky)
+  val = val + heart * (1 - 0.85 * wSky)
+  val = clamp(val, 0, 1.8) + exp(-rs * 1.35) * 0.06 * (1 - wSky)
+
+  qr = val * 0.55
+  qg = val * 0.85
+  qb = val * 1.12
+  er = val * (0.22 + 0.90 * warm)
+  eg = val * (0.88 - 0.30 * warm)
+  eb = val * (1.08 - 0.88 * warm)
+  kr = val * (0.62 + 0.48 * warm)
+  kg = val * (0.30 + 0.45 * warm)
+  kb = val * (0.26 - 0.13 * warm)
+
+  cr = mix(qr, er, wBranch)
+  cg = mix(qg, eg, wBranch)
+  cb = mix(qb, eb, wBranch)
+  cr = mix(cr, kr, wSky)
+  cg = mix(cg, kg, wSky)
+  cb = mix(cb, kb, wSky)
+
+  # deep background, warming with the story
+  rgb(cr + 0.008 + 0.035 * warm, cg + 0.012 + 0.016 * warm, cb + 0.030 + 0.006 * warm)
+
+  # dust motes drifting through the whole journey
+  repeat k 6 {
+    px = (hash(k * 11.3 + 1.0) - 0.5) * 2.5 * aspect
+    py = fract(hash(k * 5.7) + time * (0.010 + 0.020 * hash(k * 3.1))) * 2.2 - 1.1
+    d = len(u - px, (v - py) * 0.75)
+    sp = 1 - smooth(0, 0.004 + 0.006 * hash(k * 7.7), d)
+    hb = 0.45 + 0.55 * sin(time * (2 + 2 * hash(k * 9.3)) + k * 2.1)
+    cadd(sp * hb * 0.9, sp * hb * 0.8, sp * hb * 0.65)
+  }
+
+  # ---------------- feedback: everything leaves a little light behind
+  cprevz(0.5, 0.5, 1.003 + 0.012 * storm, 0.002 + 0.006 * storm, trail)
+
+  # the name arrives with the morning
+  lg = titleline(tlabel, 0.34, 0.16) * titleA
+  lg = lg * (0.80 + 0.20 * sin(time * 3.0 + u * 6.0))
+  cadd(lg * 0.95, lg * 0.78, lg * 0.55)
+}
+
+post {
+  # bloom, a touch of chromatic split on the kick, grain and a soft vignette
+  cr = tap(0, 0)
+  cg = r1
+  cb = r2
+  sh = floor(3 * kickE)
+  ar = tap(-1 - sh, 0)
+  ab = tap(1 + sh, 0)
+  bl = (tap(-2, 0) + tap(2, 0) + tap(0, 2) + tap(0, -2) + tap(-3, 3) + tap(3, -3) + tap(-3, -3) + tap(3, 3)) * 0.125
+  rgb(cr * 0.94 + ar * 0.16 + bl * 0.36,
+      cg * 0.96 + bl * 0.29,
+      cb * 0.94 + ab * 0.18 + bl * 0.38)
+  du = (hash(x * w * 0.31 + y * h * 0.67 + frame * 5.7) - 0.5) * 0.038
+  cadd(du, du, du * 1.1)
+  d = len(u, v)
+  cmul(max(0.50, 1 - 0.28 * d))
+  cadd(0.03 * kickE, 0.012 * kickE, 0.004 * kickE)
+}

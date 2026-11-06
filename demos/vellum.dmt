@@ -1,0 +1,489 @@
+# vellum.dmt - an illuminated manuscript that writes itself in light.
+# Four folios, modal dulcimer/reed music, ink geometry and gilded feedback.
+title VELLUM
+song bpm=120 speed=6 rpb=4 channels=6 loop=0 volume=0.58 scale=2 dither=1
+order 0 0 1 1 2 2 3 3 4 4 5 5 6 6
+pan 0.50 0.54 0.48 0.32 0.68 0.50
+
+text title "VELLUM"
+text subtitle "THE LIVING MANUSCRIPT"
+text orbis "ORBIS"
+text initial "V"
+text line1 "INK REMEMBERS WHAT THE HAND FORGETS"
+text line2 "THE PAGE DREAMS IN GOLD AND STATIC"
+text line3 "EVERY MARK A SMALL MACHINE"
+text line4 "EVERY SILENCE A MARGIN"
+text line5 "TURN THE LEAF. FOLLOW THE LIGHT."
+text colophon "   WRITTEN IN LIGHT ... BOUND IN SOUND ... FOLIO VII ... THE HAND IS QUIET BUT THE PAGE IS NOT ... "
+
+palette parchment {
+  0.00 0.055 0.018 0.025
+  0.22 0.190 0.075 0.055
+  0.46 0.480 0.270 0.130
+  0.70 0.790 0.590 0.310
+  0.88 0.940 0.800 0.520
+  1.00 1.000 0.920 0.700
+}
+palette gilt {
+  0.00 0.120 0.015 0.020
+  0.28 0.400 0.055 0.025
+  0.52 0.950 0.330 0.040
+  0.72 1.000 0.780 0.220
+  0.88 1.000 0.970 0.660
+  1.00 0.120 0.015 0.020
+}
+palette midnight {
+  0.00 0.003 0.006 0.018
+  0.30 0.012 0.025 0.065
+  0.55 0.035 0.100 0.135
+  0.76 0.120 0.250 0.250
+  1.00 0.420 0.520 0.390
+}
+
+timeline {
+  0:00 scene=0
+  2:00 scene=1
+  6:00 scene=2
+  8:00 scene=0
+  10:00 scene=3
+}
+
+# --------------------------------------------------------------------- sound
+inst drum {
+  f = 52 + 290 * exp(-t * 30)
+  $p = $p + f / sr
+  skin = sin($p * tau) + sin($p * tau * 1.51) * 0.22 * exp(-t * 18)
+  fingers = lp(noise(), 1100) * exp(-t * 55) * 0.32
+  out(dist(skin * exp(-t * 7.5) * 1.8 + fingers, 1.35) * 0.72)
+}
+inst snap {
+  n = svf(noise(), 1450 + 2800 * exp(-t * 24), 0.32)
+  wood = sin(tau * 210 * t) * exp(-t * 35)
+  out((r2 * 0.78 + n * 0.20 + wood * 0.25) * exp(-t * 11) * 0.46)
+}
+inst hat {
+  out(hp(noise(), 7600) * exp(-t * (42 + 70 * (1 - vel))) * 0.19)
+}
+inst bass {
+  e = env(0.006, 0.20, 0.38, 0.12)
+  s = tri(ph) * 0.75 + bsaw(ph, freq) * 0.28
+  s = svf(s, 150 + 850 * e + p0 * 400, 0.24)
+  out(s * e * 0.48)
+}
+inst dulcimer nna=continue {
+  attack = min(t * 650, 1)
+  e = attack * exp(-t * 3.4)
+  m = sin(ph * tau * 2.005) * 2.1 * exp(-t * 5.5)
+  a = sin(ph * tau + m)
+  b = sin(ph * tau * 3.01 + m * 0.25) * 0.28
+  c = sin(ph * tau * 0.501) * 0.16
+  out((a + b + c) * e * 0.30)
+}
+inst reed nna=continue {
+  e = env(0.025, 0.20, 0.48, 0.24)
+  vib = 1 + 0.004 * sin(t * 6.2) * min(t * 3, 1)
+  $p = $p + freq * vib / sr
+  s = bsaw($p, freq) * 0.55 + bsqr($p, 0.38, freq) * 0.45
+  s = svf(s, 650 + 2100 * e + 300 * sin(t * 2.1), 0.30)
+  out(s * e * 0.25)
+}
+inst pad nna=continue {
+  e = env(0.22, 0.55, 0.58, 0.70)
+  s = usaw(freq, 0.14) * 0.55 + sin(ph * tau * 0.5) * 0.45
+  s = svf(s, 330 + 520 * e + 130 * sin(t * 0.7), 0.22)
+  out(s * e * 0.19)
+}
+inst chime nna=continue {
+  e = min(t * 900, 1) * exp(-t * 2.2)
+  m = sin(ph * tau * 3.97) * 2.8 * exp(-t * 2.8)
+  out((sin(ph * tau + m) + sin(ph * tau * 2.006) * 0.24) * e * 0.20)
+}
+
+chan 3 {
+  d = dly(x, 0.375, 0.38)
+  out(x + d * 0.27)
+}
+chan 4 {
+  w = verb(x, 0.72, 0.48)
+  out(x * 0.86 + w * 0.24)
+}
+master {
+  dl = dly(l, 0.375, 0.30)
+  dr = dly(r, 0.500, 0.34)
+  vl = verb(l + dr * 0.18, 0.73, 0.52)
+  vr = verb(r + dl * 0.18, 0.73, 0.52)
+  out(dist(l + dr * 0.20 + vl * 0.13, 1.20), dist(r + dl * 0.20 + vr * 0.13, 1.20))
+}
+
+# Channels: 0 drum, 1 snap/hat, 2 bass, 3 dulcimer/chime, 4 reed, 5 pad.
+# D minor, two chords per bar. Every pattern is a complete bar; order gives 14.
+pattern 0 rows=16 {
+  00: . | . | D-1 4 28 S30 | D-4 5 28 | . | D-3 7 30
+  01: . | . | . | . | . | .
+  02: . | . | . | A-4 5 22 | . | .
+  03: . | . | . | . | . | .
+  04: . | C-6 3 0C | D-2 4 24 | F-4 5 25 | . | .
+  05: . | . | . | . | . | .
+  06: . | . | . | E-4 5 21 | . | .
+  07: . | C-6 3 0A | . | . | . | .
+  08: . | . | A-1 4 28 S60 | A-4 5 27 | . | A-2 7 28
+  09: . | . | . | . | . | .
+  10: . | C-6 3 0D | . | F-4 5 22 | . | .
+  11: . | . | A-1 4 22 | . | . | .
+  12: . | . | . | C-5 5 25 | . | .
+  13: . | C-6 3 09 | . | . | . | .
+  14: . | . | D-2 4 23 | A-4 5 23 | . | .
+  15: . | . | . | D-5 8 18 | . | .
+}
+pattern 1 rows=16 {
+  00: C-2 1 38 | C-6 3 13 | D-1 4 38 S40 | D-4 5 30 | . | D-3 7 31
+  01: . | . | . | A-4 5 24 | . | .
+  02: . | C-6 3 1B | D-1 4 28 | F-4 5 26 | . | .
+  03: . | . | . | A-4 5 22 | . | .
+  04: C-2 1 32 | D-5 2 32 | . | C-5 5 28 | D-5 6 24 | .
+  05: . | C-6 3 10 | D-2 4 25 | A-4 5 22 | . | .
+  06: . | C-6 3 1B | D-1 4 30 | F-4 5 26 | . | .
+  07: . | . | . | E-4 5 23 | . | .
+  08: C-2 1 38 | C-6 3 13 | A#1 4 37 S70 | A#4 5 29 | . | A#2 7 30
+  09: . | . | . | F-4 5 23 | . | .
+  10: . | C-6 3 1C | A#1 4 27 | D-4 5 26 | . | .
+  11: . | . | . | F-4 5 22 | . | .
+  12: C-2 1 32 | D-5 2 34 | . | A-4 5 28 | F-5 6 23 | .
+  13: . | C-6 3 10 | A#1 4 24 | F-4 5 22 | . | .
+  14: C-2 1 25 | C-6 3 18 | C-2 4 28 | D-4 5 25 | . | .
+  15: . | D-5 2 20 | . | A-4 8 20 | . | .
+}
+pattern 2 rows=16 {
+  00: C-2 1 39 | C-6 3 13 | F-1 4 38 S50 | F-4 5 30 | F-5 6 24 | F-3 7 31
+  01: . | . | . | A-4 5 23 | . | .
+  02: . | C-6 3 1C | F-1 4 27 | C-5 5 27 | . | .
+  03: . | . | . | A-4 5 22 | . | .
+  04: C-2 1 33 | D-5 2 34 | . | F-5 5 27 | A-5 6 23 | .
+  05: . | C-6 3 10 | F-2 4 25 | C-5 5 22 | . | .
+  06: C-2 1 25 | C-6 3 1B | F-1 4 29 | A-4 5 26 | . | .
+  07: . | . | . | G-4 5 22 | . | .
+  08: C-2 1 38 | C-6 3 13 | C-2 4 37 S80 | C-5 5 29 | . | C-3 7 30
+  09: . | . | . | E-5 5 23 | . | .
+  10: . | C-6 3 1C | C-2 4 27 | G-4 5 26 | G-5 6 23 | .
+  11: . | . | . | E-4 5 22 | . | .
+  12: C-2 1 33 | D-5 2 34 | . | C-5 5 28 | E-5 6 24 | .
+  13: . | C-6 3 10 | C-2 4 24 | G-4 5 22 | . | .
+  14: . | C-6 3 18 | G-1 4 28 | E-4 5 25 | . | .
+  15: . | D-5 2 21 | . | D-5 8 20 | D-5 6 22 | .
+}
+pattern 3 rows=16 {
+  00: C-2 1 36 | C-6 3 11 | G-1 4 35 S30 | G-4 5 28 | . | G-2 7 30
+  01: . | . | . | D-5 5 22 | . | .
+  02: . | C-6 3 19 | G-1 4 25 | A#4 5 25 | . | .
+  03: . | . | . | D-4 5 22 | . | .
+  04: C-2 1 30 | D-5 2 30 | . | G-4 5 26 | D-5 6 22 | .
+  05: . | C-6 3 0E | G-2 4 23 | A#4 5 21 | . | .
+  06: . | C-6 3 18 | G-1 4 28 | D-5 5 25 | . | .
+  07: . | . | . | A-4 5 22 | . | .
+  08: C-2 1 36 | C-6 3 12 | A-1 4 36 S90 | A-4 5 29 | . | A-2 7 30
+  09: . | . | . | E-5 5 23 | . | .
+  10: . | C-6 3 1A | A-1 4 26 | C#5 5 26 | . | .
+  11: . | . | . | E-4 5 22 | . | .
+  12: C-2 1 31 | D-5 2 32 | . | A-4 5 27 | E-5 6 24 | .
+  13: . | C-6 3 10 | A-1 4 24 | C#5 5 22 | . | .
+  14: C-2 1 28 | C-6 3 18 | E-2 4 28 | E-5 5 25 | . | .
+  15: C-2 1 24 | D-5 2 25 E93 | . | A-5 8 20 | . | .
+}
+pattern 4 rows=16 {
+  00: C-2 1 40 | C-6 3 14 | D-1 4 40 S60 | D-5 5 31 | D-5 6 25 | D-3 7 32
+  01: . | C-6 3 0D | . | A-4 5 23 | . | .
+  02: . | C-6 3 1D | D-1 4 29 | F-5 5 27 | . | .
+  03: . | . | . | E-5 5 23 | . | .
+  04: C-2 1 34 | D-5 2 35 | D-2 4 26 | D-5 5 29 | A-5 6 25 | .
+  05: . | C-6 3 11 | . | C-5 5 22 | . | .
+  06: C-2 1 27 | C-6 3 1C | D-1 4 31 | A-4 5 27 | . | .
+  07: . | D-5 2 18 | . | F-5 8 19 | . | .
+  08: C-2 1 39 | C-6 3 14 | A#1 4 39 S80 | A#4 5 30 | . | A#2 7 31
+  09: . | C-6 3 0D | . | D-5 5 23 | . | .
+  10: . | C-6 3 1D | A#1 4 28 | F-5 5 27 | F-5 6 24 | .
+  11: . | . | . | D-5 5 22 | . | .
+  12: C-2 1 34 | D-5 2 36 | A#1 4 25 | A-4 5 29 | A-5 6 25 | .
+  13: . | C-6 3 11 | C-2 4 25 | F-4 5 22 | . | .
+  14: C-2 1 29 | C-6 3 19 | D-2 4 29 | D-5 5 26 | . | .
+  15: C-2 1 25 | D-5 2 24 | . | F-5 8 21 | C-6 6 21 | .
+}
+pattern 5 rows=16 {
+  00: C-2 1 40 | C-6 3 14 | F-1 4 40 S70 | F-5 5 31 | F-5 6 25 | F-3 7 32
+  01: . | C-6 3 0D | . | C-5 5 23 | . | .
+  02: . | C-6 3 1D | F-1 4 29 | A-5 5 27 | . | .
+  03: . | . | . | G-5 5 23 | . | .
+  04: C-2 1 34 | D-5 2 35 | F-2 4 26 | F-5 5 29 | A-5 6 25 | .
+  05: . | C-6 3 11 | . | E-5 5 22 | . | .
+  06: C-2 1 27 | C-6 3 1C | F-1 4 31 | C-5 5 27 | . | .
+  07: . | D-5 2 19 | . | A-5 8 20 | . | .
+  08: C-2 1 39 | C-6 3 14 | C-2 4 39 SA0 | C-5 5 30 | G-5 6 24 | C-3 7 31
+  09: . | C-6 3 0D | . | E-5 5 23 | . | .
+  10: . | C-6 3 1D | C-2 4 28 | G-5 5 27 | . | .
+  11: . | . | . | E-5 5 22 | . | .
+  12: C-2 1 34 | D-5 2 36 | G-1 4 26 | E-5 5 29 | C-6 6 25 | .
+  13: . | C-6 3 11 | C-2 4 25 | G-4 5 22 | . | .
+  14: C-2 1 29 | C-6 3 19 | D-2 4 29 | D-5 5 26 | . | .
+  15: C-2 1 26 | D-5 2 26 E93 | A-1 4 27 | E-5 8 21 | D-6 6 22 | .
+}
+pattern 6 rows=16 {
+  00: C-2 1 40 | C-6 3 15 | D-1 4 40 S90 | D-5 5 32 | D-5 6 27 | D-3 7 33
+  01: . | C-6 3 0E | . | A-5 5 24 | . | .
+  02: . | C-6 3 1E | D-1 4 30 | F-5 5 28 | . | .
+  03: . | C-6 3 0C | . | E-5 5 23 | . | .
+  04: C-2 1 35 | D-5 2 37 | D-2 4 27 | D-6 5 30 | A-5 6 26 | .
+  05: . | C-6 3 12 | . | C-6 5 23 | . | .
+  06: C-2 1 28 | C-6 3 1D | D-1 4 32 | A-5 5 28 | . | .
+  07: . | D-5 2 22 | . | F-6 8 21 | . | .
+  08: C-2 1 40 | C-6 3 15 | D-1 4 40 SB0 | D-5 5 31 | F-5 6 25 | D-3 7 32
+  09: . | C-6 3 0E | . | A-4 5 24 | . | .
+  10: . | C-6 3 1E | D-2 4 29 | F-5 5 28 | A-5 6 25 | .
+  11: . | C-6 3 0C | A-1 4 25 | E-5 5 23 | . | .
+  12: C-2 1 36 | D-5 2 38 | D-1 4 29 | D-5 5 30 | D-6 6 26 | .
+  13: C-2 1 27 | C-6 3 12 | D-2 4 26 | A-4 5 23 | . | .
+  14: C-2 1 31 | C-6 3 1D | A-1 4 29 | C-5 5 27 | . | .
+  15: C-2 1 38 | D-5 2 30 | D-1 4 36 | D-5 8 30 | A-5 6 25 | D-4 8 24
+}
+
+# --------------------------------------------------------------------- drawing
+fn textline(s, px, py, sz) {
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn centred(s, py, sz) {
+  return textline(s, -strlen(s) * sz * 0.5, py, sz)
+}
+fn ring(px, py, rr, thick) {
+  return exp(-abs(len(px, py) - rr) / thick)
+}
+fn boxline(px, py, hx, hy, thick) {
+  q = max(abs(px) / hx, abs(py) / hy)
+  return exp(-abs(q - 1) / thick)
+}
+fn scroller(s, py, sz, speed) {
+  per = (strlen(s) + 10) * sz
+  px = aspect - fract(time * speed / per) * per
+  return max(textline(s, px, py, sz), textline(s, px + per, py, sz))
+}
+
+uniform kickE snapE pluckE leadE turn drift gild reveal
+frame {
+  kickE = exp(-trig(0) * 8)
+  snapE = exp(-trig(1) * 12) * (1 - step(80, note(1)))
+  pluckE = exp(-trig(3) * 5)
+  leadE = cenv(4)
+  turn = beat * 0.055 + 0.12 * sin(beat * 0.11)
+  drift = sin(beat * 0.09) * 0.5 + 0.5
+  gild = 0.55 + 0.25 * sin(beat * 0.17) + pluckE * 0.20
+  reveal = smooth(0, 2, time)
+  select(evt(scene))
+}
+
+# Folio I: deckled parchment, manuscript type, a living botanical rosette.
+pixel folio {
+  px = u + 0.012 * sin(v * 4 + beat * 0.12)
+  py = v + 0.009 * sin(u * 5 - beat * 0.09)
+  grain = fbm(px * 5 + 17, py * 5 - 9, 4)
+  stain = fbm(px * 1.25 - 3, py * 1.25 + 8, 3)
+  fibre = sin(py * 530 + grain * 12) * 0.018
+  pal(parchment, 0.53 + grain * 0.25 + stain * 0.16 + fibre)
+  cmul(0.82 + reveal * 0.18)
+  edge = max(abs(u) / aspect, abs(v))
+  cmul(1 - 0.58 * smooth(0.69, 1.0, edge))
+
+  border = boxline(px, py, 1.46, 0.86, 0.010)
+  border2 = boxline(px, py, 1.41, 0.81, 0.006)
+  corners = ring(abs(px) - 1.42, abs(py) - 0.82, 0.055, 0.009)
+  ink = max(border * 0.64, max(border2 * 0.42, corners * 0.75))
+  cmul(1 - ink * 0.72)
+
+  # The rosette is drawn as polar equations rather than a texture.
+  rx = px
+  ry = py + 0.055
+  rad = polar(rx, ry)
+  ang = r1 + turn * 0.32
+  rose = 0.205 + 0.065 * cos(ang * 8) + 0.018 * cos(ang * 16 - beat * 0.18)
+  petals = exp(-abs(rad - rose) * 105)
+  r1ing = ring(rx, ry, 0.335, 0.0045)
+  r2ing = ring(rx, ry, 0.305, 0.0030)
+  spokes = pow(abs(cos(ang * 6)), 52) * smooth(0.09, 0.14, rad) * (1 - smooth(0.28, 0.32, rad))
+  heart = ring(rx, ry, 0.073 + kickE * 0.012, 0.009)
+  gold = max(petals, max(r1ing * 0.85, max(r2ing * 0.65, max(spokes * 0.7, heart))))
+  cadd(gold * (0.52 + gild * 0.38), gold * (0.24 + gild * 0.32), gold * 0.055)
+  cmul(1 - exp(-abs(rad - 0.245) * 130) * 0.35)
+
+  # Mirrored stems and leaves occupy the margins.
+  mx = abs(px)
+  stem = exp(-abs(mx - (1.20 + 0.045 * sin(py * 10 + turn))) * 95) * step(abs(py), 0.66)
+  leafwave = abs(sin(py * 18 + turn * 2))
+  leaves = exp(-abs(mx - (1.15 + leafwave * 0.11)) * 65) * pow(leafwave, 5) * step(abs(py), 0.62)
+  cmul(1 - stem * 0.46)
+  cadd(leaves * 0.19, leaves * 0.28, leaves * 0.075)
+
+  ttl = centred(title, 0.62, 0.190)
+  shadow = centred(title, 0.608, 0.190)
+  cmul(1 - shadow * 0.52)
+  cadd(ttl * (0.74 + pluckE * 0.25), ttl * (0.43 + gild * 0.25), ttl * 0.095)
+  sub = centred(subtitle, 0.395, 0.048)
+  cmul(1 - sub * 0.74)
+  l1 = centred(line1, -0.485, 0.044)
+  l2 = centred(line2, -0.600, 0.044)
+  cmul(1 - max(l1, l2) * 0.76)
+  seal = ring(px, py + 0.72, 0.024 + pluckE * 0.012, 0.008)
+  cadd(seal * 0.42, seal * 0.025, seal * 0.035)
+}
+
+# Folio II: an armillary sphere and orbiting lamps on a star-sprinkled chart.
+pixel armillary {
+  px = u
+  py = v + 0.025
+  grain = fbm(px * 4 + 31, py * 4 + 12, 3)
+  pal(parchment, 0.34 + grain * 0.26)
+  cmul(0.70 + 0.10 * drift)
+  edge = max(abs(u) / aspect, abs(v))
+  cmul(1 - 0.65 * smooth(0.65, 1.0, edge))
+  chart = boxline(px, py, 1.43, 0.82, 0.007)
+  cmul(1 - chart * 0.65)
+
+  # A sparse cellular star field behind the instrument.
+  cell = vor(px * 5.2 + 8, py * 5.2 - 4)
+  cid = r1
+  stars = exp(-cell * 75) * step(0.64, cid) * (0.25 + 0.75 * hash(cid * 91))
+  cadd(stars * 0.34, stars * 0.23, stars * 0.08)
+
+  rad = polar(px, py)
+  ang = r1
+  outer = ring(px, py, 0.60, 0.005)
+  outer2 = ring(px, py, 0.555, 0.003)
+  ticks = pow(abs(cos((ang - turn * 0.3) * 24)), 70) * smooth(0.54, 0.56, rad) * (1 - smooth(0.60, 0.62, rad))
+  cmul(1 - max(outer, max(outer2, ticks)) * 0.73)
+
+  arms = 0
+  repeat i 4 {
+    qx = rot(px, py, turn * (0.5 + i * 0.11) + i * pi / 4)
+    qy = r1
+    ell = abs(len(qx, qy * (1.35 + i * 0.28)) - (0.47 + i * 0.026))
+    arms = max(arms, exp(-ell * 135))
+  }
+  axis = exp(-abs(px * cos(turn) + py * sin(turn)) * 180) * (1 - smooth(0.54, 0.61, rad))
+  cadd(arms * (0.54 + gild * 0.32), arms * (0.27 + gild * 0.27), arms * 0.055)
+  cmul(1 - axis * 0.62)
+
+  # Sun and moon travel on different periods; their previous positions linger.
+  sa = beat * 0.23
+  sx = cos(sa) * 0.47
+  sy = sin(sa) * 0.30
+  sun = exp(-len(px - sx, py - sy) * 55)
+  ma = -beat * 0.16 + 2.1
+  mx = cos(ma) * 0.56
+  my = sin(ma) * 0.42
+  moon = exp(-len(px - mx, py - my) * 70)
+  cadd(sun * 1.05 + moon * 0.16, sun * 0.60 + moon * 0.32, sun * 0.10 + moon * 0.40)
+  pulseRing = ring(px, py, fract(beat * 0.5) * 0.62, 0.008) * (1 - fract(beat * 0.5)) * pluckE
+  cadd(pulseRing * 0.34, pulseRing * 0.12, pulseRing * 0.025)
+
+  ttl = centred(title, 0.75, 0.095)
+  cadd(ttl * 0.72, ttl * 0.42, ttl * 0.10)
+  lab = centred(orbis, -0.665, 0.068)
+  cmul(1 - lab * 0.72)
+  foot = centred(line3, -0.765, 0.038)
+  cmul(1 - foot * 0.72)
+  cprevz(0.5, 0.5, 1.002, 0.0015 * sin(beat * 0.2), 0.10 + pluckE * 0.06)
+}
+
+# Folio III: the red initial, nocturnal ink and vegetal computation.
+pixel initial {
+  px = u
+  py = v
+  mist = fbm(px * 2.3 + beat * 0.006, py * 2.3, 4)
+  pal(midnight, 0.12 + mist * 0.44 + (py + 1) * 0.06)
+  fil = kali(px * 0.62 + 0.3, py * 0.62, 0.73, 0.79, 6)
+  veins = exp(-fil * 20) * (0.20 + 0.30 * drift)
+  cadd(veins * 0.07, veins * 0.22, veins * 0.19)
+
+  border = boxline(px, py, 1.44, 0.84, 0.008)
+  cadd(border * 0.33, border * 0.20, border * 0.055)
+  # The oversized V has a vermilion body and eight gilt offsets.
+  vx = -1.23
+  vy = 0.51
+  vs = 0.67
+  halo = 0
+  repeat k 8 {
+    a = k * tau / 8 + turn * 0.08
+    halo = max(halo, textline(initial, vx + cos(a) * 0.018, vy + sin(a) * 0.018, vs))
+  }
+  body = textline(initial, vx, vy, vs)
+  cadd(halo * (0.68 + gild * 0.28), halo * (0.36 + gild * 0.25), halo * 0.055)
+  cmul(1 - body * 0.82)
+  cadd(body * 0.52, body * 0.025, body * 0.035)
+  inner = textline(initial, vx + 0.008, vy - 0.008, vs * 0.94)
+  cmul(1 - inner * 0.26)
+
+  # Rubricated text is set as a measured column to the right of the initial.
+  cadd(0.20, 0.12, 0.045)
+  t1 = textline(line1, -0.38, 0.44, 0.047)
+  t2 = textline(line2, -0.38, 0.20, 0.047)
+  t3 = textline(line3, -0.38, -0.04, 0.047)
+  t4 = textline(line4, -0.38, -0.28, 0.047)
+  type = max(max(t1, t2), max(t3, t4))
+  cadd(type * 0.74, type * 0.66, type * 0.40)
+  rules = exp(-abs(py - 0.56) * 250) + exp(-abs(py + 0.49) * 250)
+  rules = rules * step(-0.40, px) * (1 - step(1.28, px))
+  cadd(rules * 0.38, rules * 0.08, rules * 0.035)
+
+  # A quill-like gold filament writes a moving underline.
+  writeX = -0.36 + fract(beat * 0.25) * 1.55
+  nib = exp(-len(px - writeX, py + 0.405) * 65)
+  cadd(nib * 0.85, nib * 0.52, nib * 0.12)
+  spark = pow(max(0, sin(px * 27 + py * 19 - beat * 0.8)), 34) * leadE
+  cadd(spark * 0.11, spark * 0.08, spark * 0.025)
+}
+
+# Folio IV: all the manuscript's systems overprint one another in gold feedback.
+pixel overprint {
+  px = rot(u, v, 0.018 * sin(beat * 0.08))
+  py = r1
+  grain = fbm(px * 3.2 + 4, py * 3.2 + beat * 0.004, 4)
+  pal(parchment, 0.26 + grain * 0.25 + 0.05 * sin(px * 2 + turn))
+  cmul(0.62 + 0.12 * drift)
+  rad = polar(px, py + 0.03)
+  ang = r1 - turn * 0.45
+  lattice = pow(abs(cos(ang * 12)), 42) * (1 - smooth(0.72, 0.79, rad))
+  rings = ring(px, py + 0.03, 0.60 + kickE * 0.025, 0.004)
+  rings = max(rings, ring(px, py + 0.03, 0.43, 0.003))
+  geometry = max(lattice * 0.42, rings)
+  cadd(geometry * 0.34, geometry * 0.16, geometry * 0.035)
+
+  # Orbital cells become tiny illuminated rubies around the title.
+  cells = vor(cos(ang) * rad * 8 + turn, sin(ang) * rad * 8 - turn)
+  gems = exp(-cells * 52) * smooth(0.38, 0.50, rad) * (1 - smooth(0.70, 0.78, rad))
+  cadd(gems * (0.25 + pluckE * 0.55), gems * 0.035, gems * 0.045)
+
+  # Feed back the chart, then set crisp type over its moving afterimage.
+  cprevz(0.5, 0.51, 1.006 + kickE * 0.008, 0.003 + pluckE * 0.004, 0.18 + pluckE * 0.08)
+  halo = 0
+  repeat k 4 {
+    halo = max(halo, centred(title, 0.31 + (k - 1.5) * 0.014, 0.245))
+  }
+  ttl = centred(title, 0.31, 0.245)
+  cmul(1 - halo * 0.40)
+  cadd(ttl * (0.86 + pluckE * 0.14), ttl * (0.55 + gild * 0.25), ttl * 0.14)
+  sub = centred(subtitle, 0.015, 0.066)
+  cmul(1 - sub * 0.70)
+  rule = boxline(px, py, 1.42, 0.83, 0.006)
+  cadd(rule * 0.34, rule * 0.17, rule * 0.035)
+  scroll = scroller(colophon, -0.65, 0.072, 0.72)
+  cadd(scroll * 0.84, scroll * 0.64, scroll * 0.28)
+}
+
+post {
+  bloom = (tap(-2, 0) + tap(2, 0) + tap(0, -2) + tap(0, 2) + tap(-1, -1) + tap(1, 1)) / 6
+  split = tap(-1 - floor(kickE * 2), 0)
+  rr = mix(cget(0), split, 0.10 + snapE * 0.10)
+  rgb(rr + bloom * 0.065, cget(1) + bloom * 0.050, cget(2) + bloom * 0.035)
+  vign = max(abs(u) / aspect, abs(v))
+  cmul(1 - 0.25 * smooth(0.68, 1.0, vign))
+  grain = (hash(floor(x * w) * 0.713 + floor(y * h) * 19.17 + frame * 0.017) - 0.5) * 0.018
+  cadd(grain, grain, grain)
+}

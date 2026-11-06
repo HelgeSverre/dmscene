@@ -1,0 +1,463 @@
+# hollowstar.dmt - a dying hollow star: black disc, photon ring, streaked
+# accretion disc, lensed starfield, orbiting sparks; everything falls inward
+# on the collapse scenes. Dark 120 bpm techno: synth kick + sub, sampled
+# snare/hat, drone in a hall, FM bells and a dotted-echo arp.
+# 14 bars of 16 rows at 120 bpm / speed 6 -> 28 seconds.
+
+title HOLLOWSTAR
+song bpm=120 speed=6 rpb=4 channels=6 loop=2 volume=0.52 dither=1
+order 0 0 1 2 3 4 2 3 5 6 7 8 9 9
+pan 0.5 0.6 0.5 0.42 0.62 0.38
+
+text title "HOLLOWSTAR"
+text tag "ALL LIGHT FALLS INWARD"
+
+sample snare "assets/snare.wav"
+sample hat "assets/hat.wav"
+
+palette ember {
+  0.00 0.02 0.00 0.03
+  0.25 0.35 0.05 0.08
+  0.50 0.90 0.25 0.10
+  0.72 1.00 0.65 0.25
+  0.88 1.00 0.95 0.80
+  1.00 0.03 0.01 0.05
+}
+palette void {
+  0.00 0.01 0.01 0.04
+  0.40 0.05 0.15 0.35
+  0.70 0.30 0.60 0.90
+  1.00 0.90 0.95 1.00
+}
+
+timeline {
+  0:00 scene=0 glow=0.5 die=0 spin=0
+  2:00 scene=1 glow=0.9
+  7:08 spin=0
+  8:00 scene=2 spin=1.2 glow=0.8
+  9:00 scene=1 spin=0 glow=1.25
+  11:08 die=0 spin=0
+  12:00 scene=2 spin=1.8 glow=1.0
+  13:00 die=1
+  13:08 glow=0.45
+}
+
+# ------------------------------------------------------------------ helpers
+fn textline(s, px, py, sz) {
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn stars(lx, ly, f) {
+  # one layer of twinkling point stars on a hashed grid
+  gx = floor(lx * f + 60)
+  gy = floor(ly * f + 60)
+  h1 = hash(gx * 1.71 + gy * 91.7)
+  px2 = fract(lx * f) - 0.5
+  py2 = fract(ly * f) - 0.5
+  sd = len(px2, py2)
+  twk = 0.55 + 0.45 * sin(beat * 2.2 + h1 * 40)
+  return exp(-sd * sd * (30 + 200 * h1)) * step(0.90, h1) * twk
+}
+
+# ------------------------------------------------------------------ instruments
+# channels: 0 kick  1 snare/hat (sampled)  2 bass  3 drone  4 bell  5 arp
+inst kick {
+  f = 44 + 300 * exp(-t * 28)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 4.5)
+  click = hp(noise(), 4000) * exp(-t * 200) * 0.5
+  out(dist(body * 1.6 + click, 1.4) * 0.85)
+}
+inst dsnare {
+  out(smp(snare, t) * 0.85)
+}
+inst dhat {
+  out(smp(hat, t * (1.3 - 0.5 * vel)) * 0.5)
+}
+inst bass {
+  e = env(0.004, 0.30, 0.6, 0.10)
+  s = sin(ph * tau) * 0.9 + bsaw(ph, freq) * 0.3
+  s = svf(s, 120 + 900 * e, 0.5)
+  out(s * e * 0.55)
+}
+inst drone {
+  e = env(0.8, 1.0, 0.9, 1.2)
+  s = usaw(freq, 0.35) * 0.5 + sin(ph * tau * 0.5) * 0.6
+  s = svf(s, 200 + 500 * e + 120 * sin(t * 0.23), 0.6)
+  out(s * e * 0.16)
+}
+inst bell {
+  # hollow FM bell: inharmonic partials, long decay
+  e = env(0.002, 1.1, 0.0, 0.4)
+  m = sin(ph * tau * 3.53) * exp(-t * 1.8) * 4.5
+  s = sin(ph * tau + m) * 0.75
+  s = s + sin(ph * tau * 2.756 + m * 0.35) * exp(-t * 2.6) * 0.4
+  s = s + sin(ph * tau * 5.41) * exp(-t * 5.0) * 0.18
+  out(s * e * 0.30)
+}
+inst arp {
+  e = env(0.001, 0.18, 0.0, 0.06)
+  s = bsaw(ph, freq) + bsqr(ph, 0.5, freq * 2) * 0.3
+  s = svf(s, 300 + 5000 * e, 0.4)
+  out(s * e * 0.25)
+}
+
+chan 3 {
+  w = verb(x, 0.90, 0.40)
+  out(x * 0.55 + w * 0.75)
+}
+chan 4 {
+  d = dly(x, 0.5, 0.5)
+  w = verb(x * 0.7 + d * 0.3, 0.85, 0.5)
+  out(x + d * 0.45 + w * 0.35)
+}
+chan 5 {
+  d = dly(x, 0.375, 0.42)
+  out(x + d * 0.38)
+}
+master {
+  w = verb(l * 0.4 + r * 0.4, 0.80, 0.55)
+  out(dist(l + w * 0.14, 1.05) * 0.92, dist(r + w * 0.14, 1.05) * 0.92)
+}
+
+# ------------------------------------------------------------------ patterns
+pattern 0 rows=16 {
+  # intro: drone + bells, a single arp note rings
+  . | . | . | A-2 5 30 | A-4 6 2C | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | E-5 6 24 | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | A-5 7 1C
+  . | . | . | .        | .        | .
+  . | . | . | .        | .        | .
+  . | . | . | .        | C-5 6 20 | .
+}
+pattern 1 rows=16 {
+  # kick + bass enter, quarter-note arp
+  C-2 1 40 | .        | A-1 4 40 | A-2 5 2C | .        | A-4 7 22
+  .        | .        | .        | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 40 | .        | .        | .        | .        | C-5 7 20
+  .        | .        | .        | .        | .        | .
+  .        | .        | A-1 4 36 | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 40 | .        | A-1 4 38 | .        | E-5 6 24 | E-5 7 20
+  .        | .        | .        | .        | .        | .
+  .        | C-6 3 12 | .        | .        | .        | .
+  .        | .        | .        | .        | .        | .
+  C-2 1 40 | .        | .        | .        | .        | A-5 7 22
+  .        | .        | .        | .        | .        | .
+  .        | C-6 3 12 | G-1 4 30 | .        | .        | .
+  .        | .        | .        | .        | .        | .
+}
+pattern 2 rows=16 {
+  # full groove, Am
+  C-2 1 40 | .        | A-1 4 40 | A-2 5 28 | .        | A-4 7 24
+  .        | .        | .        | .        | .        | C-5 7 1A
+  .        | C-6 3 14 | .        | .        | .        | E-5 7 20
+  .        | .        | A-1 4 34 | .        | .        | A-5 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | C-6 7 20
+  .        | .        | .        | .        | .        | A-5 7 1C
+  .        | C-6 3 14 | A-1 4 38 | .        | .        | E-5 7 20
+  .        | C-6 3 0E | .        | .        | .        | C-5 7 18
+  C-2 1 40 | .        | A-1 4 40 | .        | C-5 6 2A | A-4 7 22
+  .        | .        | .        | .        | .        | C-5 7 1A
+  .        | C-6 3 14 | .        | .        | .        | E-5 7 20
+  .        | .        | A-2 4 34 | .        | .        | A-5 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | E-6 7 22
+  .        | .        | .        | .        | .        | C-6 7 1C
+  .        | C-6 3 14 | A-1 4 36 | .        | .        | A-5 7 1E
+  .        | C-6 3 0E | .        | .        | .        | E-5 7 18
+}
+pattern 3 rows=16 {
+  # full groove, F
+  C-2 1 40 | .        | F-1 4 40 | F-2 5 28 | .        | F-4 7 24
+  .        | .        | .        | .        | .        | A-4 7 1A
+  .        | C-6 3 14 | .        | .        | .        | C-5 7 20
+  .        | .        | F-1 4 34 | .        | .        | F-5 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | A-5 7 20
+  .        | .        | .        | .        | .        | F-5 7 1C
+  .        | C-6 3 14 | F-1 4 38 | .        | .        | C-5 7 20
+  .        | C-6 3 0E | .        | .        | .        | A-4 7 18
+  C-2 1 40 | .        | F-1 4 40 | .        | A-4 6 2A | F-4 7 22
+  .        | .        | .        | .        | .        | A-4 7 1A
+  .        | C-6 3 14 | .        | .        | .        | C-5 7 20
+  .        | .        | F-2 4 34 | .        | .        | F-5 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | A-5 7 22
+  .        | .        | .        | .        | .        | F-5 7 1C
+  .        | C-6 3 14 | F-1 4 36 | .        | .        | C-6 7 1E
+  .        | C-6 3 0E | .        | .        | C-5 6 22 | A-5 7 18
+}
+pattern 4 rows=16 {
+  # G with a snare fill
+  C-2 1 40 | .        | G-1 4 40 | G-2 5 28 | .        | G-4 7 24
+  .        | .        | .        | .        | .        | B-4 7 1A
+  .        | C-6 3 14 | .        | .        | .        | D-5 7 20
+  .        | .        | G-1 4 34 | .        | .        | G-5 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | B-5 7 20
+  .        | .        | .        | .        | .        | G-5 7 1C
+  .        | C-6 3 14 | G-1 4 38 | .        | .        | D-5 7 20
+  .        | C-6 3 0E | .        | .        | .        | B-4 7 18
+  C-2 1 40 | .        | G-1 4 40 | .        | D-5 6 28 | G-4 7 22
+  .        | .        | .        | .        | .        | B-4 7 1A
+  .        | C-6 3 14 | .        | .        | .        | D-5 7 20
+  .        | .        | G-2 4 34 | .        | .        | G-5 7 24
+  C-2 1 40 | C-4 2 30 | G-1 4 36 | .        | .        | B-5 7 22
+  .        | C-4 2 24 | .        | .        | .        | .
+  .        | C-4 2 2C E93 | E-1 4 30 | .    | .        | .
+  .        | C-6 3 10 | .        | .        | G-5 6 20 | .
+}
+pattern 5 rows=16 {
+  # break: no kick, bells and echoes while the star breathes in
+  . | .        | A-1 4 34 | A-2 5 30 | A-4 6 30 | A-5 7 1E
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | .        | .
+  . | C-6 3 0C | .        | .        | .        | E-6 7 1A
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | C-5 6 28 | .
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | .        | C-6 7 1C
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | E-5 6 26 | .
+  . | .        | .        | .        | .        | .
+  . | C-6 3 0C | .        | .        | .        | A-5 7 18
+  . | .        | .        | .        | .        | .
+  . | .        | .        | .        | .        | .
+  . | C-6 3 08 | .        | .        | G-5 6 1E | .
+}
+pattern 6 rows=16 {
+  # return, busier Am an octave up on the arp
+  C-2 1 40 | .        | A-1 4 40 | A-2 5 2A | E-5 6 26 | A-5 7 24
+  .        | .        | .        | .        | .        | C-6 7 1A
+  .        | C-6 3 14 | .        | .        | .        | E-6 7 20
+  .        | .        | A-2 4 34 | .        | .        | A-6 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | .        | C-7 7 20
+  .        | .        | .        | .        | .        | A-6 7 1C
+  .        | C-6 3 14 | A-1 4 38 | .        | .        | E-6 7 20
+  .        | C-6 3 0E | .        | .        | .        | C-6 7 18
+  C-2 1 40 | .        | A-1 4 40 | .        | .        | A-5 7 22
+  .        | .        | .        | .        | .        | C-6 7 1A
+  .        | C-6 3 14 | .        | .        | .        | E-6 7 20
+  .        | .        | A-2 4 34 | .        | .        | A-6 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | G-5 6 24 | E-7 7 22
+  .        | .        | .        | .        | .        | C-7 7 1C
+  C-2 1 34 | C-6 3 14 | E-2 4 36 | .        | .        | A-6 7 1E
+  .        | C-6 3 0E | .        | .        | .        | E-6 7 18
+}
+pattern 7 rows=16 {
+  # F again, snare push at the end
+  C-2 1 40 | .        | F-1 4 40 | F-2 5 28 | .        | F-5 7 24
+  .        | .        | .        | .        | .        | A-5 7 1A
+  .        | C-6 3 14 | .        | .        | .        | C-6 7 20
+  .        | .        | F-1 4 34 | .        | .        | F-6 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | F-5 6 28 | A-6 7 20
+  .        | .        | .        | .        | .        | F-6 7 1C
+  .        | C-6 3 14 | F-1 4 38 | .        | .        | C-6 7 20
+  .        | C-6 3 0E | .        | .        | .        | A-5 7 18
+  C-2 1 40 | .        | F-1 4 40 | .        | .        | F-5 7 22
+  .        | .        | .        | .        | .        | A-5 7 1A
+  .        | C-6 3 14 | .        | .        | .        | C-6 7 20
+  .        | .        | F-2 4 34 | .        | .        | F-6 7 24
+  C-2 1 40 | C-4 2 38 | .        | .        | A-5 6 24 | A-6 7 22
+  .        | C-4 2 2C | .        | .        | .        | F-6 7 1C
+  .        | C-6 3 14 | C-2 4 36 | .        | .        | C-6 7 1E
+  .        | C-6 3 0E | .        | .        | .        | A-5 7 18
+}
+pattern 8 rows=16 {
+  # build: 16th hats, snare roll, rising arp
+  C-2 1 40 | C-6 3 18 | A-1 4 38 | A-2 5 2C | A-4 6 2A | A-4 7 24
+  .        | C-6 3 0C | .        | .        | .        | .
+  .        | C-6 3 16 | A-1 4 30 | .        | .        | C-5 7 22
+  .        | C-6 3 0C | .        | .        | .        | .
+  C-2 1 40 | C-4 2 38 | A-1 4 38 | .        | .        | E-5 7 24
+  .        | C-6 3 0C | .        | .        | .        | .
+  .        | C-6 3 16 | A-1 4 30 | .        | .        | A-5 7 22
+  .        | C-6 3 0C | .        | .        | .        | .
+  C-2 1 40 | C-6 3 18 | A-1 4 38 | .        | C-5 6 28 | C-6 7 24
+  .        | C-6 3 0C | .        | .        | .        | .
+  .        | C-6 3 16 | A-1 4 30 | .        | .        | E-6 7 22
+  .        | C-6 3 0C | .        | .        | .        | .
+  C-2 1 40 | C-4 2 38 | A-1 4 38 | .        | .        | A-6 7 24
+  .        | C-4 2 30 E92 | .    | .        | .        | .
+  C-2 1 34 | C-4 2 34 E92 | A-1 4 38 | .    | E-5 6 2A | E-7 7 22
+  .        | C-4 2 3A E92 | .    | .        | .        | .
+}
+pattern 9 rows=16 {
+  # outro: the star dies; kick once, bells ring out
+  C-2 1 30 | . | A-1 4 3A | A-2 5 30 | A-4 6 34 | A-5 7 20
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | E-6 7 1A
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | C-5 6 26 | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | A-4 6 1E | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | .        | .
+  .        | . | .        | .        | E-5 6 22 | .
+}
+
+# ------------------------------------------------------------------ visuals
+uniform kickE snE bellE arpE holeR spinK lensK shx shy
+
+frame {
+  select(evt(scene))
+  kickE = exp(-trig(0) * 8)
+  snE = exp(-trig(1) * 9) * step(0.5, vel(1))
+  bellE = exp(-trig(4) * 2.5)
+  arpE = exp(-trig(5) * 9)
+  holeR = 0.14 + evtl(die) * 0.32
+  spinK = evtl(spin)
+  lensK = 0.10 + 0.06 * kickE
+  shx = kickE * 0.012 * sin(beat * 41)
+  shy = kickE * 0.012 * cos(beat * 37)
+}
+
+pixel intro {
+  # deep space, a faint ring breathing with the bells, title
+  r = polar(u, v) + 0.0001
+  a = r1
+  warp = 0.06 / (r + 0.18)
+  lx = u * (1 + warp)
+  ly = v * (1 + warp)
+  neb = fbm(lx * 1.6 + 5.1, ly * 1.6 - 2.3, 4)
+  pal(void, 0.15 + neb * 0.35)
+  cmul(0.45)
+  s1 = stars(lx, ly, 22)
+  s2 = stars(lx + 3.3, ly - 1.7, 41)
+  cadd(s1 * 0.60 + s2 * 0.35, s1 * 0.62 + s2 * 0.36, s1 * 0.75 + s2 * 0.45)
+  ring = exp(-abs(r - 0.30) * 60) * (0.10 + 0.35 * bellE + 0.06 * sin(beat * pi))
+  cadd(ring * 0.9, ring * 0.55, ring * 0.30)
+  ttl = textline(title, -0.70, 0.12, 0.14)
+  halo = textline(title, -0.692, 0.112, 0.14)
+  fade = smooth(0.4, 2.0, time)
+  cadd((ttl + halo * 0.5) * fade * 0.95, (ttl + halo * 0.4) * fade * 0.72, (ttl + halo * 0.3) * fade * 0.42)
+  tg = textline(tag, -0.50, -0.14, 0.045) * smooth(1.2, 3.0, time)
+  cadd(tg * 0.55, tg * 0.60, tg * 0.72)
+  cmul(1 + 0.12 * bellE)
+}
+
+pixel star {
+  # the hollow star: black disc, photon ring, streaked accretion disc
+  sx = u + shx
+  sy = v + shy
+  rr = polar(sx, sy) + 0.0001
+  a = r1
+
+  # gravitationally lensed sky coordinates
+  warp = lensK / (rr + 0.10)
+  lx = sx * (1 + warp)
+  ly = sy * (1 + warp)
+  rx2 = rot(lx, ly, beat * 0.01)
+  ry2 = r1
+
+  # accretion disc with differential rotation, seam-free noise domain
+  discR = 0.30
+  dr = rr - discR
+  band = exp(-dr * dr * 240)
+  streak = fbm(cos(a) * 1.8 + beat * 0.6 / (rr * 4 + 0.4), sin(a) * 1.8 + rr * 9, 5)
+  beam = 0.55 + 0.75 * (0.5 + 0.5 * cos(a + 0.7)) ^ 2
+  dk = band * (0.35 + 1.1 * streak) * beam
+  pal(ember, 0.85 - rr * 1.6 + streak * 0.25)
+  cmul(dk * (0.85 + 0.4 * kickE))
+
+  # cold nebula and two star layers behind everything
+  neb = fbm(rx2 * 1.5 + 3.7, ry2 * 1.5 - 1.3, 4)
+  cadd(neb * neb * 0.10, neb * neb * 0.05, neb * neb * 0.16)
+  s1 = stars(rx2, ry2, 22)
+  s2 = stars(rx2 + 3.3, ry2 - 1.7, 41)
+  cadd(s1 * 0.55 + s2 * 0.30, s1 * 0.58 + s2 * 0.31, s1 * 0.72 + s2 * 0.40)
+
+  # photon ring hugging the hole
+  ring = exp(-abs(rr - holeR - 0.035) * 200) * (1.0 + 0.8 * kickE + 0.4 * arpE)
+  cadd(ring * 1.25, ring * 1.10, ring * 0.85)
+
+  # the hollow interior: near black with a cold whisper of gas
+  cmul(mix(0.03, 1.0, smooth(holeR * 0.72, holeR * 1.04, rr)))
+  vd = fbm(cos(a) + beat * 0.05, sin(a) + rr * 3 - beat * 0.08, 4)
+  inM = 1 - smooth(holeR * 0.5, holeR * 0.95, rr)
+  mixpal(void, vd * 0.7 + beat * 0.01, inM * 0.30)
+
+  # orbiting sparks, some retrograde
+  repeat i 9 {
+    hi = hash(i * 17.31 + 4.7)
+    dir2 = 1 - 2 * step(0.5, hash(i * 5.77 + 0.3))
+    ang = hi * tau + beat * (0.20 + 0.45 * hash(i * 3.17)) * dir2 * tau * 0.35
+    rad = discR * (0.72 + 0.62 * hash(i * 7.93 + 1.1))
+    dx2 = sx - cos(ang) * rad
+    dy2 = sy - sin(ang) * rad
+    sp2 = exp(-(dx2 * dx2 + dy2 * dy2) * 3200) * (0.30 + 0.70 * (0.5 + 0.5 * sin(beat * 5 + i * 2.1)))
+    cadd(sp2 * 1.30, sp2 * 0.85, sp2 * 0.40)
+  }
+
+  # kick glow in the core region
+  cadd(kickE * 0.10 * exp(-rr * 5), kickE * 0.05 * exp(-rr * 5), kickE * 0.03 * exp(-rr * 5))
+  cmul(1 + 0.18 * kickE)
+}
+
+pixel collapse {
+  # the star falls into itself: shrinking rings + inward spiral feedback
+  rr = polar(u, v) + 0.0001
+  a = r1
+  ph2 = fract(beat * 0.5)
+  ringr = mix(0.92, holeR * 1.55 + 0.03, ph2)
+  lump = 0.55 + 0.9 * fbm(cos(a) * 2.3 + beat * 0.35, sin(a) * 2.3 - beat * 0.22, 3)
+  ring = exp(-abs(rr - ringr) * 22) * (0.30 + 0.9 * kickE) * lump
+  ring2 = exp(-abs(rr - mix(0.80, holeR * 1.45, fract(ph2 + 0.5))) * 30) * (0.2 + 0.5 * bellE) * lump
+  pal(ember, 0.3 + ph2 * 0.5 + beat * 0.02)
+  cmul((ring + ring2 * 0.7) * (0.5 + 0.5 * evtl(glow)))
+  st2 = fbm(cos(a) * 2 + rr * 6, sin(a) * 2 - beat * 0.2, 4)
+  cadd(st2 * 0.14 * exp(-rr * 1.2), st2 * 0.09 * exp(-rr * 1.2), st2 * 0.20 * exp(-rr * 1.2))
+  # sparks spiralling to their death
+  repeat i 7 {
+    hi = hash(i * 11.17 + 2.9)
+    ph3 = fract(beat * (0.25 + 0.3 * hash(i * 3.71)) + hi)
+    rad = mix(0.60, holeR * 1.05, ph3)
+    ang = hi * tau + ph3 * tau * (1.5 + hash(i * 7.13)) + beat * 0.2
+    dx2 = u - cos(ang) * rad
+    dy2 = v - sin(ang) * rad
+    sp2 = exp(-(dx2 * dx2 + dy2 * dy2) * 2600) * 0.9
+    cadd(sp2 * 1.2, sp2 * 0.7, sp2 * 0.35)
+  }
+  # zoom < 1: the previous frame is pulled toward the hole, with a twist
+  cprevz(0.5, 0.5, 0.988 - 0.012 * min(spinK, 2), 0.02 + 0.03 * spinK + 0.03 * snE, 0.86)
+  cmul(0.935)
+  # the hole eats the light; it grows while the star dies
+  cmul(mix(0.0, 1.0, smooth(holeR * 0.85, holeR * 1.25, rr)))
+  rim2 = exp(-abs(rr - holeR * 1.18) * 90) * (0.5 + 0.9 * kickE + 0.5 * arpE)
+  cadd(rim2 * 1.2, rim2 * 0.55, rim2 * 0.22)
+}
+
+post {
+  # bloom, radial chromatic aberration, grain, vignette, faint scanlines
+  g = evtl(glow)
+  b = tap(-3, 0) + tap(3, 0) + tap(0, -2) + tap(0, 2) + tap(-2, -2) + tap(2, 2) + tap(-2, 2) + tap(2, -2)
+  bl = b * 0.125
+  ca = 1.5 + 3.5 * kickE + 2.0 * snE
+  cr = tap(-u * ca, -v * ca)
+  cbv = tap(u * ca, v * ca)
+  cb = r2
+  rgb(mix(cget(0), cr, 0.55) + bl * 0.42 * g, cget(1) + bl * 0.34 * g, mix(cget(2), cb, 0.55) + bl * 0.5 * g)
+  gr = (hash(x * 913.7 + y * 771.3 + frame * 0.731) - 0.5) * 0.045
+  cadd(gr, gr, gr)
+  d = len(u, v)
+  cmul(1 - 0.34 * d * d)
+  cmul(1 - 0.09 * step(0.5, fract(y * h * 0.5)))
+}

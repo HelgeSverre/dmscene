@@ -200,6 +200,37 @@ art/               README artwork and animated demo highlights
 | `mycelium.dmt` | 92 | ambient: heartbeat kick, spores, root bass, breath pad, glints, rustle and wind | a warped plane folded into mushroom-gill radials, branching filaments, a cellular spore layer and breathing colour feedback over a 64-beat arc |
 | `life.dmt` | 120 | kick, snare, hat, bass, glass, cloud pad | Conway-style cellular automaton living in the previous-frame buffer: red is the live bit, blue the afterglow; one generation per 16th note, a ring of seeds every two bars |
 
+### Written by the models
+
+Twelve demos below were made end to end by different language models. Each got
+the same brief: read this README and a few existing demos, then write one
+original `.dmt` with a fixed filename. The content, music and visuals were
+entirely their choice; only the name and the build/render targets were given.
+`morrow` is an encore: after `cinder` was picked as the favourite, the same
+model was asked for a longer single-arc piece built on continuous morphing.
+`nocturne`, `dunes`, `signal` and `carnival` are a second batch from that model,
+each started from a different cinematic register — noir, desert epic, science
+fiction and dreamlike carnival — and then taken wherever the model wanted.
+
+| file | model | bpm | len | music | visual |
+|------|-------|-----|-----|-------|--------|
+| `cinder.dmt` | DeepSeek V4.1 Flash | 126 | 27 s | dark techno in D minor: distorted sine kick, filtered-noise snare, wavefolded/SVF bass, FM bell lead, NNA pad, dual delay and reverb | three bar-cut scenes: glowing coal fissures over warped voronoi/fbm, a spiral furnace with long-exposure feedback trails, a scrolling fbm fire wall; ember bloom, kick chromatic split, grain |
+| `parable.dmt` | DeepSeek V4 Pro | 96 | 30 s | ambient: heartbeat kick, seed-noise ticks, FM sub bass, breathing SVF pad, FM bell arp through cross-fed delay and reverb | a parabolic mirror gathers parallel rays into a burning focus; pure Euclidean geometry, timeline-ramped rays, dusk-to-ember palette, converging feedback, a crawling moral line |
+| `vellum.dmt` | Kimi K3.1 Pro | 120 | 28 s | D minor: frame drum, snap, hats, bass, dulcimer, reed, pad, chimes with channel/master delay and reverb | four timeline-cut illuminated-manuscript folios: parchment grain, botanical rosettes, an armillary chart, a vermilion initial and rubricated text, a scrolling colophon; kifs filigree, glyphs, feedback; `scale=2 dither=1` |
+| `hollowstar.dmt` | Kimi K3 | 120 | 28 s | synth sub-kick, sampled snare/hat, sub bass, `usaw` drone through a channel reverb, inharmonic FM bells, 16th arp in dotted-eighth delay, `E9x` rolls | a dying black hole in three timeline-cut scenes: a lensed starfield, a kick-pulsing photon ring, a differentially rotating ember accretion disc with orbiting sparks, then a `cprevz` infall collapse; bloom, radial chromatic aberration, grain, scanlines |
+| `razorwire.dmt` | Kimi K2.7 Code | 165 | 27 s | industrial hard techno: distorted kick, metallic hats and snare, FM bass, stab lead, drone pad, noise texture; master delay/reverb/saturation | sharp rotating KIFS blades folded through a kaleidoscope mirror with Kali filaments, snare-triggered RGB glitch, low-persistence feedback trails, bloom, scanlines and vignette |
+| `tidepool.dmt` | GLM-5.3-Flash | 100 | 24 s | liquid ambient: FM droplet plinks, sub-bass heartbeat, noise-swell wash, detuned shimmer pad, FM bells, shell ticks; dotted delays and Freeverb | dusk tidepool from above: two fbm domain warps, sine-interference caustics, voronoi pool stones, beat rings, a folded radial anemone, twinkling glints, `cprevz` drift, abyss-to-coral palette; refraction, chromatic split and bloom in post |
+| `bonechurch.dmt` | Kimi K2.7 Code | 110 | 29 s | gothic rave in D minor: deep kick, snare, 8th hats, organ bass, choir arpeggios, bell melody over Dm–B♭–F–C | inside a bone nave: a kaleidoscopic `kali` rose window, domain-repeated SDF arches and ribbed vaults, a receding floor grid, columns, rotating light shafts and dust; bloom and vignette |
+| `morrow.dmt` | DeepSeek V4.1 Flash | 96 | 50 s | one continuous arc: sub drone and heartbeat, then bass pulse, arps and hats, a filter-swell dissonant breakdown, a full B♭/F climax, and a final Picardy-third D-major chord with bells ringing to the last frame | a cold seed of light unfolds into a vein membrane, shears into violet tendrils around a surviving heart, then dissolves into a sunrise and the title; one pixel program blended by timeline-ramped uniforms, a shared camera transform and `cprevz` feedback, so every state morphs into the next with no cuts |
+| `nocturne.dmt` | DeepSeek V4.1 Flash | 80 | 36 s | 3 a.m. noir: felt kick, brushed snare, laid-back sampled ride, upright bass, FM Rhodes, muted trumpet through dotted delay and reverb, rain room-tone, vinyl ticks and tape hiss | one continuous interior shot: venetian-blind bars crawl across the wall and wet floor, a rain-streaked window onto a neon skyline, a fedora silhouette under the streetlight from ~16 s, smoke lit only where it crosses the light; gate weave, bloom, chromatic fringing and grain in post |
+| `dunes.dmt` | DeepSeek V4.1 Flash | 96 | 40 s | D harmonic minor desert cue: doum frame drum, tak/shaker, sub bass, drone, FM/oud plucks, ney-like flute and bells through delay and reverb, ringing to the last sample | one continuous 2.2:1 desert shot: parallax dune ridges with wind ripples and crest rims, blue hour to gold sun, a dust-haze movement, then a two-camel SDF caravan walking the near crest; heat shimmer, bloom, chromatic fringe and grain; `scale=2 dither=1` |
+| `signal.dmt` | DeepSeek V4.1 Flash | 100 | 38 s | sub-heavy FM kick, long FM sonar bell with NNA tails, sub, filtered radio static, 7-saw pad through an SVF, theremin lead, metallic data ticks; ping-pong delay and long reverb | a listening ring on a black sea: a carrier thread of light opens the aperture into two-source moiré interference, rays and lens flare, a rippled reflection, an oscilloscope trace in the sky and a HUD flipping ACQUIRING to CARRIER LOCKED before the SIGNAL wordmark; bloom, chromatic split and grain |
+| `carnival.dmt` | DeepSeek V4.1 Flash | 120 | 36 s | 3/4 waltz: tuba, chord-generating calliope, music-box FM, theremin, soft kick, brushes and harmonium drone through modulated delays and Freeverb | a night fairground reflected in a wet plaza under a moon with a face: tents, a Ferris wheel and lantern strings, then a match cut into a cracked plaster mask with a tiny fair inside its eyes, a widening grin and a tear, then back to the fair for the confetti finale and title; `scale=2 dither=1` |
+
+Provider outages during the run forced both Kimi K2.7 Code demos onto the same
+endpoint and moved one Kimi K3 demo to the managed provider, so the set covers
+six distinct models rather than the seven originally planned.
+
 ## The text format (.dmt)
 
 Top level is line oriented. `#` (at line start or after whitespace, so `D#4`

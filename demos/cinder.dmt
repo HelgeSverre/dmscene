@@ -1,0 +1,416 @@
+# cinder.dmt - a burning coal, an ember vortex and a wall of fire.
+# Dark techno at 126 BPM; the last bar keeps the fire alive.
+title CINDER
+song bpm=126 speed=6 rpb=4 channels=6 loop=13 volume=0.44
+order 0 1 2 1 2 3 4 5 6 5 6 5 6 7
+pan 0.5 0.5 0.58 0.5 0.44 0.6
+
+text tlabel "CINDER"
+
+timeline {
+  0:00  scn=0 glow=0.10 zoom=0.00 titleA=0.0
+  0:08  titleA=0.90
+  1:00  glow=0.50 titleA=0.90
+  1:08  titleA=0.00
+  2:00  glow=0.62 zoom=0.15
+  3:00  glow=0.70 zoom=0.22
+  4:00  glow=0.80 zoom=0.30
+  5:00  scn=1 glow=0.85 zoom=0.40
+  6:00  glow=1.00 zoom=0.50
+  7:00  scn=2 glow=1.00 zoom=0.55
+  8:00  glow=1.10 zoom=0.60
+  9:00  scn=1 glow=1.00 zoom=0.65
+  10:00 glow=1.15 zoom=0.62
+  11:00 scn=2 glow=1.15 zoom=0.70
+  12:00 scn=0 glow=1.25 zoom=0.85 titleA=0.0
+  12:08 titleA=0.70
+  13:00 glow=1.35 zoom=1.00 titleA=0.95
+}
+
+# ------------------------------------------------------------------ instruments
+inst kick {
+  f = 46 + 540 * exp(-t * 42)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 7)
+  click = hp(noise(), 2400) * exp(-t * 120) * 0.5
+  out(dist(body * 1.7 + click, 1.4) * 0.86)
+}
+inst snare {
+  tone = sin(tau * 186 * t) * exp(-t * 24) * 0.5
+  n = svf(noise(), 1400 + 3200 * exp(-t * 38), 0.55)
+  out((n * 1.15 + tone) * exp(-t * 9) * 0.5)
+}
+inst hat {
+  out(hp(noise(), 7600) * exp(-t * (36 + 90 * (1 - vel))) * 0.26)
+}
+inst bass {
+  e = env(0.004, 0.10, 0.55, 0.07)
+  sub = sin(ph * tau) * 0.85
+  g = saw(ph) * 0.5 + sqr(ph * 0.503, 0.35 + 0.15 * sin(t * 7)) * 0.32
+  s = fold((g * (1.0 + 1.1 * e) + sub) * 1.05, 1.45)
+  s = svf(s, 150 + 1500 * e * e, 0.42)
+  out(dist(s, 1.5) * e * 0.5)
+}
+inst bell {
+  e = exp(-t * 3.1)
+  m = sin(ph * tau * 3.01 + 1.1 * sin(t * 8.5)) * exp(-t * 5.5)
+  s = sin(ph * tau + m * 1.4) + 0.28 * sin(ph * tau * 2.01)
+  out(s * e * 0.25)
+}
+inst pad nna=continue {
+  e = env(0.55, 1.2, 0.78, 1.7)
+  s = usaw(freq, 0.20) + usaw(freq * 1.5, 0.14) * 0.34
+  s = svf(s, 280 + 420 * (0.5 + 0.5 * sin(t * 0.37)) + 260 * mp1, 0.18)
+  out(s * e * 0.2)
+}
+
+master {
+  dl = dly(l, 0.357, 0.40)
+  dr = dly(r, 0.476, 0.40)
+  w = verb(l * 0.5 + r * 0.5, 0.82, 0.44)
+  out(dist(l + dr * 0.22 + w * 0.18, 1.05), dist(r + dl * 0.22 + w * 0.18, 1.05))
+}
+
+# --------------------------------------------------- 0: intro, Dm
+pattern 0 rows=16 {
+  C-2 1 34 | . | C-6 3 08 | D-1 4 24 | . | D-3 6 22
+  .
+  . | . | C-6 3 14
+  .
+  . | . | C-6 3 08
+  .
+  . | . | C-6 3 14 | D-2 4 22
+  .
+  C-2 1 30 | . | C-6 3 08 | . | A-4 5 18
+  .
+  . | . | C-6 3 14 | D-1 4 24
+  .
+  . | . | C-6 3 08
+  .
+  C-2 1 26 | . | C-6 3 14 | A-1 4 20 | F-5 5 14
+  .
+}
+# --------------------------------------------------- 1: groove, Dm
+pattern 1 rows=16 {
+  C-2 1 40 | . | C-6 3 10 | D-1 4 40 | . | D-3 6 26
+  .
+  . | . | C-6 3 20 | D-1 4 32
+  . | . | . | D-2 4 26
+  C-2 1 38 | C-3 2 34 | C-6 3 10
+  .
+  . | . | C-6 3 20 | D-1 4 34
+  . | . | . | A-1 4 26
+  C-2 1 40 | . | C-6 3 10 | D-1 4 40
+  .
+  . | . | C-6 3 20 | D-2 4 32
+  . | . | . | F-1 4 26
+  C-2 1 38 | C-3 2 34 | C-6 3 10
+  .
+  . | . | C-6 3 20 | A-1 4 36 | A-4 5 20
+  . | . | . | C-2 4 26
+}
+# --------------------------------------------------- 2: groove, Bb
+pattern 2 rows=16 {
+  C-2 1 40 | . | C-6 3 10 | A#1 4 40 | . | A#3 6 26
+  .
+  . | . | C-6 3 20 | A#1 4 32
+  . | . | . | A#2 4 26
+  C-2 1 38 | C-3 2 34 | C-6 3 10
+  .
+  . | . | C-6 3 20 | A#1 4 34
+  . | . | . | F-1 4 26
+  C-2 1 40 | . | C-6 3 10 | A#1 4 40
+  .
+  . | . | C-6 3 20 | A#2 4 32 | D-5 5 20
+  . | . | . | F-2 4 26
+  C-2 1 38 | C-3 2 34 | C-6 3 10
+  .
+  . | . | C-6 3 20 | F-1 4 34 | F-5 5 18
+  . | . | . | C-2 4 26
+}
+# --------------------------------------------------- 3: break, Gm
+pattern 3 rows=16 {
+  . | . | C-6 3 08 | G-1 4 26 | G-4 5 24 | G-3 6 28
+  .
+  . | . | . | . | A#4 5 22
+  .
+  . | C-3 2 20 | C-6 3 10
+  . | . | . | . | D-5 5 24
+  . | . | . | G-1 4 24
+  .
+  . | . | C-6 3 08 | . | G-5 5 26
+  .
+  . | C-3 2 24 | . | C-2 4 24 | F-5 5 22
+  .
+  . | . | C-6 3 10 | . | D-5 5 24
+  .
+  . | C-3 2 18 | . | G-1 4 22
+  .
+}
+# --------------------------------------------------- 4: build, A
+pattern 4 rows=16 {
+  C-2 1 40 | C-3 2 30 | C-6 3 12 | A-1 4 36 | . | A-2 6 28
+  C-2 1 22
+  C-2 1 34 | C-3 2 24 | C-6 3 18 | A-1 4 30
+  C-2 1 22
+  C-2 1 38 | C-3 2 30 | C-6 3 12 | A-1 4 34
+  C-2 1 24 | C-3 2 20 E92
+  C-2 1 34 | C-3 2 26 E92 | C-6 3 18 | A-2 4 30
+  C-2 1 24
+  C-2 1 40 | C-3 2 34 | C-6 3 12 | A-2 4 36
+  C-2 1 24 | C-3 2 22 E92
+  C-2 1 36 | C-3 2 30 E92 | C-6 3 18 | A-1 4 30
+  C-2 1 26 | C-3 2 24 E92
+  C-2 1 40 | C-3 2 36 | C-6 3 12 | A-1 4 36 | E-5 5 20
+  C-2 1 28 | C-3 2 26 E92
+  C-2 1 36 | C-3 2 32 E92 | C-6 3 18 | A-2 4 32
+  C-2 1 30 | C-3 2 30 E93 | C-6 3 22 | A-1 4 34 | G-5 5 22
+}
+# --------------------------------------------------- 5: drop, Dm
+pattern 5 rows=16 {
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | D-1 4 3E | . | D-3 6 30
+  . | . | C-6 3 18 | D-2 4 28
+  C-2 1 40 | . | C-6 3 10 | D-1 4 36
+  . | . | C-6 3 18 | D-2 4 28
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | D-1 4 40 | A-4 5 24
+  . | . | C-6 3 18 | A-1 4 26
+  C-2 1 40 | . | C-6 3 10 | D-1 4 36
+  . | . | C-6 3 18 | D-2 4 28
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | D-1 4 3E
+  . | . | C-6 3 18 | F-1 4 28
+  C-2 1 40 | . | C-6 3 10 | D-2 4 36 | D-5 5 22
+  . | . | C-6 3 18 | A-1 4 26
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | D-1 4 40
+  . | . | C-6 3 18 | D-2 4 28
+  C-2 1 40 | . | C-6 3 10 | A-1 4 34 | F-5 5 26
+  . | . | C-6 3 18 | D-2 4 30
+}
+# --------------------------------------------------- 6: peak, F
+pattern 6 rows=16 {
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | F-1 4 3E | . | F-3 6 30
+  . | . | C-6 3 18 | F-2 4 28
+  C-2 1 40 | . | C-6 3 10 | F-1 4 36
+  . | . | C-6 3 18 | F-2 4 28
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | F-1 4 40 | C-5 5 24
+  . | . | C-6 3 18 | C-2 4 26
+  C-2 1 40 | . | C-6 3 10 | F-1 4 36
+  . | . | C-6 3 18 | F-2 4 28
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | F-1 4 3E
+  . | . | C-6 3 18 | A-1 4 28
+  C-2 1 40 | . | C-6 3 10 | F-2 4 36 | F-5 5 22
+  . | . | C-6 3 18 | C-2 4 26
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | F-1 4 40
+  . | . | C-6 3 18 | F-2 4 28
+  C-2 1 40 | . | C-6 3 10 | C-2 4 34 | A-5 5 26
+  . | . | C-6 3 18 | F-2 4 30
+}
+# --------------------------------------------------- 7: final, A
+pattern 7 rows=16 {
+  C-2 1 40 | C-3 2 38 | C-6 3 14 | A-1 4 40 | E-5 5 26 | A-3 6 32
+  C-2 1 30 | . | C-6 3 18 | A-2 4 30
+  C-2 1 3E | C-3 2 36 | C-6 3 12 | A-1 4 40
+  . | . | C-6 3 18 | A-2 4 30
+  C-2 1 40 | C-3 2 38 | C-6 3 14 | A-1 4 3E | A-5 5 26
+  . | . | C-6 3 18 | C-2 4 28
+  C-2 1 3E | . | C-6 3 12 | A-1 4 40
+  . | . | C-6 3 18 | E-2 4 30
+  C-2 1 40 | C-3 2 38 | C-6 3 14 | A-1 4 40
+  . | . | C-6 3 18 | A-2 4 30
+  C-2 1 3E | . | C-6 3 12 | A-1 4 40 | C-6 5 26
+  . | . | C-6 3 18 | A-2 4 28
+  C-2 1 40 | C-3 2 38 | C-6 3 14 | A-1 4 3E
+  . | . | C-6 3 18 | C-2 4 30
+  C-2 1 3E | C-3 2 34 | C-6 3 16 | A-1 4 40 | E-5 5 26
+  C-2 1 40 | . | C-6 3 22 | A-2 4 32 | A-5 5 22
+}
+
+# ------------------------------------------------------------------ visuals
+uniform kickE snE hatE bellE glow zoom titleA scn cut
+
+fn titleline(s, py, sz) {
+  # centred glow text in the u,v plane
+  n = strlen(s)
+  cx = (u + n * sz * 0.5) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  g = glyph(str(s, i), fract(cx), fract(cy))
+  return g * step(0, cx) * step(cx, n) * step(0, cy) * step(cy, 1)
+}
+
+fn sparks(speed, wide, hot) {
+  # additive rising ember streaks; call inside a pixel program
+  repeat k 9 {
+    sx = (hash(k * 13.71 + 5.1) - 0.5) * wide * aspect
+    sy = fract(hash(k * 7.37 + 1.9) + time * speed * (0.45 + 0.9 * hash(k * 3.1))) * 2.3 - 1.15
+    sx = sx + 0.09 * sin(time * 1.3 + k * 2.1)
+    d = len(u - sx, (v - sy) * 0.35)
+    core = 1 - smooth(0, 0.006 + 0.008 * hash(k * 5.7), d)
+    halo = 1 - smooth(0, 0.018 + 0.014 * hash(k * 2.9), d)
+    fl = 0.5 + 0.5 * sin(time * (6 + 6 * hash(k * 9.1)) + k * 3.3)
+    gl = core * 1.7 + halo * 0.22
+    cadd(gl * fl * hot * 1.25, gl * fl * hot * 0.52, gl * fl * hot * 0.11)
+  }
+}
+
+frame {
+  kickE = exp(-trig(0) * 10) * step(0.5, vel(0))
+  snE = exp(-trig(1) * 13)
+  hatE = exp(-trig(2) * 42)
+  bellE = exp(-trig(4) * 3.2)
+  glow = evtl(glow)
+  zoom = evtl(zoom)
+  titleA = evtl(titleA)
+  scn = evt(scn)
+  ps = $scn
+  $scn = scn
+  cut = step(0.5, abs(scn - ps))
+  select(scn)
+}
+
+pixel coal {
+  # a lumpy burning boulder, lit from the inside by its own fissures
+  z = 0.92 - 0.12 * zoom - 0.03 * sin(time * 0.37) + 0.03 * kickE
+  ca = 0.24 + 0.10 * sin(time * 0.21)
+  rx = rot(u, v, ca) * z
+  ry = r1 * z
+
+  lump = fbm(rx * 1.7 + 4.3, ry * 1.7 - 2.1, 3)
+  rad = len(rx, ry) + 0.17 * (lump - 0.5)
+  inside = 1 - smooth(0.60, 0.665, rad)
+  depth = sqrt(max(0, 1 - (rad / 0.64) ^ 2))
+
+  n1 = fbm(rx * 3.1 + 11.3, ry * 3.1 - 7.7, 4)
+  n2 = fbm(rx * 7.0 + n1 * 2.2 + time * 0.03, ry * 7.0 - n1 * 2.2, 3)
+
+  # fissure network: voronoi cell borders, only some cells molten
+  vx = rx * 3.4 + (n1 - 0.5) * 2.2
+  vy = ry * 3.4 + (n2 - 0.5) * 2.2
+  d1 = vor(vx, vy)
+  id = r1
+  seam = exp(-(r2 - d1) * 30)
+  hotcell = 0.30 + 0.70 * hash(id * 41.3 + 3.7)
+  flick = 0.72 + 0.40 * sin(time * 2.3 + id * 31.0) + 0.22 * sin(time * 7.1 + id * 7.0)
+  lava = seam * hotcell * flick * (0.42 + 0.90 * glow) * (1 + 1.15 * kickE)
+
+  # magma pooling in the low crust and the general inner heat of the coal
+  pool = smooth(0.58, 0.24, n1) * (0.05 + 0.30 * glow)
+  inner = (0.30 + 0.70 * depth) * (0.14 + 0.42 * glow) * (0.4 + 0.6 * n2)
+  hot = clamp(lava + pool * inside + inner * inside, 0, 1.55)
+  hv = clamp(hot, 0, 1)
+
+  crust = 0.014 + 0.055 * n2 + 0.025 * depth
+  cr = crust + hv * 1.05
+  cg = crust * 0.62 + hv ^ 1.9 * 0.62
+  cb = crust * 0.45 + hv ^ 4.5 * 0.20
+
+  # deep space behind the boulder, with a faint red halo
+  haze = 0.010 + 0.030 * exp(-rad * 1.4)
+  cr = cr * inside + haze * 0.7
+  cg = cg * inside + haze * 0.22
+  cb = cb * inside + haze * 1.0
+  rgb(cr, cg, cb)
+
+  # shock ring on the kick
+  ring = exp(-abs(rad - (0.5 + 0.55 * fract(trig(0) * 1.6))) * 26) * kickE * 0.35
+  cadd(ring, ring * 0.35, ring * 0.08)
+
+  sparks(0.075, 2.35, 0.7 + 0.5 * glow)
+  # the name, written in embers at the bottom
+  lg = titleline(tlabel, -0.66, 0.20) * titleA
+  lg = lg * (0.72 + 0.28 * sin(time * 10.0 + u * 9.0))
+  cadd(lg * 1.05, lg * 0.58, lg * 0.22)
+}
+
+pixel vortex {
+  # an accelerating spiral of embers around a furnace core
+  rr = len(u, v)
+  th = atan2(v, u)
+  spin = 0.85 + 0.95 * zoom + 0.05 * sin(time * 0.31)
+  logr = log(rr + 0.04)
+
+  # spiral filaments, broken into embers by turbulence
+  arm = th * 3.0 + logr * 2.4 - time * spin * 1.6
+  fil = (0.5 + 0.5 * sin(arm)) ^ 7.0
+  n = fbm(th * 3.1 + time * 0.15, logr * 5.0 - time * 0.8, 4)
+  fil = fil * (0.20 + 1.25 * smooth(0.38, 0.78, n))
+  heat = fil * 0.95 / (0.32 + rr * 1.5)
+
+  # a second, counter-rotating family of arcs, dimmer
+  arm2 = th * 5.0 - logr * 4.1 + time * spin * 0.7
+  fil2 = (0.5 + 0.5 * sin(arm2)) ^ 10.0
+  heat = heat + fil2 * 0.22 / (0.50 + rr * 2.0)
+
+  # fine high-harmonic streaks
+  arm3 = th * 13.0 + logr * 5.0 - time * spin * 2.4
+  heat = heat + ((0.5 + 0.5 * sin(arm3)) ^ 22.0) * 0.30 / (0.45 + rr * 1.8)
+
+  core = exp(-rr * 7.0) * (0.55 + 0.65 * kickE)
+  heat = clamp(heat * (0.50 + 0.70 * glow) + core * 0.75, 0, 1.2)
+
+  rgb(heat * 1.10, heat ^ 2.0 * 0.80, heat ^ 3.8 * 0.30)
+  # long-exposure streaks: the previous frame expands and twists outward
+  cprevz(0.5, 0.5, 1.010 + 0.006 * kickE, 0.005 + 0.003 * sin(time * 0.7), 0.30)
+
+  # spark orbit ring
+  repeat k 6 {
+    a = time * (0.55 + 0.5 * hash(k * 7.1)) + k * 1.047
+    rr2 = 0.18 + 0.55 * fract(hash(k * 3.3) + time * 0.03)
+    px = rr2 * cos(a) * 1.1
+    py = rr2 * sin(a) * 0.9
+    d = len(u - px, v - py)
+    sp = 1 - smooth(0, 0.010 + 0.010 * hash(k * 5.5), d)
+    cadd(sp * 1.2, sp * 0.55, sp * 0.12)
+  }
+}
+
+pixel fire {
+  # a wall of fire: tall thin turbulence under a per-column flame height
+  yb = clamp(1 - y, 0, 1)
+  sway = 0.10 * sin(yb * 5.0 - time * 1.4) + 0.05 * sin(yb * 11.0 + time * 0.9)
+  n1 = fbm(x * 9.0 + sway, yb * 2.0 - time * 1.5, 4)
+  n2 = fbm(x * 22.0 - sway * 2.0, yb * 5.0 - time * 2.8, 3)
+  fil = smooth(0.42, 0.60, n1 * 0.65 + n2 * 0.35)
+
+  H = 0.66 + 0.32 * fbm(x * 3.2 + 7.0, 0.6 + time * 0.10, 3)
+  column = 1 - smooth(0.0, 1.0, yb / max(H, 0.15))
+  heat = column * (0.16 + 0.85 * fil) * (0.70 + 0.40 * glow)
+
+  # white-hot base with its own flicker
+  base = exp(-yb * 7.0) * (0.50 + 0.35 * fbm(x * 16.0, time * 2.0, 2))
+  heat = clamp(heat + base * (0.42 + 0.18 * kickE), 0, 1.0)
+
+  # the word burns inside the flame
+  logo = titleline(tlabel, 0.16, 0.18) * clamp(titleA * 1.6, 0, 1)
+  heat = max(heat, logo * (0.70 + 0.25 * sin(time * 9.0 + u * 20.0)))
+
+  # side walls keep the fire in a column
+  wall = smooth(0.0, 0.30, 1.0 - abs(u) / aspect)
+  heat = heat * (0.55 + 0.45 * wall)
+  heat = clamp(heat * (1 + 0.22 * kickE), 0, 1.0)
+
+  rgb(heat * 1.10, heat ^ 2.5 * 1.0, heat ^ 5.5 * 0.40)
+  # a little memory of the previous flame makes the tongues lick and smear
+  cprev(x, y + 0.004, 0.12 * glow)
+  sparks(0.10, 2.2, 0.55 + 0.35 * glow)
+}
+
+post {
+  # ember bloom, kick chromatic split, dust and a warm vignette
+  cr = tap(0, 0)
+  cg = r1
+  cb = r2
+  sh = floor(4 * kickE)
+  ar = tap(-1 - sh, 0)
+  ab = tap(1 + sh, 1)
+  bl = (tap(-3, 0) + tap(3, 0) + tap(0, 3) + tap(0, -3) + tap(-2, 2) + tap(2, -2) + tap(-2, -2) + tap(2, 2)) * 0.125
+  bl = bl * (1 - 0.45 * step(0.5, scn - 1.5))
+  st = tap(0, 4)
+  rgb(cr * 0.92 + ar * 0.20 + bl * 0.42 + st * 0.09,
+      cg * 0.96 + bl * 0.30 + st * 0.04,
+      cb * 0.94 + ab * 0.22 + bl * 0.40 + st * 0.02)
+  du = (hash(x * w * 0.37 + y * h * 0.71 + frame * 7.3) - 0.5) * 0.045
+  cadd(du, du * 0.8, du * 0.6)
+  d = len(u, v)
+  cmul(max(0.48, 1 - 0.34 * d))
+  cadd(0.05 * kickE + 0.22 * cut, 0.014 * kickE + 0.08 * cut, 0.02 * cut)
+}

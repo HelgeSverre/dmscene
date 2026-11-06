@@ -1,0 +1,303 @@
+# parable.dmt - one mirror, many paths, one light.
+# A contemplative geometry demo: a parabolic dish gathers parallel rays into a
+# single burning focus. The rays arrive one pair at a time across a twelve-bar
+# arc, the sky turns from indigo dusk to ember, an expanding ring speaks the
+# return path, and the word PARABLE hangs above while a one-line moral crawls
+# underneath. Everything is pixel-space geometry (a real parabola + reflected
+# rays), palette-mapped, with a converging afterimage in the feedback buffer.
+
+title PARABLE
+song bpm=96 speed=6 rpb=4 channels=5 loop=0 volume=0.62 dither=1
+order 0 1 1 2 3 2 4 1 2 3 5 5
+pan 0.42 0.58 0.50 0.46 0.62
+
+text title "PARABLE"
+text scroll "  MANY PATHS ...  ONE LIGHT ...  EVERY PARABLE GATHERS ITS DUST TO A SINGLE POINT ...  ALL THE WANDERERS MEET AT THE FIRE ...  "
+
+palette dusk {
+  0.00  0.012 0.010 0.070
+  0.30  0.075 0.055 0.220
+  0.55  0.320 0.160 0.330
+  0.72  0.760 0.340 0.300
+  0.86  0.990 0.660 0.330
+  0.96  1.000 0.940 0.760
+  1.00  0.012 0.010 0.070
+}
+palette ember {
+  0.00  0.028 0.006 0.012
+  0.30  0.320 0.045 0.030
+  0.55  0.720 0.150 0.060
+  0.75  0.990 0.350 0.090
+  0.90  1.000 0.820 0.420
+  1.00  0.028 0.006 0.012
+}
+
+timeline {
+  0:00 rays=2.0
+  1:00 rays=3.2
+  2:00 rays=4.4
+  3:00 rays=5.6
+  4:00 rays=6.8
+  5:00 rays=8.0
+  6:00 rays=9.2
+  7:00 rays=10.4
+  8:00 rays=11.0
+  9:00 rays=12.0
+  10:00 rays=12.0
+  11:00 rays=12.0
+}
+
+# ------------------------------------------------------------------ instruments
+inst heart {
+  f = 46 + 300 * exp(-t * 36)
+  $p = $p + f / sr
+  thump = sin($p * tau) * exp(-t * 7)
+  air = lp(noise(), 900) * exp(-t * 40)
+  out(dist(thump * 1.8 + air * 0.10, 1.4) * 0.55)
+}
+inst seed {
+  n = hp(noise(), 7400)
+  out(n * exp(-t * (34 + 60 * (1 - vel))) * 0.16)
+}
+inst root {
+  e = env(0.012, 0.28, 0.55, 0.30)
+  sub = sin(ph * tau)
+  wood = svf(tri(ph) * 0.9 + saw(ph) * 0.22, 150 + 500 * e, 0.28)
+  out((sub * 0.55 + wood * 0.20) * e * 0.5)
+}
+inst pad {
+  e = env(0.5, 0.8, 0.72, 1.0)
+  a = sin(ph * tau + 0.6 * sin(ph * tau * 0.5 + t * 0.22))
+  b = saw(ph + 0.0016 * t) + saw(ph - 0.0021 * t)
+  s = svf(a * 0.7 + b * 0.24, 420 + 260 * sin(t * 0.27) + p0 * 700, 0.20)
+  out(s * e * 0.22)
+}
+inst bell {
+  e = exp(-t * 2.1)
+  m = sin(ph * tau * 2.05) * exp(-t * 3.2) * 1.6
+  s = sin(ph * tau + m) + sin(ph * tau * 2.01 + m * 0.35) * 0.30
+  out(s * e * 0.24)
+}
+
+master {
+  dl = dly(l, 0.46875, 0.38)
+  dr = dly(r, 0.625, 0.34)
+  vl = verb(l + dr * 0.24, 0.72, 0.50)
+  vr = verb(r + dl * 0.24, 0.72, 0.50)
+  out(dist(l + dr * 0.26 + vl * 0.20, 1.15), dist(r + dl * 0.26 + vr * 0.20, 1.15))
+}
+
+# ------------------------------------------------------------------ patterns
+# channels: 0 heart  1 seed  2 root  3 pad  4 bell
+pattern 0 rows=16 {
+  00: .        | .            | .        | A-3 4 30 | A-5 5 18
+  01: .
+  02: .
+  03: .
+  04: .        | .            | .        | .        | E-5 5 14
+  05: .
+  06: .
+  07: .
+  08: .        | .            | A-1 3 28 | .        | C-5 5 16
+  09: .
+  10: .
+  11: .
+  12: .        | .            | .        | .        | A-4 5 12
+  13: .
+  14: .
+  15: .
+}
+pattern 1 rows=16 {
+  00: C-2 1 30 | .            | A-1 3 30 | .        | A-4 5 20
+  01: .
+  02: .        | C-6 2 0C    | .        | .        | C-5 5 16
+  03: .
+  04: C-2 1 30 | .            | .        | .        | E-5 5 18
+  05: .
+  06: .        | C-6 2 0C    | .        | .        | A-5 5 14
+  07: .
+  08: C-2 1 30 | .            | .        | .        | E-5 5 18
+  09: .
+  10: .        | C-6 2 0C    | .        | .        | C-5 5 16
+  11: .
+  12: C-2 1 30 | .            | A-2 3 28 | .        | A-4 5 20
+  13: .
+  14: .        | C-6 2 10    | .        | .        | .
+  15: .
+}
+pattern 2 rows=16 {
+  00: C-2 1 30 | .            | F-1 3 30 | .        | F-4 5 20
+  01: .
+  02: .        | C-6 2 0C    | .        | .        | A-4 5 16
+  03: .
+  04: C-2 1 30 | .            | .        | .        | C-5 5 18
+  05: .
+  06: .        | C-6 2 0C    | .        | .        | F-5 5 14
+  07: .
+  08: C-2 1 30 | .            | .        | .        | C-5 5 18
+  09: .
+  10: .        | C-6 2 0C    | .        | .        | A-4 5 16
+  11: .
+  12: C-2 1 30 | .            | F-2 3 28 | .        | F-4 5 20
+  13: .
+  14: .        | C-6 2 10    | .        | .        | .
+  15: .
+}
+pattern 3 rows=16 {
+  00: C-2 1 32 | .            | C-2 3 30 | .        | C-5 5 20
+  01: .
+  02: .        | C-6 2 0E    | .        | .        | G-5 5 16
+  03: .
+  04: C-2 1 32 | C-6 2 10    | .        | .        | E-5 5 18
+  05: .
+  06: .        | C-6 2 0E    | .        | .        | B-4 5 14
+  07: .
+  08: C-2 1 32 | C-6 2 10    | G-1 3 30 | .        | G-4 5 20
+  09: .
+  10: .        | C-6 2 0E    | .        | .        | B-4 5 16
+  11: .
+  12: C-2 1 32 | C-6 2 10    | .        | .        | D-5 5 18
+  13: .
+  14: .        | C-6 2 12    | .        | .        | .
+  15: .
+}
+pattern 4 rows=16 {
+  00: .        | .            | F-2 3 28 | F-3 4 26 | A-4 5 14
+  01: .
+  02: .        | C-6 2 06    | .        | .        | C-5 5 12
+  03: .
+  04: .        | .            | .        | .        | E-5 5 14
+  05: .
+  06: .        | C-6 2 06    | .        | .        | A-4 5 10
+  07: .
+  08: .        | .            | C-2 3 26 | .        | F-5 5 14
+  09: .
+  10: .        | C-6 2 06    | .        | .        | C-5 5 12
+  11: .
+  12: .        | .            | .        | .        | A-5 5 12
+  13: .
+  14: .        | C-6 2 08    | .        | .        | .
+  15: .
+}
+pattern 5 rows=16 {
+  00: C-2 1 34 | .            | A-1 3 30 | .        | E-5 5 20
+  01: .
+  02: .        | C-6 2 0E    | .        | .        | A-5 5 18
+  03: .
+  04: C-2 1 34 | C-6 2 10    | .        | .        | C-6 5 18
+  05: .
+  06: .        | C-6 2 0E    | .        | .        | E-6 5 16
+  07: .
+  08: C-2 1 34 | C-6 2 10    | A-2 3 28 | .        | A-5 5 20
+  09: .
+  10: .        | C-6 2 0E    | .        | .        | C-6 5 18
+  11: .
+  12: C-2 1 34 | C-6 2 10    | .        | .        | E-6 5 16
+  13: .
+  14: C-2 1 20 | C-6 2 12    | .        | .        | A-5 5 14
+  15: .
+}
+
+# ------------------------------------------------------------------ helpers
+fn textline(s, px, py, sz) {
+  cx = (u - px) / sz
+  cy = (py - v) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn crawl(s, base, sz, spd) {
+  per = strlen(s) * sz
+  px = aspect - fract(time * spd / per) * per
+  cx = (u - px) / sz
+  i = floor(cx)
+  cy = (base - v) / sz
+  g = glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+  cx2 = (u - px - per) / sz
+  i2 = floor(cx2)
+  cy2 = (base - v) / sz
+  g2 = glyph(str(s, i2), fract(cx2), fract(cy2)) * step(0, cx2) * step(cx2, strlen(s)) * step(0, cy2) * step(cy2, 1)
+  return max(g, g2)
+}
+
+# ------------------------------------------------------------------ visuals
+uniform phase rayN kickE bellE seedE padE warm intro breathe
+
+frame {
+  rayN = evtl(rays)
+  kickE = exp(-trig(0) * 7)
+  bellE = exp(-trig(4) * 5)
+  seedE = exp(-trig(1) * 14)
+  padE = cenv(3)
+  phase = lbeat / llen
+  warm = smooth(0.58, 0.92, phase)
+  intro = 1 - smooth(0.0, 0.10, phase)
+  breathe = 0.90 + 0.10 * sin(beat * 0.32)
+}
+
+pixel {
+  f = 0.6
+  fy = -0.15
+  fdx = len(u, v - fy)
+
+  # Sky: indigo at the top, warm near the ground and around the focus.
+  ky = v * 0.5 + 0.5
+  tone = 0.04 + 0.30 * (1 - ky) + 0.22 * exp(-fdx * fdx * 2.4) + 0.03 * sin(time * 0.13)
+  tone = tone + 0.20 * padE * exp(-fdx * fdx * 1.2)
+  pal(dusk, tone)
+  mixpal(ember, tone + 0.18, warm * 0.85)
+
+  # The mirror itself: a parabola v = fy + u^2/(4f) opening upward.
+  ymir = fy + u * u / (4 * f)
+  dish = step(abs(u), 1.5) * step(fy, v) * exp(-((v - ymir) * (v - ymir)) / 0.00045)
+
+  # The focus point, burning with the music.
+  focus = exp(-fdx * fdx / 0.0011) * (0.35 + 2.0 * kickE + 1.4 * bellE + 0.5 * seedE)
+
+  lum = max(dish * 0.55, focus)
+
+  # Rays: pairs appear symmetric around the axis, walking outward as rayN grows.
+  repeat i 12 {
+    wt = clamp(rayN - i, 0, 1)
+    half = floor((i + 1) / 2)
+    side = 1 - 2 * (i % 2)
+    xr = side * (0.22 + 0.19 * half)
+    ym = fy + xr * xr / (4 * f)
+    di = abs(u - xr)
+    above = step(ym, v) * step(v, 1.0)
+    segIn = above * exp(-(di * di) / 0.0004)
+    sx = 0 - xr
+    syy = fy - ym
+    l2 = sx * sx + syy * syy
+    tt = clamp(((u - xr) * sx + (v - ym) * syy) / l2, 0, 1)
+    pxx = xr + tt * sx
+    pyy = ym + tt * syy
+    dr = len(u - pxx, v - pyy)
+    segRefl = exp(-(dr * dr) / 0.00062) * (0.22 + 1.85 * (1 - tt))
+    lum = max(lum, wt * (segIn * 0.22 + segRefl))
+  }
+
+  # The return path: an expanding ring that speaks on the beat near the end.
+  ringR = 0.12 + 0.55 * phase
+  ring = exp(-abs(fdx - ringR) * 18) * warm * (0.25 + 0.9 * kickE)
+  lum = lum + ring
+
+  # Colour the gathered light: warm core with a cool violet halo.
+  cadd(lum, lum * 0.76, lum * 0.40)
+  cadd(lum * 0.12, lum * 0.20, lum * 0.34)
+
+  # The word and the moral.
+  tg = textline(title, 0.0, 0.66, 0.46) * intro
+  cadd(tg * 0.9, tg * 0.82, tg * 0.62)
+  sg = crawl(scroll, -0.80, 0.13, 0.7) * 0.45
+  cadd(sg * 0.5, sg * 0.65, sg * 0.8)
+
+  # A converging afterimage: the previous frame crawls toward the focus.
+  xf = 0.5
+  yf = 0.5 + fy / 2
+  sx0 = xf + (x - xf) * 0.986
+  sy0 = yf + (y - yf) * 0.986
+  cprev(sx0, sy0, 0.62 * (0.55 + 0.45 * warm))
+
+  rr = len(u, v)
+  cmul((1 - 0.30 * rr * rr) * breathe)
+}

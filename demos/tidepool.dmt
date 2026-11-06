@@ -1,0 +1,354 @@
+# tidepool.dmt - a tidepool at dusk: caustic water web, pool stones, an anemone,
+# tide ripples and drifting feedback. Liquid ambient at 100 bpm, five 8-beat
+# sections: Am / F / C / G / Am(full).
+title TIDEPOOL
+song bpm=100 speed=6 rpb=4 channels=6 loop=0 volume=0.56
+order 0 1 2 3 4
+pan 0.45 0.5 0.35 0.62 0.70 0.30
+
+palette abyss {
+  0.00  0.010 0.030 0.080
+  0.18  0.020 0.100 0.240
+  0.38  0.030 0.360 0.460
+  0.56  0.120 0.700 0.720
+  0.70  0.550 0.920 0.850
+  0.82  0.980 0.990 0.920
+  0.92  0.950 0.450 0.380
+  1.00  0.010 0.030 0.080
+}
+palette coral {
+  0.00  0.020 0.010 0.050
+  0.28  0.300 0.050 0.180
+  0.52  0.800 0.150 0.300
+  0.72  0.950 0.550 0.250
+  0.88  1.000 0.900 0.600
+  1.00  0.020 0.010 0.050
+}
+
+# ----------------------------------------------------------------- instruments
+# 1 droplet - watery plink that lands sharp and slides home
+inst droplet {
+  e    = exp(-t * (12 + 18 * (1 - vel)))
+  bend = 1 + 0.9 * exp(-t * 26)
+  s    = sin(ph * tau * bend)
+  atk = hp(noise(), 5000) * exp(-t * 260) * 0.35
+  out((s * 0.85 + atk) * e * 0.4)
+}
+
+# 2 tide - the slow breathing sub
+inst tide {
+  e = env(0.02, 0.35, 0.6, 0.25)
+  s = sin(ph * tau) * 0.85 + saw(ph) * 0.12 + sin(ph * tau * 2) * 0.1
+  s = lp(s, 150 + 900 * e)
+  out(s * e * 0.55)
+}
+
+# 3 wash - a swell of filtered noise rolling over the pool
+inst wash {
+  e = env(0.5, 1.4, 0.65, 1.1)
+  n = noise()
+  f = 260 + 2600 * e + 1500 * p0 + 700 * sin(t * 0.53)
+  b = svf(n, f, 0.32)
+  out((b * 0.55 + r2 * 0.3) * e * 0.3)
+}
+
+# 4 shimmer - a warm detuned pad holding the chord
+inst shimmer {
+  e = env(0.6, 1.0, 0.75, 1.2)
+  a = sin(ph * tau + 0.5 * sin(ph * tau * 0.5 + t * 0.21))
+  d = saw(ph + 0.0013 * t) * 0.5 + saw(ph - 0.0011 * t) * 0.5
+  s = svf(a * 0.6 + d * 0.35, 520 + 700 * sin(t * 0.24), 0.22)
+  out(s * e * 0.24)
+}
+
+# 5 bell - two-op FM glint off the water
+inst bell {
+  i = 1.4 * exp(-t * 3.2)
+  s = sin(ph * tau + sin(ph * tau * 2.41) * i)
+  s = s + sin(ph * tau * 3.02 + i * 0.5) * exp(-t * 5) * 0.3
+  out(s * exp(-t * 2.1) * 0.26)
+}
+
+# 6 shell - soft percussion tick
+inst shell {
+  n = svf(noise(), 5200 + 2000 * exp(-t * 40), 0.5)
+  out((n * 0.4 + r2 * 0.4) * exp(-t * 60) * 0.2)
+}
+
+master {
+  dl = dly(l, 0.45, 0.35)
+  dr = dly(r, 0.675, 0.35)
+  vl = verb(l + dr * 0.22, 0.70, 0.50)
+  vr = verb(r + dl * 0.22, 0.70, 0.50)
+  out(dist(l + dr * 0.30 + vl * 0.18, 1.1), dist(r + dl * 0.30 + vr * 0.18, 1.1))
+}
+
+# channels: 0 droplet 1 tide 2 wash 3 shimmer 4 bell 5 shell
+pattern 0 rows=32 {
+  00: E-5 1 24 | A-2 2 36 | A-1 3 30 | A-3 4 24 | .      | .
+  01: .
+  02: .        | .        | .        | .        | .      | A-4 6 12
+  03: .
+  04: A-5 1 20 | .        | .        | .        | .      | .
+  05: .        | .        | .        | .        | C-6 5 22 | .
+  06: .        | A-1 2 26 | .        | .        | .      | .
+  07: .
+  08: C-6 1 22 | .        | .        | .        | .      | A-4 6 10
+  09: .
+  10: .        | .        | .        | C-4 4 20 | .      | .
+  11: .
+  12: E-5 1 24 | A-2 2 34 | .        | .        | E-6 5 20 | .
+  13: .
+  14: .        | .        | .        | .        | .      | A-4 6 12
+  15: .
+  16: A-4 1 20 | E-2 2 32 | .        | E-4 4 22 | .      | .
+  17: .
+  18: .        | .        | .        | .        | .      | E-5 6 10
+  19: .
+  20: C-6 1 22 | .        | .        | .        | A-5 5 22 | .
+  21: .
+  22: .        | A-1 2 24 | .        | .        | .      | .
+  23: .
+  24: E-6 1 24 | A-2 2 30 | .        | A-3 4 20 | .      | A-4 6 12
+  25: .
+  26: .        | .        | .        | .        | C-6 5 18 | .
+  27: .
+  28: A-5 1 18 | G-1 2 26 | .        | .        | .      | .
+  29: .
+  30: .        | .        | .        | .        | E-5 5 18 | A-4 6 10
+  31: .
+}
+
+pattern 1 rows=32 {
+  00: F-5 1 24 | F-2 2 36 | F-1 3 30 | F-3 4 24 | .      | .
+  01: .
+  02: .        | .        | .        | .        | .      | F-4 6 12
+  03: .
+  04: A-5 1 20 | .        | .        | .        | .      | .
+  05: .        | .        | .        | .        | A-5 5 22 | .
+  06: .        | F-1 2 26 | .        | .        | .      | .
+  07: .
+  08: C-6 1 22 | .        | .        | .        | .      | A-4 6 10
+  09: .
+  10: .        | .        | .        | A-3 4 20 | .      | .
+  11: .
+  12: A-5 1 24 | F-2 2 34 | .        | .        | C-6 5 20 | .
+  13: .
+  14: .        | .        | .        | .        | .      | C-5 6 12
+  15: .
+  16: C-5 1 20 | C-2 2 32 | .        | C-4 4 22 | .      | .
+  17: .
+  18: .        | .        | .        | .        | .      | F-4 6 10
+  19: .
+  20: F-6 1 22 | .        | .        | .        | F-6 5 22 | .
+  21: .
+  22: .        | F-1 2 24 | .        | .        | .      | .
+  23: .
+  24: C-6 1 24 | F-2 2 30 | .        | F-3 4 20 | .      | A-4 6 12
+  25: .
+  26: .        | .        | .        | .        | A-5 5 18 | .
+  27: .
+  28: A-5 1 18 | G-1 2 26 | .        | .        | .      | .
+  29: .
+  30: .        | .        | .        | .        | C-6 5 18 | C-5 6 10
+  31: .
+}
+
+pattern 2 rows=32 {
+  00: E-5 1 24 | C-2 2 36 | C-2 3 30 | E-4 4 24 | .      | .
+  01: .
+  02: .        | .        | .        | .        | .      | E-5 6 12
+  03: .
+  04: G-5 1 20 | .        | .        | .        | .      | .
+  05: .        | .        | .        | .        | E-6 5 22 | .
+  06: .        | C-3 2 26 | .        | .        | .      | .
+  07: .
+  08: E-6 1 22 | .        | .        | .        | .      | G-4 6 10
+  09: .
+  10: .        | .        | .        | G-4 4 20 | .      | .
+  11: .
+  12: C-6 1 24 | C-2 2 34 | .        | .        | G-5 5 20 | .
+  13: .
+  14: .        | .        | .        | .        | .      | E-5 6 12
+  15: .
+  16: G-4 1 20 | G-1 2 32 | .        | C-4 4 22 | .      | .
+  17: .
+  18: .        | .        | .        | .        | .      | C-5 6 10
+  19: .
+  20: E-5 1 22 | .        | .        | .        | E-6 5 22 | .
+  21: .
+  22: .        | C-2 2 24 | .        | .        | .      | .
+  23: .
+  24: G-5 1 24 | C-3 2 30 | .        | E-4 4 20 | .      | G-4 6 12
+  25: .
+  26: .        | .        | .        | .        | G-6 5 18 | .
+  27: .
+  28: C-6 1 18 | B-1 2 26 | .        | .        | .      | .
+  29: .
+  30: .        | .        | .        | .        | E-5 5 18 | E-5 6 10
+  31: .
+}
+
+pattern 3 rows=32 {
+  00: D-5 1 24 | G-1 2 36 | G-1 3 30 | G-3 4 24 | .      | .
+  01: .
+  02: .        | .        | .        | .        | .      | G-4 6 12
+  03: .
+  04: B-5 1 20 | .        | .        | .        | .      | .
+  05: .        | .        | .        | .        | B-5 5 22 | .
+  06: .        | G-2 2 26 | .        | .        | .      | .
+  07: .
+  08: D-6 1 22 | .        | .        | .        | .      | B-4 6 10
+  09: .
+  10: .        | .        | .        | B-3 4 20 | .      | .
+  11: .
+  12: B-5 1 24 | G-1 2 34 | .        | .        | D-6 5 20 | .
+  13: .
+  14: .        | .        | .        | .        | .      | D-5 6 12
+  15: .
+  16: G-4 1 20 | D-2 2 32 | .        | D-4 4 22 | .      | .
+  17: .
+  18: .        | .        | .        | .        | .      | G-4 6 10
+  19: .
+  20: D-6 1 22 | .        | .        | .        | B-5 5 22 | .
+  21: .
+  22: .        | G-1 2 24 | .        | .        | .      | .
+  23: .
+  24: B-5 1 24 | G-2 2 30 | .        | G-3 4 20 | .      | B-4 6 12
+  25: .
+  26: .        | .        | .        | .        | D-6 5 18 | .
+  27: .
+  28: G-5 1 18 | A-1 2 26 | .        | .        | .      | .
+  29: .
+  30: .        | .        | .        | .        | B-5 5 18 | D-5 6 10
+  31: .
+}
+
+pattern 4 rows=32 {
+  00: E-5 1 26 | A-2 2 38 | A-1 3 34 | A-3 4 26 | A-5 5 22 | A-4 6 12
+  01: .
+  02: .        | .        | .        | .        | .      | C-5 6 12
+  03: .
+  04: A-5 1 22 | .        | .        | .        | C-6 5 24 | .
+  05: .        | A-1 2 28 | .        | .        | .      | .
+  06: C-6 1 22 | .        | .        | .        | .      | A-4 6 10
+  07: .
+  08: E-6 1 22 | .        | .        | C-4 4 22 | .      | E-5 6 10
+  09: .
+  10: .        | .        | .        | .        | E-6 5 22 | .
+  11: .
+  12: C-6 1 24 | A-2 2 36 | .        | .        | A-6 5 22 | .
+  13: .
+  14: A-5 1 20 | .        | .        | .        | .      | A-4 6 12
+  15: .
+  16: E-5 1 22 | E-2 2 34 | .        | E-4 4 24 | .      | C-5 6 12
+  17: .
+  18: .        | .        | .        | .        | C-6 5 22 | .
+  19: .
+  20: A-5 1 22 | .        | .        | A-3 4 22 | E-6 5 22 | A-4 6 10
+  21: .
+  22: .        | A-1 2 26 | .        | .        | .      | .
+  23: .
+  24: C-6 1 24 | A-2 2 32 | .        | A-3 4 22 | A-5 5 20 | E-5 6 12
+  25: .
+  26: .        | .        | .        | .        | B-5 5 20 | .
+  27: .
+  28: E-6 1 22 | G-1 2 28 | .        | .        | C-6 5 22 | A-4 6 12
+  29: .
+  30: A-5 1 20 | A-2 2 34 | .        | .        | E-6 5 24 | C-5 6 12
+  31: G-5 1 18 | A-1 2 30 | .        | .        | A-5 5 20 | .
+}
+
+# --------------------------------------------------------------------- visuals
+uniform spin washu kickE glintE pipE hueA bloomA
+frame {
+  pipE   = exp(-trig(0) * 16)
+  kickE  = exp(-trig(1) * 5)
+  washu  = cenv(2)
+  glintE = exp(-trig(4) * 4)
+  bloomA = 0.5 + 0.5 * sin(beat * 0.16)
+  spin   = beat * 0.023 + 0.12 * sin(beat * 0.048)
+  hueA   = beat * 0.011
+}
+
+pixel {
+  # domain warp: two drifting fbm fields bend the water surface
+  f1 = fbm(u * 2.4 + beat * 0.013, v * 2.4 - beat * 0.011, 3)
+  f2 = fbm(u * 3.1 - beat * 0.017 + 4.7, v * 3.1 + beat * 0.015, 2)
+  wx = u + (f1 - 0.5) * 0.22 * (0.5 + washu)
+  wy = v + (f2 - 0.5) * 0.16 * (0.5 + washu) + 0.04 * sin(u * 6 + beat * 0.09)
+
+  rr = polar(wx, wy)
+  an = r1
+
+  # caustic web: interference of two ripple fields, bright at zero crossings
+  w1 = sin(wx * 11 + beat * 0.24) * sin(wy * 11 - beat * 0.2)
+  w2 = sin((wx + wy) * 6.5 + beat * 0.1)
+  caust = exp(-abs(w1 + 0.5 * w2) * 5)
+
+  # pool stones: voronoi tiles, dark grout between, id-shaded interiors
+  cd  = vor(wx * 4.5 + spin, wy * 4.5 - spin * 0.6)
+  cid = r1
+  edge  = exp(-cd * 26)
+  shade = 0.45 + 0.55 * cid
+
+  # tide ripples radiating outward from the anemone
+  rip = exp(-abs(sin(rr * 15 - beat * 0.5)) * 4.2)
+
+  # the anemone: folded tentacle spokes around a pulsing mouth
+  tent = exp(-abs(sin(an * 9 + rr * 8 - beat * 0.35)) * 2.0)
+  mask = 1 - smooth(0.10, 0.34, rr)
+  anem = (tent * 0.7 + exp(-rr * 9) * (1.0 + 2.0 * kickE)) * mask
+  anem = anem * (0.5 + 0.4 * glintE + 0.35 * pipE)
+
+  # glints: sparse twinkles scattered over the surface
+  hp  = hash(floor(wx * 110) * 3.1 + floor(wy * 110) * 7.7)
+  spk = step(0.982, hp) * (0.3 + 0.7 * (0.5 + 0.5 * sin(beat * 7 + hp * 60)) ^ 2)
+
+  tone = rr * 0.24 + hueA + cid * 0.30 + caust * 0.10 + washu * 0.18
+  pal(abyss, tone)
+  mixpal(coral, tone * 1.1, bloomA * 0.55)
+
+  light = 0.13 + shade * 0.35 + caust * (0.45 + 0.4 * washu)
+  light = light + rip * (0.2 + 0.25 * kickE) + edge * 0.25
+  light = light + anem + spk * 0.7
+  cmul(light * (0.8 + 0.35 * bloomA + 0.25 * kickE))
+  cadd(anem * 0.65, caust * (0.10 + 0.25 * pipE) + anem * 0.18, anem * 0.30 + rip * 0.07 * washu)
+
+  # feedback: gentle zoom + rotation smear, like surface drift
+  cprevz(0.5, 0.5, 1.003 + 0.010 * kickE + 0.008 * washu, 0.004 + 0.010 * kickE, 0.14 + 0.10 * washu)
+  cmul(1 - 0.30 * rr * rr)
+}
+
+post {
+  # underwater refraction wobble + slight chromatic split, then a soft bloom
+  ox = 1.4 * sin(y * 21 + beat * 2.3) * (0.3 + 0.7 * washu)
+  sp = 1.1 + 2.0 * glintE
+  c  = tap(ox, 0)
+  cG = r1
+  cB = r2
+  tR = tap(ox + sp, 0)
+  tB = tap(ox - sp, 0)
+  bB = r2
+  b1 = tap(2, 2)
+  b1g = r1
+  b1b = r2
+  b2 = tap(-2, 2)
+  b2g = r1
+  b2b = r2
+  b3 = tap(2, -2)
+  b3g = r1
+  b3b = r2
+  b4 = tap(-2, -2)
+  b4g = r1
+  b4b = r2
+  avR = (b1 + b2 + b3 + b4) * 0.25
+  avG = (b1g + b2g + b3g + b4g) * 0.25
+  avB = (b1b + b2b + b3b + b4b) * 0.25
+  kb  = 0.18 + 0.30 * bloomA + 0.2 * glintE
+  R = mix(tR, avR, kb)
+  G = mix(cG, avG, kb)
+  B = mix(mix(cB, bB, 0.8), avB, kb)
+  rgb(R, G, B)
+  cmul(1 - 0.32 * (u * u + v * v))
+}

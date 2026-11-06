@@ -1,0 +1,854 @@
+# carnival.dmt - a waltz for a fairground that is a little too quiet.
+# A wide shot of a lantern-lit carnival under a moon with a painted face,
+# a match cut into that face during the bridge, then back for the last dance.
+title CARNIVAL
+song bpm=120 speed=6 rpb=4 channels=7 loop=0 volume=0.55 scale=2 dither=1
+order 0 1 2 3 4 5 6 2 3 4 5 7 7 8 8 9 9 10 11 9 10 11 12 13
+pan 0.50 0.46 0.58 0.40 0.50 0.62 0.50
+
+text ttitle "CARNIVAL"
+
+# ------------------------------------------------------------------ instruments
+# a soft tuba for the oom of the waltz
+inst tuba {
+  e = env(0.004, 0.10, 0.45, 0.14)
+  s = sin(ph * tau) * 0.95 + tri(ph * 2.0) * 0.15 + saw(ph) * 0.18
+  s = lp(s, 180 + 700 * e * e)
+  out(dist(s * e * 1.2, 1.4) * 0.52)
+}
+# steam calliope: root + third (p0 picks major) + fifth, slightly sharp
+inst calliope {
+  e = env(0.018, 0.09, 0.55, 0.16)
+  third = 1.1892 + 0.0702 * p0
+  s = usaw(freq, 0.075) * 0.55
+  s = s + usaw(freq * third, 0.095) * 0.34
+  s = s + usaw(freq * 1.4983, 0.12) * 0.28
+  s = s + sin(ph * tau + 0.06 * sin(t * 5.1)) * 0.40
+  s = svf(s, 380 + 1600 * e + 260 * sin(t * 7.3), 0.22)
+  s = s * (0.82 + 0.18 * sin(t * tau * 6.2))
+  out(dist(s * e * 1.1, 1.5) * 0.24)
+}
+# a music box with a worn comb
+inst musicbox {
+  e = exp(-t * 2.4)
+  m = sin(ph * tau * 3.01 + 0.5 * sin(t * 2.7)) * exp(-t * 4.2)
+  s = sin(ph * tau + m * 1.25) + 0.30 * sin(ph * tau * 2.005)
+  click = hp(noise(), 3800) * exp(-t * 160) * 0.18
+  out((s * e + click) * 0.22)
+}
+# the thing that sings in the bridge
+inst theremin nna=continue {
+  e = env(0.28, 0.35, 0.80, 0.45)
+  v = 0.22 * sin(t * 5.7) + 0.08 * sin(t * 2.1)
+  s = sin(ph * tau + v) + 0.16 * sin(ph * tau * 2.002 - v * 1.4)
+  s = svf(s, 1100 + 900 * e, 0.40)
+  out(s * e * 0.20)
+}
+inst kick {
+  f = 52 + 220 * exp(-t * 28)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 8)
+  thump = sin($p * tau * 2.01) * exp(-t * 22) * 0.20
+  click = lp(noise(), 1500) * exp(-t * 110) * 0.18
+  out(dist((body + thump + click) * 1.35, 1.25) * 0.62)
+}
+# brushes on a snare, played as a whisper
+inst brush {
+  e = exp(-t * (7 + 5 * (1 - vel)))
+  n = svf(noise(), 1800 + 2400 * vel, 0.5)
+  body = sin(tau * 197 * t) * exp(-t * 26) * 0.18
+  out((n * 0.9 + body) * e * 0.30)
+}
+inst chime {
+  e = exp(-t * 1.35)
+  m = sin(ph * tau * 2.76 + 0.4) * 2.0 * exp(-t * 2.0)
+  s = sin(ph * tau + m) + 0.28 * sin(ph * tau * 3.01)
+  out(s * e * 0.17)
+}
+# a low harmonium drone that never quite settles
+inst drone nna=continue {
+  e = env(1.2, 1.4, 0.80, 1.8)
+  s = usaw(freq * 0.5, 0.22) * 0.35 + sin(ph * tau * 0.5) * 0.55 + sin(ph * tau) * 0.22
+  s = svf(s, 150 + 180 * sin(t * 0.17) + 260 * p0, 0.22)
+  out(s * e * 0.20)
+}
+
+master {
+  # short modulated delays: a seasick chorus on the whole fairground
+  cl = dly(l, 0.013 + 0.0035 * sin(t * 0.63), 0.0)
+  cr = dly(r, 0.017 + 0.0040 * sin(t * 0.71 + 1.7), 0.0)
+  dl = dly(l + cr * 0.25, 0.371, 0.40)
+  dr = dly(r + cl * 0.25, 0.487, 0.40)
+  w = verb(l * 0.5 + r * 0.5, 0.84, 0.50)
+  out(dist(l * 0.90 + cl * 0.22 + dr * 0.18 + w * 0.18, 1.10),
+      dist(r * 0.90 + cr * 0.22 + dl * 0.18 + w * 0.18, 1.10))
+}
+
+# ------------------------------------------------------------------ 0: first light
+pattern 0 rows=12 {
+  00: . | . | D-6 3 24 ... | . | . | . | D-2 7 26 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | . | . | . | . | . | A-2 7 20 ...
+  05: . | . | . | . | . | . | .
+  06: . | . | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: . | . | A-5 3 20 ... | . | . | C-6 6 10 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 1: the gate opens
+pattern 1 rows=12 {
+  00: D-2 1 26 ... | D-4 2 14 S00 | D-5 3 24 ... | . | C-2 4 14 ... | . | D-2 7 22 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | D-4 2 12 S00 | . | . | . | C-5 6 12 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: A-1 1 22 ... | D-4 2 14 S00 | A-5 3 20 ... | . | . | C-5 6 10 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 2: Dm, the waltz
+pattern 2 rows=12 {
+  00: D-2 1 36 ... | D-4 2 20 S00 | D-5 3 26 ... | . | C-2 4 20 ... | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | D-4 2 18 S00 | F-5 3 22 ... | . | . | C-5 6 15 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | A-5 3 20 ... | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: A-1 1 30 ... | D-4 2 20 S00 | D-6 3 22 ... | . | . | C-5 6 13 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | C-6 3 17 ... | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 3: Gm
+pattern 3 rows=12 {
+  00: G-2 1 36 ... | G-4 2 20 S00 | G-5 3 26 ... | . | C-2 4 20 ... | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | G-4 2 18 S00 | A#5 3 22 ... | . | . | C-5 6 15 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | D-6 3 20 ... | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: D-2 1 30 ... | G-4 2 20 S00 | G-6 3 20 ... | . | . | C-5 6 13 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | F-6 3 17 ... | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 4: A7
+pattern 4 rows=12 {
+  00: A-2 1 36 ... | A-4 2 20 SFF | A-5 3 26 ... | . | C-2 4 20 ... | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | A-4 2 18 SFF | C#6 3 22 ... | . | . | C-5 6 15 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | E-6 3 20 ... | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: E-2 1 30 ... | A-4 2 20 SFF | A-6 3 19 ... | . | . | C-5 6 13 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | G-6 3 16 ... | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 5: Dm, answer
+pattern 5 rows=12 {
+  00: D-2 1 36 ... | D-4 2 20 S00 | D-6 3 24 ... | . | C-2 4 20 ... | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | A-5 3 19 ... | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | D-4 2 18 S00 | F-5 3 22 ... | . | . | C-5 6 15 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | E-5 3 19 ... | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: A-1 1 30 ... | D-4 2 20 S00 | D-5 3 20 ... | . | . | C-5 6 13 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | F-5 3 17 ... | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 6: build
+pattern 6 rows=12 {
+  00: D-2 1 38 ... | D-4 2 22 S00 | D-6 3 26 ... | . | C-2 4 26 ... | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | F-6 3 19 ... | . | C-2 4 12 ... | . | .
+  03: . | . | . | . | . | C-6 6 13 ... | .
+  04: . | D-4 2 20 S00 | A-6 3 22 ... | . | . | . | .
+  05: . | . | . | . | . | . | .
+  06: . | . | G-6 3 19 ... | . | C-2 4 12 ... | C-6 6 11 ... | .
+  07: . | . | . | . | . | . | .
+  08: A-1 1 34 ... | D-4 2 22 S00 | F-6 3 20 ... | . | . | . | .
+  09: . | . | . | . | . | . | .
+  10: . | . | D-6 3 18 ... | . | C-2 4 14 ... | C-6 6 11 ... | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 7: the mask leans in
+pattern 7 rows=12 {
+  00: D-2 1 30 ... | . | D-6 3 18 ... | A-5 4 26 ... | C-2 4 16 ... | . | D-2 7 22 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | C#6 3 14 ... | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | . | C-6 3 13 ... | . | . | . | .
+  05: . | . | . | . | . | . | .
+  06: . | . | A#5 3 12 ... | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: . | . | A-5 3 12 ... | F-5 4 24 305 | . | . | A-2 7 18 ...
+  09: . | . | . | . | . | . | .
+  10: . | . | G#5 3 10 ... | . | . | . | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 8: the wrong key
+pattern 8 rows=12 {
+  00: D-2 1 32 ... | D-4 2 16 S00 | D-6 3 18 ... | D-6 4 28 ... | C-2 4 18 ... | . | D-2 7 22 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: D#2 1 30 ... | . | C-6 3 12 ... | . | . | . | .
+  04: . | . | . | . | . | . | .
+  05: . | . | . | . | . | . | .
+  06: E-2 1 30 ... | E-4 2 14 S00 | A#5 3 12 ... | A-5 4 26 304 | . | C-5 6 9 ... | .
+  07: . | . | . | . | . | . | .
+  08: . | . | . | . | . | . | .
+  09: F-2 1 30 ... | F-4 2 14 SFF | A-5 3 10 ... | . | . | . | E-2 7 16 ...
+  10: . | . | . | . | . | . | .
+  11: . | . | . | off | . | . | .
+}
+# ------------------------------------------------------------------ 9: climax, Dm
+pattern 9 rows=12 {
+  00: D-2 1 40 ... | D-4 2 24 S00 | D-6 3 28 ... | . | C-2 4 28 ... | C-5 6 18 ... | D-2 7 24 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | A-6 3 21 ... | . | C-2 4 12 ... | . | .
+  03: . | . | . | . | . | . | .
+  04: . | D-4 2 22 S00 | F-6 3 24 ... | . | . | C-5 6 20 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | A-6 3 21 ... | . | C-2 4 12 ... | C-6 6 13 ... | .
+  07: . | . | . | . | . | . | .
+  08: A-1 1 36 ... | D-4 2 24 S00 | D-7 3 22 ... | . | C-2 4 22 ... | C-5 6 18 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | E-6 3 19 ... | . | . | C-6 6 15 ... | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 10: climax, Gm
+pattern 10 rows=12 {
+  00: G-2 1 40 ... | G-4 2 24 S00 | G-6 3 28 ... | . | C-2 4 28 ... | C-5 6 18 ... | .
+  01: . | . | . | . | . | . | .
+  02: . | . | D-7 3 19 ... | . | C-2 4 12 ... | . | .
+  03: . | . | . | . | . | . | .
+  04: . | G-4 2 22 S00 | A#6 3 24 ... | . | . | C-5 6 20 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | D-7 3 19 ... | . | C-2 4 12 ... | C-6 6 13 ... | .
+  07: . | . | . | . | . | . | .
+  08: D-2 1 36 ... | G-4 2 24 S00 | G-6 3 20 ... | . | C-2 4 22 ... | C-5 6 18 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | A#6 3 17 ... | . | . | C-6 6 15 ... | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 11: climax, A7
+pattern 11 rows=12 {
+  00: A-2 1 40 ... | A-4 2 24 SFF | A-6 3 28 ... | . | C-2 4 28 ... | C-5 6 18 ... | .
+  01: . | . | . | . | . | . | .
+  02: . | . | C#6 3 19 ... | . | C-2 4 12 ... | . | .
+  03: . | . | . | . | . | . | .
+  04: . | A-4 2 22 SFF | E-6 3 24 ... | . | . | C-5 6 20 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | C#6 3 19 ... | . | C-2 4 12 ... | C-6 6 13 ... | .
+  07: . | . | . | . | . | . | .
+  08: E-2 1 36 ... | A-4 2 24 SFF | A-6 3 20 ... | . | C-2 4 22 ... | C-5 6 18 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | E-6 3 17 ... | . | . | C-6 6 15 ... | .
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 12: last chord
+pattern 12 rows=12 {
+  00: D-2 1 34 ... | D-4 2 22 S00 | D-6 3 24 ... | . | C-2 4 24 ... | . | D-2 7 24 ...
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | D-4 2 18 S00 | F-6 3 18 ... | . | . | . | A-2 7 18 ...
+  05: . | . | . | . | . | . | .
+  06: . | . | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: . | off | A-6 3 16 ... | . | . | C-6 6 14 ... | .
+  09: . | . | . | . | . | . | .
+  10: off | . | D-7 3 14 ... | . | . | . | off
+  11: . | . | . | . | . | . | .
+}
+# ------------------------------------------------------------------ 13: ringing out
+pattern 13 rows=12 {
+  00: . | . | D-6 3 16 ... | . | . | . | .
+  01: . | . | . | . | . | . | .
+  02: . | . | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | . | . | . | . | C-6 6 12 ... | .
+  05: . | . | . | . | . | . | .
+  06: . | . | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: . | . | A-6 3 14 ... | . | . | C-6 6 10 ... | .
+  09: . | . | . | . | . | . | .
+  10: . | . | . | . | . | . | .
+  11: . | . | D-7 3 12 ... | . | . | . | .
+}
+
+# ------------------------------------------------------------------ timeline
+timeline {
+  0:00  scn=0 glow=0.12 faceA=0.00 smile=0.15 eye=0.95 titleA=1.0 conf=0.0 warp=0.0
+  2:00  titleA=0.0
+  1:00  glow=0.22
+  2:00  glow=0.38 faceA=0.16
+  3:00  glow=0.52
+  5:00  faceA=0.24
+  8:00  glow=0.66 faceA=0.30
+  10:00 glow=0.74 faceA=0.36 warp=0.0
+  11:00 scn=1 smile=0.30 eye=0.05 titleA=0.0 warp=0.35
+  11:06 smile=0.38 eye=0.45
+  12:00 eye=0.90 smile=0.50
+  13:00 eye=1.00 smile=0.62
+  13:06 eye=0.06
+  13:09 eye=1.05 smile=0.78
+  14:00 eye=0.38 smile=0.94
+  14:06 eye=1.15 smile=1.10 warp=0.90 conf=0.0
+  15:00 scn=0 glow=0.82 faceA=0.55 smile=0.60 eye=1.00 conf=0.25 warp=0.00
+  17:00 glow=1.00 conf=0.55
+  19:00 glow=1.15 conf=0.90
+  21:00 glow=1.02 titleA=0.0
+  21:04 titleA=0.85
+  22:00 titleA=1.00 conf=0.65
+  23:00 glow=0.82 titleA=1.00 conf=0.20
+  23:08 glow=0.66
+}
+
+# ------------------------------------------------------------------ visual helpers
+uniform zoom camx camy roll glow faceA smile eye titleA scn flash conf warp wheelA kickE
+
+fn word(s, py, sz, a, xo) {
+  # centred banner type with a slow hand-painted wobble
+  n = strlen(s)
+  cx = (u - xo + n * sz * 0.5) / sz
+  cy = (py - v + 0.012 * sin(cx * 1.1 + time * 1.7)) / sz
+  i = floor(cx)
+  g = glyph(str(s, i), fract(cx), fract(cy))
+  return g * a * step(0.0, cx) * step(cx, n) * step(0.0, cy) * step(cy, 1.0)
+}
+
+fn tent(px, py, cx, w, eave, apex, base, seed) {
+  # a striped big top with bulbs on the seams and a lit doorway
+  bx = px - cx
+  ry = (py - eave) / max(apex - eave, 0.001)
+  halfw = w * 0.5 * (1.0 - ry)
+  roof = step(0.0, ry) * step(ry, 1.0) * step(abs(bx), halfw)
+  wall = step(base, py) * step(py, eave) * step(abs(bx), w * 0.42)
+  m = max(roof, wall)
+  sf = fract(bx / (w * 0.105) + seed)
+  stp = step(0.5, sf)
+  pr = mix(0.50, 0.88, stp)
+  pg = mix(0.055, 0.66, stp)
+  pb = mix(0.070, 0.44, stp)
+  sh = 0.42 + 0.58 * clamp(0.5 - bx / w, 0.0, 1.0)
+  pr = pr * sh
+  pg = pg * sh
+  pb = pb * sh
+  rimm = exp(-abs(abs(bx) - halfw) * 60.0) * roof
+  pr = pr * (1.0 - 0.55 * rimm)
+  pg = pg * (1.0 - 0.55 * rimm)
+  pb = pb * (1.0 - 0.55 * rimm)
+  wsf = 0.5 + 0.5 * sin(bx / (w * 0.05) * pi)
+  wr = 0.15 + 0.08 * wsf
+  wg = 0.032 + 0.022 * wsf
+  wb = 0.038 + 0.024 * wsf
+  fr = pr * roof + wr * wall
+  fg = pg * roof + wg * wall
+  fb = pb * roof + wb * wall
+  # cream valance at the eave
+  val = step(py, eave) * step(eave - 0.030, py) * step(abs(bx), w * 0.46)
+  fr = mix(fr, 0.80, val)
+  fg = mix(fg, 0.62, val)
+  fb = mix(fb, 0.38, val)
+  cmul(1.0 - m)
+  cadd(fr * m, fg * m, fb * m)
+  ad = len(bx / (w * 0.100), (py - (base + w * 0.13)) / (w * 0.140))
+  door = (1.0 - smooth(0.55, 0.92, ad)) * wall
+  cmul(1.0 - 0.90 * door)
+  ring = exp(-abs(ad - 1.0) * 14.0) * wall
+  cadd(ring * 1.20, ring * 0.55, ring * 0.15)
+  el = exp(-abs(py - eave) * 150.0) * step(abs(bx), w * 0.46)
+  cadd(el * 0.50, el * 0.34, el * 0.14)
+  bedge = exp(-abs(abs(bx) - halfw) * 70.0) * roof
+  bd2 = step(0.30, sin(bx * 190.0 + time * 2.2 + seed * 6.0))
+  bulb = bedge * bd2
+  cadd(bulb * 1.25, bulb * 0.78, bulb * 0.34)
+  # a pennant on the peak
+  fgx = px - (cx + 0.018 * sin(time * 1.9 + seed))
+  fgy = py - (apex + 0.022)
+  pole = exp(-abs(fgx) * 260.0) * step(0.0, fgy) * step(fgy, 0.075)
+  flag = step(0.0, fgy) * step(fgy, 0.052) * step(abs(fgx), 0.048 * (1.0 - fgy / 0.052))
+  cadd(pole * 0.35, pole * 0.30, pole * 0.22)
+  cadd(flag * 0.70, flag * 0.16, flag * 0.15)
+}
+
+fn lantstring(px, py, y0, sag, sp, sz, seed, bright) {
+  # a whole catenary of paper lanterns in one evaluation
+  u01 = clamp((px + 1.75) / 3.5, 0.0, 1.0)
+  wy = y0 - sag * sin(pi * u01)
+  lx = (px + 1.75) / sp
+  id = floor(lx)
+  sxp = (id + 0.5 + 0.10 * (hash(id * 3.17 + seed) - 0.5)) * sp - 1.75
+  wi = clamp((sxp + 1.75) / 3.5, 0.0, 1.0)
+  wy2 = y0 - sag * sin(pi * wi)
+  szz = sz * (0.78 + 0.44 * hash(id * 5.13 + seed + 2.0))
+  sway = 0.012 * sin(time * 0.9 + id * 1.7)
+  ddx = px - sxp
+  ddy = py - (wy2 - szz * 1.05 + sway)
+  d = len(ddx, ddy * 1.18)
+  body = 1.0 - smooth(szz * 0.78, szz, d)
+  glow = exp(-d * 24.0) * 0.26 + exp(-d * 6.0) * 0.040
+  rib = 0.70 + 0.30 * cos(ddx / max(szz, 0.001) * pi * 2.0)
+  fl = 0.85 + 0.15 * sin(time * 2.7 + id * 2.3) + 0.10 * bright
+  cadd((glow + body * 0.85 * rib) * bright * fl,
+       (glow * 0.40 + body * 0.50 * rib) * bright * fl,
+       (glow * 0.11 + body * 0.15 * rib) * bright * fl)
+  wire = exp(-abs(py - wy) * 420.0) * 0.08 * bright
+  cadd(wire, wire * 0.8, wire * 0.5)
+}
+
+fn crowd(px, py, base, hmin, hmax, cnt, seed, dark) {
+  cg = (px + 1.7) * (cnt / 3.4)
+  id = floor(cg)
+  fx = (fract(cg) - 0.5) * (3.4 / cnt) + (hash(id * 2.11 + seed) - 0.5) * (0.55 / cnt)
+  hh = hmin + (hmax - hmin) * hash(id * 7.31 + seed)
+  hh = hh * (1.0 + 0.30 * step(0.93, hash(id * 13.7 + seed)))
+  by = base + 0.04 * hash(id * 3.77 + seed)
+  sw = 0.008 * sin(time * 0.9 + id * 2.1)
+  hd = len((fx - sw) / (hh * 0.20), (py - (by + hh + hh * 0.20)) / (hh * 0.22))
+  head = 1.0 - smooth(0.80, 1.0, hd)
+  body = 1.0 - smooth(0.78, 1.0, len(fx / (hh * 0.52), (py - (by + hh * 0.48)) / (hh * 0.56)))
+  sil = max(head, body)
+  sil = sil * step(0.10, hash(id * 11.3 + seed))
+  cmul(1.0 - sil * dark)
+}
+
+# ------------------------------------------------------------------ frame
+frame {
+  glowT = evtl(glow)
+  glow = glowT * (0.88 + 0.12 * sin(time * 0.73)) + 0.28 * cenv(1) + 0.10 * cenv(0)
+  faceA = evtl(faceA)
+  smile = evtl(smile)
+  eye = evtl(eye)
+  titleA = evtl(titleA)
+  conf = evtl(conf)
+  warp = evtl(warp)
+  kickE = exp(-trig(4) * 9.0) * step(0.40, vel(4))
+  prog = clamp(lbeat / max(llen, 1.0), 0.0, 1.0)
+  zoom = 1.0 + 0.15 * prog + 0.012 * kickE
+  camx = 0.035 * prog + 0.012 * sin(time * 0.13)
+  camy = -0.010 * prog + 0.008 * sin(time * 0.19)
+  roll = 0.010 * sin(time * 0.11) + 0.004 * sin(beat * 0.5)
+  wheelA = time * 0.20 + 0.06 * sin(time * 0.07)
+  scn = evt(scn)
+  ps = $scn
+  $scn = scn
+  cut = step(0.5, abs(scn - ps))
+  flash = max(cut, flash * 0.70)
+  select(scn)
+}
+
+# ------------------------------------------------------------------ the fairground
+pixel fair {
+  prog = clamp(lbeat / max(llen, 1.0), 0.0, 1.0)
+  zz = zoom * (1.0 + 0.004 * sin(time * 0.9) + 0.014 * kickE)
+  qx = rot(u, v, roll + 0.012 * sin(time * 0.17)) * zz + camx + 0.05 * warp * sin(v * 4.0 + time * 0.7)
+  qy = r1 * zz + camy + 0.04 * warp * sin(u * 5.0 - time * 0.6)
+
+  # ---------------- wet ground mirrors everything above the horizon
+  hor = -0.18
+  gnd = step(qy, hor)
+  rr = hor - qy
+  qx = qx + gnd * (0.020 * sin(qy * 17.0 + time * 1.1) + 0.009 * sin(qy * 37.0 - time * 1.9)) * smooth(0.02, 0.22, rr)
+  rip = (0.011 * sin(qx * 5.5 + time * 1.2) + 0.005 * sin(qx * 15.0 - time * 2.0)) * smooth(0.0, 0.10, rr)
+  sy = mix(qy, 2.0 * hor - qy, gnd) + rip * gnd
+
+  # ---------------- sky: indigo night over a narrow ember sunset
+  hgt = clamp((sy - hor) * 0.72, 0.0, 1.0)
+  skyR = mix(mix(0.30, 0.052, smooth(0.0, 0.30, hgt)), 0.006, smooth(0.30, 1.0, hgt))
+  skyG = mix(mix(0.095, 0.020, smooth(0.0, 0.30, hgt)), 0.008, smooth(0.30, 1.0, hgt))
+  skyB = mix(mix(0.060, 0.062, smooth(0.0, 0.30, hgt)), 0.028, smooth(0.30, 1.0, hgt))
+  bnd = exp(-max(0.0, sy - hor) * 13.0) * (0.35 + 0.65 * glow)
+  skyR = skyR + bnd * 0.36
+  skyG = skyG + bnd * 0.13
+  skyB = skyB + bnd * 0.045
+  cn = fbm(qx * 1.5 + time * 0.010, sy * 2.2 + 1.0 + time * 0.005, 3)
+  ce = smooth(0.50, 0.66, cn) * smooth(0.03, 0.18, hgt) * (1.0 - smooth(0.70, 1.0, hgt))
+  crm = smooth(0.60, 0.655, cn) * (1.0 - smooth(0.655, 0.72, cn))
+  skyR = mix(skyR, 0.022, ce * 0.65) + crm * (0.14 + 0.55 * bnd)
+  skyG = mix(skyG, 0.014, ce * 0.65) + crm * (0.06 + 0.24 * bnd)
+  skyB = mix(skyB, 0.042, ce * 0.65) + crm * (0.07 + 0.10 * bnd)
+  rgb(skyR, skyG, skyB)
+
+  # stars
+  gx = qx * 60.0 + 9.0
+  gy = sy * 34.0 + 3.0
+  ix = floor(gx)
+  iy = floor(gy)
+  hs = hash(ix * 1.31 + iy * 7.77)
+  st = step(0.958, hs) * (1.0 - ce) * smooth(0.18, 0.50, hgt)
+  sdx = fract(gx) - 0.5 - (hash(ix + iy * 2.3) - 0.5) * 0.5
+  sdy = fract(gy) - 0.5 - (hash(ix * 3.7 + iy) - 0.5) * 0.5
+  sd = len(sdx, sdy)
+  sdot = (1.0 - smooth(0.05, 0.15 + 0.10 * hs, sd)) * st
+  tw = 0.55 + 0.45 * sin(time * (1.5 + 3.0 * hs) + hs * 40.0)
+  cadd(sdot * tw * 0.95, sdot * tw * 0.90, sdot * tw * 0.78)
+
+  # ---------------- the moon has a face
+  mx = -0.62
+  my = 0.32
+  Rm = 0.32
+  mdx = qx - mx
+  mdy = sy - my
+  md = len(mdx, mdy)
+  disc = 1.0 - smooth(Rm - 0.004, Rm + 0.002, md)
+  nz = sqrt(max(0.0, 1.0 - (md / Rm) * (md / Rm)))
+  mar = fbm(qx * 4.4 + 2.0, sy * 4.4 - 1.0, 2)
+  mlum = (0.58 + 0.42 * nz) * (0.82 + 0.22 * mar) * (0.92 + 0.08 * glow)
+  mr = 1.00 * mlum
+  mg = 0.90 * mlum
+  mb = 0.68 * mlum
+  hal = exp(-max(0.0, md - Rm) * 8.0) * (0.16 + 0.10 * glow)
+  cadd(hal * 0.80, hal * 0.52, hal * 0.26)
+  cmul(1.0 - disc)
+  cadd(mr * disc, mg * disc, mb * disc)
+  # eyes
+  ex = abs(mdx) - 0.112
+  ey = mdy - 0.070
+  eop = clamp(eye, 0.04, 1.3)
+  ed = len(ex / 0.082, ey / (0.034 * eop))
+  em = (1.0 - smooth(0.66, 1.0, ed)) * disc
+  cmul(1.0 - em * faceA * 0.96)
+  gl = (1.0 - smooth(0.0, 0.012, len(mdx - 0.065, mdy - 0.082))) * disc
+  cadd(gl * faceA * 0.95, gl * faceA * 0.88, gl * faceA * 0.62)
+  # smile
+  rho = len(mdx, mdy - 0.125)
+  mum = exp(-abs(rho - 0.250) * 44.0) * step(abs(mdx), 0.080 + 0.100 * smile) * step(mdy, 0.060) * disc
+  cmul(1.0 - mum * faceA * 0.92)
+  # nose
+  nm = exp(-abs(len(mdx * 1.8, mdy + 0.010)) * 24.0) * disc
+  cmul(1.0 - nm * faceA * 0.30)
+  # two painted cheeks
+  ck = exp(-len((mdx - 0.17) / 0.055, (mdy + 0.045) / 0.055) * 2.0) * faceA
+  cmul(1.0 - ck * 0.16)
+
+  # ---------------- paper lanterns rising behind the tents
+  lgx = qx * 4.6
+  lgy = (sy - time * 0.030) * 3.0
+  li = floor(lgx)
+  lj = floor(lgy)
+  lh = hash(li * 17.13 + lj * 5.31)
+  lfx = fract(lgx) - 0.5 - (hash(li * 3.17 + lj * 7.71) - 0.5) * 0.55
+  lfy = fract(lgy) - 0.5 - (hash(li * 5.91 + lj * 2.33) - 0.5) * 0.55
+  ld = len(lfx * 0.7, lfy * 1.2)
+  lan = step(0.72, lh) * (1.0 - smooth(0.03, 0.17, ld)) * smooth(0.10, 0.35, hgt)
+  lgl = exp(-ld * 9.0) * 0.05 * smooth(0.10, 0.35, hgt)
+  cadd((lan + lgl * 0.6) * 1.00, (lan * 0.45 + lgl * 0.3) * 0.90, (lan * 0.15 + lgl * 0.1) * 0.90)
+
+  # ---------------- the wheel
+  fwx = qx - 1.02
+  fwy = sy - 0.18
+  fwr = len(fwx, fwy)
+  fwa = atan2(fwy, fwx)
+  spa = abs(fract(fwa / tau * 10.0 + wheelA / tau) - 0.5)
+  spd = spa * fwr * 1.5
+  spoke = exp(-spd * 150.0) * step(fwr, 0.335) * step(0.028, fwr)
+  rim = exp(-abs(fwr - 0.335) * 160.0)
+  rim2 = exp(-abs(fwr - 0.295) * 190.0) * 0.45
+  hub = exp(-fwr * 140.0)
+  cabg = exp(-abs(fwr - 0.335) * 18.0) * exp(-spd * 26.0)
+  bid = floor(fwa / tau * 10.0 + wheelA / tau)
+  bfl = 0.62 + 0.38 * sin(time * 2.4 + bid * 1.9)
+  cadd((spoke * 0.22 + rim * 0.62 + rim2 * 0.22 + hub * 0.55) * 0.80,
+       (spoke * 0.13 + rim * 0.36 + rim2 * 0.12 + hub * 0.40) * 0.80,
+       (spoke * 0.05 + rim * 0.13 + rim2 * 0.05 + hub * 0.15) * 0.80)
+  cadd(cabg * 1.20 * bfl, cabg * 0.55 * bfl, cabg * 0.16 * bfl)
+  cadd(exp(-abs(fwr - 0.335) * 9.0) * 0.045, exp(-abs(fwr - 0.335) * 9.0) * 0.018, 0.0)
+
+  # ---------------- tents
+  tent(qx, sy, 0.12, 0.96, -0.02, 0.36, -0.22, 0.08)
+  tent(qx, sy, -1.22, 0.58, -0.06, 0.14, -0.20, 0.31)
+  tent(qx, sy, 1.62, 0.62, -0.08, 0.12, -0.20, 0.55)
+
+  # ---------------- strings (part of the world, so they reflect)
+  lantstring(qx, sy, 0.58, 0.11, 0.46, 0.026, 1.7, 1.0)
+  lantstring(qx, sy, 0.30, 0.09, 0.60, 0.022, 4.3, 0.85)
+
+  # ---------------- paving, reflection and ripples
+  depth = smooth(0.0, 0.16, rr)
+  pz = 1.0 / (rr + 0.012)
+  wxx = qx * pz * 0.42
+  wzz = pz * 0.42
+  ta = abs(fract(wxx * 1.1) - 0.5)
+  tb = abs(fract(wzz * 1.1) - 0.5)
+  ln = clamp((1.0 - smooth(0.0, 0.035, ta)) + (1.0 - smooth(0.0, 0.035, tb)), 0.0, 1.0) * smooth(0.02, 0.16, rr)
+  gr = 0.030 + 0.018 * sin(wxx * 3.0) - 0.016 * ln
+  gg = 0.024 + 0.010 * sin(wxx * 3.0) - 0.012 * ln
+  gb = 0.032 + 0.012 * cos(wxx * 2.0) - 0.012 * ln
+  rcr = cget(0)
+  rcg = cget(1)
+  rcb = cget(2)
+  refR = rcr * 0.46 + 0.006
+  refG = rcg * 0.43 + 0.006
+  refB = rcb * 0.58 + 0.020
+  glint = smooth(0.60, 0.96, sin(rr * 24.0 + qx * 7.0 - time * 2.2)) * (0.14 + 0.18 * glow)
+  fR = mix(rcr, mix(refR, gr, depth * 0.62) + glint * 1.0, gnd)
+  fG = mix(rcg, mix(refG, gg, depth * 0.62) + glint * 0.48, gnd)
+  fB = mix(rcb, mix(refB, gb, depth * 0.62) + glint * 0.15, gnd)
+  rgb(fR, fG, fB)
+  hl = exp(-abs(qy - hor) * 300.0) * (0.22 + 0.20 * glow)
+  cadd(hl * 0.55, hl * 0.30, hl * 0.10)
+  dg = len((qx - 0.12) / 0.62, (qy + 0.33) / 0.24)
+  spill = (1.0 - smooth(0.15, 1.0, dg)) * gnd * (0.10 + 0.12 * glow)
+  cadd(spill * 1.0, spill * 0.42, spill * 0.10)
+
+  # ---------------- a lantern string hanging in front of the lens
+  lantstring(u, v, 1.06, 0.05, 0.28, 0.052, 7.1, 1.15)
+
+  # ---------------- the audience
+  crowd(qx, qy, -0.56, 0.13, 0.27, 9.0, 2.0, 0.82)
+
+  # ---------------- one watcher close to us, in a hat, and their little moon
+  wh = len((qx + 1.16) / 0.200, (qy + 0.600) / 0.220)
+  wb = len((qx + 1.16) / 0.620, (qy + 1.340) / 0.640)
+  hbrim = len((qx + 1.16) / 0.330, (qy + 0.350) / 0.036)
+  hcrown = len((qx + 1.16) / 0.165, (qy + 0.265) / 0.095)
+  wat = max(max(1.0 - smooth(0.82, 1.0, wh), 1.0 - smooth(0.80, 1.0, wb)),
+            max(1.0 - smooth(0.70, 1.0, hbrim), 1.0 - smooth(0.80, 1.0, hcrown)))
+  cmul(1.0 - wat * 0.97)
+  # their balloon, a second little face
+  blx = -0.56 + 0.018 * sin(time * 0.37)
+  bly = -0.10 + 0.014 * sin(time * 0.61 + 1.0)
+  bld = len(qx - blx, qy - bly)
+  bal = 1.0 - smooth(0.052, 0.060, bld)
+  bsh = sqrt(max(0.0, 1.0 - (bld / 0.056) * (bld / 0.056)))
+  cadd(bal * (0.30 + 0.72 * bsh), bal * (0.20 + 0.66 * bsh), bal * (0.11 + 0.46 * bsh))
+  bsm = exp(-abs(len(qx - blx, qy - bly + 0.030) - 0.030) * 90.0) * bal
+  cmul(1.0 - bsm * 0.60)
+  # the string from the watcher's hand up to the balloon
+  sax = qx + 0.82
+  say = qy + 0.55
+  slt = clamp((sax * 0.26 + say * 0.43) / 0.2525, 0.0, 1.0)
+  sdx = sax - 0.26 * slt
+  sdy = say - 0.43 * slt
+  sline = exp(-len(sdx, sdy) * 700.0)
+  cadd(sline * 0.22, sline * 0.18, sline * 0.13)
+
+  # ---------------- confetti
+  repeat k 4 {
+    chx = (hash(k * 7.13 + 2.0) - 0.5) * 3.1
+    chy = fract(hash(k * 3.71 + 8.0) + time * (0.025 + 0.030 * hash(k * 1.9))) * 2.4 - 1.15
+    rv = rot(u - chx - 0.05 * sin(time * 0.8 + k * 2.0), v - chy, time * 1.7 + k)
+    fl = (1.0 - smooth(0.005, 0.011, abs(rv))) * (1.0 - smooth(0.002, 0.004, abs(r1)))
+    cadd(fl * conf * 1.10, fl * conf * 0.62, fl * conf * 0.30)
+  }
+
+  # ---------------- the title
+  ta2 = clamp(titleA, 0.0, 1.0)
+  tsh = word(ttitle, 0.862, 0.210, ta2, 0.010)
+  tg = word(ttitle, 0.877, 0.210, ta2, 0.0)
+  worn = 0.78 + 0.30 * hash(floor(u * 130.0) * 1.7 + floor(v * 130.0) * 3.1)
+  cmul(1.0 - tsh * 0.75)
+  cadd(tg * 1.10 * worn, tg * 0.94 * worn, tg * 0.70 * worn)
+}
+
+# ------------------------------------------------------------------ the face
+pixel grin {
+  br = 1.0 + 0.012 * sin(time * 0.53) + 0.010 * kickE
+  qx0 = u / br + 0.020 * sin(time * 0.31)
+  qy0 = v / br + 0.014 * sin(time * 0.27) - 0.010
+  ra = 0.030 * sin(time * 0.19)
+  qx = rot(qx0, qy0, ra)
+  qy = r1
+
+  fx = qx / 1.30
+  fy = (qy - 0.02) / 1.02
+  fr = len(fx, fy)
+  face = 1.0 - smooth(0.975, 1.0, fr)
+  edge = exp(-abs(fr - 1.0) * 120.0)
+
+  # ---------------- plaster, cracks and flaking paint
+  pn = fbm(qx * 3.0 + 1.3, qy * 3.0 - 2.1, 3)
+  pn2 = fbm(qx * 11.0 - 3.0, qy * 11.0 + 1.0, 2)
+  pv = vor(qx * 3.6 + pn * 0.7, qy * 3.6 - pn * 0.5)
+  dv1 = pv
+  vid = r1
+  dv2 = r2
+  crack = exp(-(dv2 - dv1) * 110.0) * step(0.30, hash(vid * 31.7 + 2.0))
+  flake = step(0.78, hash(vid * 7.3 + 9.0))
+  basR = 0.60 + 0.18 * (pn - 0.5) + 0.07 * (pn2 - 0.5)
+  basG = 0.535 + 0.17 * (pn - 0.5) + 0.06 * (pn2 - 0.5)
+  basB = 0.415 + 0.15 * (pn - 0.5) + 0.05 * (pn2 - 0.5)
+  grm = smooth(0.35, 1.0, fr) * 0.40
+  basR = basR * (1.0 - grm) + 0.12 * grm
+  basG = basG * (1.0 - grm) + 0.09 * grm
+  basB = basB * (1.0 - grm) + 0.07 * grm
+  basR = basR * (1.0 - crack * 0.80)
+  basG = basG * (1.0 - crack * 0.80)
+  basB = basB * (1.0 - crack * 0.80)
+  basR = mix(basR, 0.62 + 0.08 * pn2, flake * 0.35)
+  basG = mix(basG, 0.46 + 0.06 * pn2, flake * 0.35)
+  basB = mix(basB, 0.40 + 0.05 * pn2, flake * 0.35)
+  nz = sqrt(max(0.0, 1.0 - fr * fr))
+  shd = 0.34 + 0.66 * nz + 0.12 * clamp(-qy * 0.6 - qx * 0.3, -1.0, 1.0)
+  warm = clamp(0.55 - qy, 0.0, 1.0)
+  basR = basR * shd + 0.070 * warm
+  basG = basG * shd + 0.030 * warm
+  basB = basB * shd + 0.008 * warm
+
+  # ---------------- painted cheeks
+  ckl = len((qx + 0.63) / 0.30, (qy + 0.15) / 0.24)
+  ckr = len((qx - 0.63) / 0.30, (qy + 0.15) / 0.24)
+  ck = clamp((1.0 - smooth(0.55, 1.0, ckl)) + (1.0 - smooth(0.55, 1.0, ckr)), 0.0, 1.0)
+  ck = ck * (0.55 + 0.45 * pn2)
+  basR = mix(basR, 0.74, ck * 0.45)
+  basG = mix(basG, 0.20, ck * 0.45)
+  basB = mix(basB, 0.22, ck * 0.45)
+
+  # ---------------- the diamond on the forehead
+  dia = abs(qx) + abs(qy - 0.58)
+  dm = 1.0 - smooth(0.062, 0.072, dia)
+  drim = exp(-abs(dia - 0.078) * 90.0)
+  basR = mix(basR, 0.66, dm)
+  basG = mix(basG, 0.05, dm)
+  basB = mix(basB, 0.09, dm)
+  basR = basR + drim * 0.55
+  basG = basG + drim * 0.36
+  basB = basB + drim * 0.12
+
+  # ---------------- the eyes are holes with a fair inside them
+  sgn = sign(qx)
+  ex = abs(qx) - 0.43 + 0.020 * warp * sgn
+  ey = qy - 0.21
+  tilt = 0.10 * ex * sgn
+  eop = clamp(eye, 0.04, 1.4)
+  ed = len(ex / 0.248, (ey + tilt) / (0.108 * eop))
+  eyeM = 1.0 - smooth(0.82, 1.0, ed)
+  inner = clamp(1.0 - ed, 0.0, 1.0)
+  inR = 0.012 + 0.020 * inner
+  inG = 0.016 + 0.022 * inner
+  inB = 0.048 + 0.040 * inner
+  hz = exp(-abs(qy - 0.178) * 30.0) * inner
+  inR = inR + hz * 0.40
+  inG = inG + hz * 0.17
+  inB = inB + hz * 0.06
+  gld = len((abs(qx) - 0.43) + 0.05, qy - 0.245)
+  glint = (1.0 - smooth(0.008, 0.018, gld)) * inner
+  dot1 = (1.0 - smooth(0.004, 0.010, len((abs(qx) - 0.43) - 0.10, qy - 0.23))) * inner
+  dot2 = (1.0 - smooth(0.003, 0.008, len((abs(qx) - 0.43) + 0.13, qy - 0.19))) * inner
+  inR = inR + glint * 1.00 + dot1 * 0.80 + dot2 * 0.50
+  inG = inG + glint * 0.92 + dot1 * 0.42 + dot2 * 0.24
+  inB = inB + glint * 0.62 + dot1 * 0.14 + dot2 * 0.07
+  basR = mix(basR, inR, eyeM)
+  basG = mix(basG, inG, eyeM)
+  basB = mix(basB, inB, eyeM)
+  liner = exp(-abs(ed - 1.0) * 24.0)
+  basR = basR + liner * 0.42
+  basG = basG + liner * 0.28
+  basB = basB + liner * 0.10
+  lash = exp(-abs(ed - 1.16) * 55.0) * 0.30
+  basR = basR * (1.0 - lash)
+  basG = basG * (1.0 - lash)
+  basB = basB * (1.0 - lash)
+
+  # ---------------- nose
+  nridge = exp(-abs(qx - 0.014) * 90.0) * step(-0.10, qy) * step(qy, 0.16)
+  ntip = exp(-len((qx - 0.010) / 0.045, (qy + 0.115) / 0.035) * 2.0) * step(qy, 0.0)
+  basR = basR * (1.0 - 0.10 * nridge - 0.16 * ntip)
+  basG = basG * (1.0 - 0.13 * nridge - 0.18 * ntip)
+  basB = basB * (1.0 - 0.15 * nridge - 0.18 * ntip)
+  basR = basR * (1.0 + 0.10 * exp(-abs(qx + 0.030) * 110.0) * step(-0.06, qy) * step(qy, 0.14))
+
+  # ---------------- the grin
+  wm = 0.46 + 0.22 * smile
+  mtop = -0.32
+  curve = 0.16 + 0.10 * smile
+  xn = clamp(qx / max(wm, 0.01), -1.0, 1.0)
+  yb = mtop - curve * (1.0 - xn * xn) - 0.05 * warp * xn
+  inX = step(abs(qx), wm)
+  mouth = inX * step(qy, mtop) * step(yb, qy)
+  basR = mix(basR, 0.10, mouth)
+  basG = mix(basG, 0.015, mouth)
+  basB = mix(basB, 0.025, mouth)
+  tgap = step(0.15, abs(fract(qx / 0.080 + 0.5) - 0.5) * 2.0)
+  tb = step(qy, mtop - 0.005) * step(mtop - 0.085, qy) * mouth * tgap
+  basR = mix(basR, 0.88, tb)
+  basG = mix(basG, 0.83, tb)
+  basB = mix(basB, 0.68, tb)
+  gum = step(qy, mtop - 0.085) * step(mtop - 0.125, qy) * mouth
+  basR = mix(basR, 0.24, gum)
+  basG = mix(basG, 0.02, gum)
+  basB = mix(basB, 0.03, gum)
+  tb2 = step(qy, yb + 0.055) * step(yb + 0.006, qy) * mouth * tgap
+  basR = mix(basR, 0.80, tb2)
+  basG = mix(basG, 0.75, tb2)
+  basB = mix(basB, 0.60, tb2)
+  lip = (exp(-abs(qy - mtop) * 55.0) + exp(-abs(qy - yb) * 55.0)) * inX
+  basR = mix(basR, 0.92, lip * 0.85)
+  basG = mix(basG, 0.70, lip * 0.85)
+  basB = mix(basB, 0.30, lip * 0.85)
+  # a single dark tear track under the right eye
+  trk = exp(-abs(qx - 0.455 - 0.012 * sin(qy * 10.0)) * 150.0) * step(-0.42, qy) * step(qy, 0.10)
+  basR = mix(basR, 0.26, trk * 0.55)
+  basG = mix(basG, 0.04, trk * 0.55)
+  basB = mix(basB, 0.05, trk * 0.55)
+  trh = exp(-abs(qx - 0.441 - 0.012 * sin(qy * 10.0)) * 260.0) * step(-0.42, qy) * step(qy, 0.10)
+  basR = mix(basR, 0.82, trh * 0.35)
+  basG = mix(basG, 0.74, trh * 0.35)
+  basB = mix(basB, 0.60, trh * 0.35)
+  bm = 1.0 - smooth(0.008, 0.014, len(qx - 0.32, qy + 0.55))
+  basR = basR * (1.0 - bm * 0.7)
+  basG = basG * (1.0 - bm * 0.7)
+  basB = basB * (1.0 - bm * 0.7)
+
+  # ---------------- the void around it
+  bgr = 0.016 + 0.008 * sin(qy * 3.0 + time * 0.2)
+  bgg = 0.009
+  bgb = 0.024 + 0.008 * sin(qx * 2.0)
+  rgb(bgr, bgg, bgb)
+  repeat k 4 {
+    bxp = (hash(k * 3.7 + 1.0) - 0.5) * 3.4
+    byp = (hash(k * 5.3 + 4.0) - 0.5) * 2.2
+    bd = len(u - bxp, v - byp)
+    bg = (exp(-bd * 5.0) * 0.10 + exp(-bd * 24.0) * 0.10) * (1.0 - face)
+    cadd(bg * 0.90, bg * 0.45, bg * 0.14)
+  }
+  repeat k 4 {
+    dxp = (hash(k * 9.1 + 3.0) - 0.5) * 3.2 + 0.10 * sin(time * 0.5 + k)
+    dyp = fract(hash(k * 2.7 + 6.0) + time * (0.020 + 0.020 * hash(k * 4.1))) * 2.4 - 1.2
+    dd = len(u - dxp, v - dyp)
+    spd2 = (1.0 - smooth(0.002, 0.006, dd)) * 0.32 * (1.0 - face * 0.6)
+    cadd(spd2, spd2 * 0.85, spd2 * 0.55)
+  }
+  cmul(1.0 - face)
+  cadd(basR * face, basG * face, basB * face)
+  cadd(edge * 0.50, edge * 0.34, edge * 0.14)
+}
+
+# ------------------------------------------------------------------ post
+post {
+  cr = cget(0)
+  cg = cget(1)
+  cb = cget(2)
+  bl = (tap(-2, 0) + tap(2, 0) + tap(0, -2) + tap(0, 2) + tap(-4, -3) + tap(4, 3)) * 0.1667 * (1.0 - 0.40 * scn)
+  sh = floor(1.0 + 3.0 * flash)
+  ar = tap(-1.0 - sh, 0.0)
+  ab = tap(1.0 + sh, 1.0)
+  cr = (cr * 0.92 + bl * 0.42 + ar * 0.18 * flash - 0.030) * 1.16
+  cg = (cg * 0.92 + bl * 0.37 - 0.026) * 1.14
+  cb = (cb * 0.96 + bl * 0.50 + ab * 0.22 * flash - 0.026) * 1.12
+  gn = (hash(x * w * 0.37 + y * h * 0.71 + frame * 7.31) - 0.5) * 0.032
+  rgb(cr + gn + 0.006, cg + gn * 0.9 + 0.004, cb + gn * 0.8 + 0.012)
+  d = len(u, v)
+  cmul(1.0 - 0.46 * d * d)
+  cadd(flash * 0.55, flash * 0.45, flash * 0.30)
+}
