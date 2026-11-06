@@ -5,7 +5,9 @@
 #include <stdlib.h>
 
 static void put_pcm(FILE *f, float x) {
-  if (x != x) x = 0; if (x > 1) x = 1; if (x < -1) x = -1;
+  if (x != x) x = 0;
+  if (x > 1) x = 1;
+  if (x < -1) x = -1;
   int v = (int)(x * 32767.0f); uint8_t b[2] = {(uint8_t)v, (uint8_t)(v >> 8)};
   fwrite(b, 1, 2, f);
 }
@@ -30,7 +32,8 @@ int main(int argc, char **argv) {
   for (size_t c = 0; c < sizeof chunks / sizeof *chunks; c++) {
     float *lr = malloc(sizeof(float) * chunks[c] * 2); if (!lr) return 1;
     for (uint32_t i = 0; i < chunks[c] * 2; i++) { float x = ((int)((i + c * 73) % 257) - 128) / 128.0f; if (c == 1 && i == 3) x = NAN; lr[i] = x; put_pcm(pcm, x); }
-    if (dm_mov_audio(mov, lr, chunks[c])) return 1; free(lr);
+    if (dm_mov_audio(mov, lr, chunks[c])) { free(lr); return 1; }
+    free(lr);
   }
   free(fb.rgb); fclose(rgb); fclose(pcm);
   return dm_mov_close(mov) ? 1 : 0;

@@ -44,7 +44,9 @@ static int put_line(dm_mov *m, const uint8_t *cur, const uint8_t *old, size_t *n
   while (x < w) {
     if (old && rgb_eq(cur + x * 3, old + x * 3)) {
       int run = 0; while (x + run < w && run < 254 && rgb_eq(cur + (x + run) * 3, old + (x + run) * 3)) run++;
-      if (put(m, 0, n) || put(m, (uint8_t)(run + 1), n)) return -1; x += run; continue;
+      if (put(m, 0, n) || put(m, (uint8_t)(run + 1), n)) return -1;
+      x += run;
+      continue;
     }
     int rep = 1; while (x + rep < w && rep < 128 && rgb_eq(cur + x * 3, cur + (x + rep) * 3)) rep++;
     if (rep >= 2) { if (put(m, (uint8_t)(256 - rep), n)) return -1; for (int k = 0; k < 3; k++) if (put(m, cur[x * 3 + k], n)) return -1; x += rep; continue; }
@@ -124,7 +126,8 @@ static void write_stsc(dm_mov *m, int video) {
 }
 static void write_stsz(dm_mov *m, int video) {
   FILE *f = m->f; long p = atom(f, "stsz"); be32(f, 0); be32(f, video ? 0 : 4); be32(f, video ? (uint32_t)m->nv : m->audio_frames);
-  if (video) for (size_t i = 0; i < m->nv; i++) be32(f, m->vsize[i]); end_atom(m, p);
+  if (video) for (size_t i = 0; i < m->nv; i++) be32(f, m->vsize[i]);
+  end_atom(m, p);
 }
 static void write_stco(dm_mov *m, int video) { FILE *f = m->f; size_t n = video ? m->nv : m->na; uint32_t *o = video ? m->voff : m->aoff; long p = atom(f, "stco"); be32(f, 0); be32(f, (uint32_t)n); for (size_t i = 0; i < n; i++) be32(f, o[i]); end_atom(m, p); }
 static void write_stbl(dm_mov *m, int video) {
@@ -153,7 +156,9 @@ int dm_mov_close(dm_mov *m) {
     long moov = atom(f, "moov"), mvhd = atom(f, "mvhd");
     be32(f, 0); be32(f, 0); be32(f, 0); be32(f, m->fps); be32(f, (uint32_t)m->nv); be32(f, 0x00010000); be16(f, 0x0100); be16(f, 0); be32(f, 0); be32(f, 0);
     be32(f, 0x00010000); be32(f, 0); be32(f, 0); be32(f, 0); be32(f, 0x00010000); be32(f, 0); be32(f, 0); be32(f, 0); be32(f, 0x40000000);
-    for (int i = 0; i < 6; i++) be32(f, 0); be32(f, m->audio_frames ? 3 : 2); end_atom(m, mvhd);
+    for (int i = 0; i < 6; i++) be32(f, 0);
+    be32(f, m->audio_frames ? 3 : 2);
+    end_atom(m, mvhd);
     write_trak(m, 1, 1); if (m->audio_frames) write_trak(m, 0, 2); end_atom(m, moov);
   }
   int bad = m->failed || ferror(f);
