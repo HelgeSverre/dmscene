@@ -1,6 +1,7 @@
 /* dm - the dmscene command line: compile, check, disasm, play, render, watch, new.
  * Inputs may be .dmt (compiled in memory) or .dms. */
 #include "dm.h"
+#include "dm_seek.h"
 #include "dm_banner.h"
 #include <pthread.h>
 #include <errno.h>
@@ -49,7 +50,7 @@ static void usage(int code) {
     "  --fps N       target frame rate (default 30)      --size WxH   force framebuffer size\n"
     "  --mute        no audio, wall-clock visuals         --start S    start S seconds in\n"
     "  --solo C      hear only channel C                  --threads N  pixel worker threads\n"
-    "  keys: q quit, left/right seek 5s, mouse wheel/trackpad scrub .25s, up/down speed, space pause\n"
+    "  keys: q quit, left/right seek 5s, mouse wheel/trackpad smooth scrub, up/down speed, space pause\n"
     "        1..8 toggle channel mute, 0 unmute all, r reload (watch), Ctrl-Z suspend\n"
     "env: DM_THREADS, DM_AUDIO_CMD, DM_AUDIO_LATENCY (pipe backend)\n");
   exit(code);
@@ -133,13 +134,8 @@ typedef struct {
   double rate, phase;
   float a[2], b[2], source[2 * 1024];
   uint32_t source_at, source_n;
-  int ready, paused, failed;
+  int ready, paused;
 } audio_ctx;
-
-static void player_skip(dm_player *p, uint64_t samples) {
-  float scratch[2 * 1024];
-  while (samples) { uint32_t n = samples > 1024 ? 1024 : (uint32_t)samples; dm_player_render(p, scratch, n); samples -= n; }
-}
 
 /* Keep the synth's normal 1024-sample render grouping.  In particular, do not
  * render it one sample at a time: several instrument effects are block-aware. */
@@ -383,24 +379,24 @@ static int render_offline(dm_module *m, opts *o) {
   return 0;
 }
 
-static int reset_player(dm_player *p, const dm_module *m, const uint8_t *mute, uint64_t pos) {
-  dm_player next;
-  memset(&next, 0, sizeof next);
-  if (dm_player_init(&next, m, DM_SR)) return -1;
-  memcpy(next.synth.mute, mute, sizeof next.synth.mute);
-  player_skip(&next, pos);
-  dm_player_free(p);
-  *p = next;
-  return 0;
+static void hold_audio(audio_ctx *ac, int paused) {
+  pthread_mutex_lock(&ac->mu);
+  ac->paused = paused;
+  pthread_mutex_unlock(&ac->mu);
 }
 
-static dm_audio *restart_audio(dm_audio *au, audio_ctx *ac, const dm_module *m, const uint8_t *mute, uint64_t pos, double rate, int paused, int muted) {
-  if (au) dm_audio_close(au);
+static void accept_audio(audio_ctx *ac, dm_player *next, double rate, int paused) {
   pthread_mutex_lock(&ac->mu);
-  int bad = reset_player(&ac->p, m, mute, pos);
-  ac->rate = rate; ac->phase = 0; ac->ready = 0; ac->source_at = ac->source_n = 0; ac->paused = paused; ac->failed = bad;
+  dm_player old = ac->p;
+  ac->p = *next;
+  ac->rate = rate;
+  ac->phase = 0;
+  ac->ready = 0;
+  ac->source_at = ac->source_n = 0;
+  ac->paused = paused;
   pthread_mutex_unlock(&ac->mu);
-  return bad || muted || paused ? NULL : dm_audio_open(DM_SR, audio_cb, ac);
+  free(next);
+  dm_player_free(&old);
 }
 
 static uint64_t advance_samples(uint64_t base, double samples) {
@@ -424,115 +420,201 @@ static void reset_scene_after_seek(dm_scene *scene, const dm_module *m, const op
 }
 
 static int play_realtime(dm_module *mods, opts *o) {
-  dm_module *m = &mods[0]; int which = 0, paused = 0, speed_i = 2;
   static const double speeds[] = {0.5, 0.75, 1.0, 1.25, 1.5, 2.0};
-  static audio_ctx ac; pthread_mutex_init(&ac.mu, NULL);
-  if (dm_player_init(&ac.p, m, DM_SR)) { fprintf(stderr, "dm: out of memory\n"); return 1; }
+  dm_module *m = &mods[0];
+  int which = 0, paused = 0, speed_i = 2, rc = 0;
+  static audio_ctx ac;
+  pthread_mutex_init(&ac.mu, NULL);
+  if (dm_player_init(&ac.p, m, DM_SR)) {
+    fprintf(stderr, "dm: out of memory\n");
+    dm_player_free(&ac.p); pthread_mutex_destroy(&ac.mu); dm_module_free(m);
+    return 1;
+  }
   if (o->solo >= 0) dm_player_solo(&ac.p, o->solo);
-  uint64_t start_sample = (uint64_t)(o->start * DM_SR); player_skip(&ac.p, start_sample); ac.rate = speeds[speed_i];
-  dm_player vis; if (dm_player_init(&vis, m, DM_SR)) { dm_player_free(&ac.p); return 1; }
-  memcpy(vis.synth.mute, ac.p.synth.mute, sizeof vis.synth.mute); player_skip(&vis, start_sample); uint64_t vis_pos = start_sample;
-  dm_seq clk; dm_seq_init(&clk, m, DM_SR); dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
+  uint8_t mute[DM_MAX_CHANNELS];
+  copy_mute(&ac, mute);
+  dm_seek *seeker = dm_seek_open(m);
+  if (!seeker) {
+    dm_player_free(&ac.p); pthread_mutex_destroy(&ac.mu); dm_module_free(m);
+    return 1;
+  }
+  uint64_t base = (uint64_t)(o->start * DM_SR), audio_origin = 0;
+  ac.rate = speeds[speed_i]; ac.paused = base != 0;
   dm_audio *au = o->mute ? NULL : dm_audio_open(DM_SR, audio_cb, &ac);
+  int waiting = au && base != 0;
+  dm_seek_request(seeker, base, mute, waiting);
+  dm_seq clk; dm_seq_init(&clk, m, DM_SR);
+  dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   dm_term *term = dm_term_open();
-  if (!term) { fprintf(stderr, "dm: cannot open terminal\n"); dm_audio_close(au); dm_player_free(&vis); dm_player_free(&ac.p); dm_scene_free(&scene); dm_module_free(m); return 1; }
-  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, srcm = mtime(o->file); uint64_t base = start_sample;
-  char note[160] = ""; double note_until = 0; int frames = 0, restore_tstp = 0, frame_dirty = 1, rc = 0; dm_fb fb = {0}; float vscratch[2 * 1024];
+  dm_fb fb = {0}; dm_scrub scrub = {0};
+  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, srcm = mtime(o->file);
+  char note[160] = ""; double note_until = 0;
+  int frames = 0, frame_dirty = 1, restore_tstp = 0;
   struct sigaction saved_tstp;
-  if (!au && !o->mute) { snprintf(note, sizeof note, "audio unavailable; wall-clock playback"); note_until = epoch + 3; }
+  if (!term) { fprintf(stderr, "dm: cannot open terminal\n"); rc = 1; goto done; }
+  if (!au && !o->mute) {
+    snprintf(note, sizeof note, "audio unavailable; wall-clock playback");
+    note_until = epoch + 3;
+  }
   for (;;) {
-    double now = dm_now(); uint64_t pos = base;
-    if (!paused) pos = au ? advance_samples(base, (double)dm_audio_played(au) * speeds[speed_i]) : advance_samples(base, (now - epoch) * DM_SR * speeds[speed_i]);
-    while (vis_pos < pos) { uint32_t n = pos - vis_pos > 1024 ? 1024 : (uint32_t)(pos - vis_pos); dm_player_render(&vis, vscratch, n); vis_pos += n; }
-    dm_seq_seek(&clk, pos);
-    int cols, rows; if (!o->W) { dm_term_size(term, &cols, &rows); rows = rows > 1 ? rows - 1 : 1; } else { cols = o->W; rows = (o->H + 1) / 2; }
-    int sc = m->scale > 1 ? m->scale : 1;
-    int fw = cols / sc > 1 ? cols / sc : 1, fh = (rows * 2) / sc > 1 ? (rows * 2) / sc : 2;
-    if (fb.w != fw || fb.h != fh) frame_dirty = 1;
-    if (dm_fb_alloc(&fb, fw, fh)) { fprintf(stderr, "dm: cannot allocate framebuffer\n"); rc = 1; break; }
-    if (!paused || frame_dirty) { dm_scene_render(&scene, &clk, vis.synth.cenv, &fb); frame_dirty = 0; }
-    uint8_t mute[DM_MAX_CHANNELS]; copy_mute(&ac, mute);
-    char chs[DM_MAX_CHANNELS + 1]; for (int c = 0; c < m->channels; c++) chs[c] = mute[c] ? '.' : (char)('1' + c); chs[m->channels] = 0;
-    char status[320]; snprintf(status, sizeof status, " %s  %s%.3gx  %dbpm  ord %02d row %02d beat %6.2f  %.0ffps  ch %s  %s%s", m->title[0] ? m->title : o->file, paused ? "pause @ " : "speed ", speeds[speed_i], clk.bpm, clk.order, clk.row, dm_seq_beat(&clk), fps_est, chs, now < note_until ? note : "", now < note_until ? "  " : "");
-    dm_term_blit(term, &fb, cols, rows, status);
-    int k = -1, scrub = 0;
-    for (int inputs = 0; inputs < 64; inputs++) {
+    double now = dm_now();
+    uint64_t pos = base;
+    if (!paused && !waiting && !scrub.active) {
+      uint64_t heard = au ? dm_audio_played(au) : 0;
+      double elapsed = au ? (double)(heard > audio_origin ? heard - audio_origin : 0) : (now - epoch) * DM_SR;
+      pos = advance_samples(base, elapsed * speeds[speed_i]);
+    }
+
+    /* Consume the whole scroll burst before drawing. Keep ordinary keys queued
+     * for the next iteration instead of discarding them behind the first key. */
+    int k = -1, delta = 0;
+    for (int inputs = 0; inputs < 4096; inputs++) {
       int in = dm_term_key(term);
       if (in < 0) break;
-      if (in == DM_KEY_SCRUB_BACK) scrub--;
-      else if (in == DM_KEY_SCRUB_FORWARD) scrub++;
+      if (in == DM_KEY_SCRUB_BACK) delta--;
+      else if (in == DM_KEY_SCRUB_FORWARD) delta++;
       else { k = in; break; }
     }
-    if (scrub < -8) scrub = -8; else if (scrub > 8) scrub = 8;
     if (k == 'q') break;
+    if (delta) {
+      if (!scrub.active) reset_scene_after_seek(&scene, m, o, pos);
+      dm_scrub_add(&scrub, delta, now, (double)pos / DM_SR);
+      base = advance_samples(0, scrub.target * DM_SR);
+      hold_audio(&ac, 1);
+      waiting = au != NULL;
+      dm_seek_request(seeker, base, mute, waiting);
+      frame_dirty = 1;
+    }
+    int was_scrubbing = scrub.active;
+    if (scrub.active) {
+      pos = advance_samples(0, dm_scrub_tick(&scrub, now) * DM_SR);
+      frame_dirty = 1;
+      if (!scrub.active && !waiting) { base = pos; epoch = now; }
+    }
+
     if (k == DM_KEY_SUSPEND) {
-      copy_mute(&ac, mute); base = pos;
-      au = restart_audio(au, &ac, m, mute, pos, speeds[speed_i], 1, 1); dm_term_close(term);
-      if (ac.failed) { fprintf(stderr, "dm: cannot save audio state\n"); term = NULL; rc = 1; break; }
+      base = pos; scrub.active = 0;
+      hold_audio(&ac, 1);
+      dm_audio_close(au); au = NULL;
+      dm_term_close(term); term = NULL;
       if (!restore_tstp) { sigaction(SIGTSTP, NULL, &saved_tstp); restore_tstp = 1; }
       signal(SIGTSTP, SIG_DFL); raise(SIGTSTP);
       term = dm_term_open();
       if (!term) { fprintf(stderr, "dm: cannot restore terminal\n"); rc = 1; break; }
-      au = restart_audio(au, &ac, m, mute, base, speeds[speed_i], paused, o->mute);
-      if (ac.failed) { fprintf(stderr, "dm: cannot restore audio state\n"); rc = 1; break; }
-      epoch = dm_now();
+      au = o->mute ? NULL : dm_audio_open(DM_SR, audio_cb, &ac);
+      waiting = au != NULL;
+      dm_seek_request(seeker, base, mute, waiting);
+      audio_origin = au ? dm_audio_played(au) : 0; epoch = dm_now();
       continue;
     }
-    int restart = 0, seeked = 0;
-    uint64_t target = pos;
-    if (k >= '1' && k <= '8') { int c = k - '1'; if (c < m->channels) { pthread_mutex_lock(&ac.mu); ac.p.synth.mute[c] ^= 1; mute[c] = ac.p.synth.mute[c]; pthread_mutex_unlock(&ac.mu); vis.synth.mute[c] = mute[c]; } }
-    if (k == '0') { pthread_mutex_lock(&ac.mu); memset(ac.p.synth.mute, 0, sizeof ac.p.synth.mute); pthread_mutex_unlock(&ac.mu); memset(vis.synth.mute, 0, sizeof vis.synth.mute); }
-    if (k == DM_KEY_LEFT) { target = pos > 5 * DM_SR ? pos - 5 * DM_SR : 0; seeked = 1; }
-    if (k == DM_KEY_RIGHT) { target = advance_samples(pos, 5 * DM_SR); seeked = 1; }
-    if (scrub < 0) { uint64_t n = (uint64_t)(-scrub) * DM_SR / 4; target = target > n ? target - n : 0; seeked = 1; }
-    if (scrub > 0) { target = advance_samples(target, (double)scrub * DM_SR / 4); seeked = 1; }
-    if (seeked) { base = target; restart = 1; }
-    if (k == DM_KEY_UP && speed_i + 1 < (int)(sizeof speeds / sizeof *speeds)) { base = target; speed_i++; restart = 1; }
-    if (k == DM_KEY_DOWN && speed_i > 0) { base = target; speed_i--; restart = 1; }
-    if (k == ' ') { base = target; paused ^= 1; restart = 1; }
-    if (restart) {
-      int reset_ok = 1;
-      copy_mute(&ac, mute);
-      if (seeked) {
-        if (reset_player(&vis, m, mute, base)) { snprintf(note, sizeof note, "seek failed"); note_until = now + 2; reset_ok = 0; }
-        else { vis_pos = base; reset_scene_after_seek(&scene, m, o, base); frame_dirty = 1; }
-      }
-      if (reset_ok) au = restart_audio(au, &ac, m, mute, base, speeds[speed_i], paused, o->mute);
-      else { rc = 1; break; }
-      if (ac.failed) { fprintf(stderr, "dm: cannot restore audio state\n"); rc = 1; break; }
-      epoch = dm_now();
+
+    if (k >= '1' && k <= '8' && k - '1' < m->channels) mute[k - '1'] ^= 1;
+    if (k == '0') memset(mute, 0, sizeof mute);
+    pthread_mutex_lock(&ac.mu);
+    memcpy(ac.p.synth.mute, mute, sizeof mute);
+    pthread_mutex_unlock(&ac.mu);
+    if ((k == '0' || (k >= '1' && k <= '8')) && (waiting || scrub.active))
+      dm_seek_request(seeker, base, mute, waiting);
+
+    int seeked = 0, changed = 0;
+    if (k == DM_KEY_LEFT) { pos = pos > 5 * DM_SR ? pos - 5 * DM_SR : 0; seeked = 1; }
+    if (k == DM_KEY_RIGHT) { pos = advance_samples(pos, 5 * DM_SR); seeked = 1; }
+    if (k == DM_KEY_UP && speed_i + 1 < (int)(sizeof speeds / sizeof *speeds)) { speed_i++; changed = 1; }
+    if (k == DM_KEY_DOWN && speed_i > 0) { speed_i--; changed = 1; }
+    if (k == ' ') { paused ^= 1; changed = 1; }
+    if (seeked || changed) {
+      base = pos; scrub.active = 0; epoch = now;
+      hold_audio(&ac, 1);
+      waiting = au != NULL;
+      dm_seek_request(seeker, base, mute, waiting);
+      if (seeked) { reset_scene_after_seek(&scene, m, o, base); frame_dirty = 1; }
     }
+
+    if (waiting && !scrub.active) {
+      dm_player *ready = dm_seek_take(seeker);
+      if (ready) {
+        base = pos = ready->seq.sample;
+        accept_audio(&ac, ready, speeds[speed_i], paused);
+        waiting = 0;
+        audio_origin = dm_audio_played(au); epoch = dm_now();
+        frame_dirty = 1;
+      }
+    }
+    if (!waiting && !scrub.active) dm_seek_request(seeker, pos, mute, 0);
+    if (dm_seek_failed(seeker)) { fprintf(stderr, "dm: audio seek worker failed\n"); rc = 1; break; }
+
+    /* The sequencer's seek function only advances. Explicitly rewind the cheap
+     * tracker clock when scrubbing backwards; never replay audio on this path. */
+    if (pos < clk.sample) dm_seq_init(&clk, m, DM_SR);
+    dm_seq_seek(&clk, pos);
+    int cols, rows;
+    if (!o->W) { dm_term_size(term, &cols, &rows); rows = rows > 1 ? rows - 1 : 1; }
+    else { cols = o->W; rows = (o->H + 1) / 2; }
+    int sc = m->scale > 1 ? m->scale : 1;
+    int fw = cols / sc > 1 ? cols / sc : 1, fh = rows * 2 / sc > 1 ? rows * 2 / sc : 2;
+    if (fb.w != fw || fb.h != fh) frame_dirty = 1;
+    if (dm_fb_alloc(&fb, fw, fh)) { rc = 1; break; }
+    float env[DM_MAX_CHANNELS];
+    if (au && !waiting && !scrub.active) {
+      pthread_mutex_lock(&ac.mu); memcpy(env, ac.p.synth.cenv, sizeof env); pthread_mutex_unlock(&ac.mu);
+    } else dm_seek_env(seeker, env);
+    if ((!paused && !waiting) || frame_dirty) {
+      dm_scene_render(&scene, &clk, env, &fb); frame_dirty = 0;
+    }
+    char chs[DM_MAX_CHANNELS + 1];
+    for (int c = 0; c < m->channels; c++) chs[c] = mute[c] ? '.' : (char)('1' + c);
+    chs[m->channels] = 0;
+    char status[320];
+    snprintf(status, sizeof status, " %s  %s%.3gx  %.2fs  beat %6.2f  %.0ffps  ch %s  %s",
+      m->title[0] ? m->title : o->file, scrub.active ? "scrub @ " : waiting ? "seeking @ " : paused ? "pause @ " : "speed ",
+      speeds[speed_i], (double)pos / DM_SR, dm_seq_beat(&clk), fps_est, chs, now < note_until ? note : "");
+    dm_term_blit(term, &fb, cols, rows, status);
+
     int reload = k == 'r';
-    if (o->watch && now - lastcheck > 0.5) { lastcheck = now; double mt = mtime(o->file); if (mt != srcm) { srcm = mt; reload = 1; } }
+    if (o->watch && now - lastcheck > .5) {
+      lastcheck = now;
+      double mt = mtime(o->file);
+      if (mt != srcm) { srcm = mt; reload = 1; }
+    }
     if (reload && o->watch) {
       dm_module *nm = &mods[which ^ 1];
       if (load_any(o->file, nm) == 0) {
-        copy_mute(&ac, mute);
-        if (reset_player(&vis, nm, mute, pos)) {
-          fprintf(stderr, "dm: cannot restore visual state\n");
-          dm_module_free(nm);
-          rc = 1;
-          break;
+        dm_seek *next_seeker = dm_seek_open(nm);
+        dm_player *next = calloc(1, sizeof *next);
+        if (!next_seeker || !next || dm_player_init(next, nm, DM_SR)) {
+          if (next) { dm_player_free(next); free(next); }
+          dm_seek_close(next_seeker); dm_module_free(nm); rc = 1; break;
         }
-        au = restart_audio(au, &ac, nm, mute, pos, speeds[speed_i], paused, o->mute);
-        if (ac.failed) {
-          fprintf(stderr, "dm: cannot restore audio state\n");
-          dm_module_free(nm);
-          rc = 1;
-          break;
-        }
-        dm_module_free(m);
+        memcpy(next->synth.mute, mute, sizeof mute);
+        hold_audio(&ac, 1);
+        dm_audio_close(au); au = NULL;
+        dm_seek_close(seeker); seeker = next_seeker;
+        accept_audio(&ac, next, speeds[speed_i], 1);
+        dm_scene_free(&scene); dm_module_free(m);
         which ^= 1; m = nm;
-        dm_seq_init(&clk, m, DM_SR); dm_seq_seek(&clk, pos);
-        reset_scene_after_seek(&scene, m, o, pos); frame_dirty = 1;
-        vis_pos = pos; base = pos; epoch = dm_now();
+        dm_scene_init(&scene, m); scene.nthreads = o->threads;
+        dm_seq_init(&clk, m, DM_SR);
+        base = pos; scrub.active = 0; frame_dirty = 1;
+        au = o->mute ? NULL : dm_audio_open(DM_SR, audio_cb, &ac);
+        waiting = au != NULL;
+        dm_seek_request(seeker, base, mute, waiting);
+        audio_origin = au ? dm_audio_played(au) : 0; epoch = dm_now();
         snprintf(note, sizeof note, "reloaded"); note_until = epoch + 2;
       } else { snprintf(note, sizeof note, "%s", dm_error()); note_until = now + 8; }
     }
-    frames++; double t1 = dm_now(); if (t1 - last >= 1.0) { fps_est = frames / (t1 - last); frames = 0; last = t1; }
-    dm_sleep(now + 1.0 / o->fps - dm_now());
+    frames++;
+    double t1 = dm_now();
+    if (t1 - last >= 1) { fps_est = frames / (t1 - last); frames = 0; last = t1; }
+    int fps = was_scrubbing && o->fps < 60 ? 60 : o->fps;
+    dm_sleep(now + 1.0 / fps - dm_now());
   }
-  dm_term_close(term); if (restore_tstp) sigaction(SIGTSTP, &saved_tstp, NULL); dm_audio_close(au); dm_player_free(&vis); dm_player_free(&ac.p); dm_scene_free(&scene); dm_fb_free(&fb); dm_module_free(m); return rc;
+ done:
+  dm_term_close(term);
+  if (restore_tstp) sigaction(SIGTSTP, &saved_tstp, NULL);
+  dm_audio_close(au); dm_seek_close(seeker);
+  dm_player_free(&ac.p); pthread_mutex_destroy(&ac.mu);
+  dm_scene_free(&scene); dm_fb_free(&fb); dm_module_free(m);
+  return rc;
 }
 
 int main(int argc, char **argv) {

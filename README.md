@@ -152,21 +152,24 @@ play options:
 
 `dm --help` (or `dm -h`) prints the banner and command reference. In the
 player, `q` quits; Left/Right seek five seconds; wheel or touchpad scroll/pan
-scrubs a quarter-second per reported step (bursts are coalesced and capped at
-two seconds per UI frame); Up/Down change
-speed; and Space pauses. Playback speed resamples audio together with the
+smoothly scrubs the timeline. Slow gestures make fine adjustments and faster
+swipes travel farther; scroll bursts retain their full reported motion.
+Up/Down change speed and Space pauses. Playback speed resamples audio together with the
 visual clock, so it changes pitch. `1`..`8` toggle channel mutes, `0` unmutes
 all, `r` forces a reload in watch mode, and Ctrl-Z cleanly restores the terminal
 before suspension and reinstates playback on `fg`. Mouse clicks, bracketed
 paste, and unknown escape sequences are ignored rather than treated as quit
 keys.
 
-Seeking restores the tracker/audio state at the target sample but does not
-replay prior video frames. Therefore feedback and other frame-history effects
-restart from an empty history after a seek or scrub. The status line shows
-title, bpm, order, row, beat, resolution, fps, speed, channel flags and the
-last reload result or compile error. `watch` swaps the new module in at the
-same sample position; uniforms and feedback buffers restart.
+Scrubbing previews the timeline immediately and temporarily silences audio.
+Audio resumes when the gesture settles and background preparation reaches the
+chosen sample; a first jump into uncached audio can take longer. Seeking does
+not replay prior video frames: feedback and other frame-history effects restart
+when a seek or scrub gesture begins. The status line shows time, beat, fps,
+speed, channel flags, and reload status. `watch` swaps the new module in at the
+same sample position; uniforms and feedback buffers restart. See
+[scroll input and performance](docs/scrubbing.md) for the Ghostty behavior and
+implementation details.
 
 Environment: `DM_THREADS` worker count, `DM_AUDIO_CMD` player command for the
 pipe backend (default `aplay -q -t raw -f S16_LE -r 44100 -c 2`),

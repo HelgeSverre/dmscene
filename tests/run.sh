@@ -10,6 +10,9 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 ./build/tests/term-input || fail "terminal input"
 ./build/tests/play-transport || fail "play transport"
+./build/tests/seek || fail "background seek"
+./build/tests/scrub-live || fail "live scrubbing"
+./build/tests/scrub-live ./build/tests/dm-audio-clock audio || fail "scrubbing with audio output"
 
 ./dm compile demos/pulse.dmt -o "$T/pulse.dms" 2>/dev/null || fail "compile"
 ./dm check demos/pulse.dmt 2>/dev/null || fail "check"

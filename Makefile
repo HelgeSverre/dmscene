@@ -12,7 +12,7 @@ else
 endif
 
 ENGINE := src/dm_vm.c src/dm_font.c src/dm_seq.c src/dm_synth.c src/dm_module.c src/dm_compile.c src/dm_scene.c src/dm_io.c
-PLAT   := src/dm_term.c src/dm_audio.c
+PLAT   := src/dm_term.c src/dm_audio.c src/dm_seek.c
 OBJ    := $(ENGINE:src/%.c=build/obj/%.o)
 POBJ   := $(PLAT:src/%.c=build/obj/%.o)
 
@@ -27,7 +27,7 @@ SHOWCASE_CHAPTER := 5.328979592
 
 all: dm
 
-build/obj/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h | build/obj
+build/obj/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h include/dm_seek.h | build/obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/obj build/modules build/audio build/video build/tests:
@@ -75,7 +75,16 @@ build/tests/term-input: tests/term-input.c src/dm_term.c include/dm.h | build/te
 build/tests/play-transport: tests/play-transport.c tools/dm.c $(OBJ) $(POBJ) | build/tests
 	$(CC) $(CFLAGS) tests/play-transport.c $(OBJ) $(POBJ) -o $@ $(LDFLAGS) $(LDLIBS)
 
-test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport
+build/tests/seek: tests/seek.c $(OBJ) build/obj/dm_seek.o build/obj/dm_term.o | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/scrub-live: tests/scrub-live.c build/obj/dm_term.o | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/dm-audio-clock: tools/dm.c tests/audio-clock.c $(OBJ) build/obj/dm_term.o build/obj/dm_seek.o | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport build/tests/seek build/tests/scrub-live build/tests/dm-audio-clock
 	./tests/run.sh
 
 clean:
