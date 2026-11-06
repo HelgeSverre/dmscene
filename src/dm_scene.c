@@ -47,7 +47,7 @@ static inline uint8_t to8(float v, float dth) {
 typedef struct {
   dm_scene *s; dm_fb *fb; int y0, step;
   const uint8_t *code; uint32_t len; int post;
-  dm_vm vm; float in[DM_IN_COUNT]; uint32_t rng;
+  dm_vm vm; float in[DM_IN_COUNT], uni[DM_MAX_UNIFORMS]; uint32_t rng;
 } job;
 
 static void *run_rows(void *arg) {
@@ -86,10 +86,12 @@ static void run_pass(dm_scene *s, dm_fb *fb, const dm_prog *p, int post, float *
     j->s = s; j->fb = fb; j->y0 = i; j->step = nt; j->post = post;
     j->code = s->m->code + p->off; j->len = p->len;
     memcpy(j->in, s->in, sizeof j->in);
+    memcpy(j->uni, s->uni, sizeof j->uni);
     float *worker_state = s->worker_state[post][i];
     if (s->frame == 0) memset(worker_state, 0, sizeof s->worker_state[post][i]);
     j->rng = s->rng ^ (uint32_t)(i * 0x9E3779B9u) ^ (uint32_t)(post * 0x51ED27u);
     j->vm = s->vm; j->vm.in = j->in; j->vm.state = i == 0 ? state : worker_state; j->vm.rng = &j->rng;
+    j->vm.uni = j->uni;
     j->vm.prev = s->prev; j->vm.pw = s->pw; j->vm.ph = s->ph; j->vm.cur = s->cur;
   }
   for (int i = 1; i < nt; i++) {
