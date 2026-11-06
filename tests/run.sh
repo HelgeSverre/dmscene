@@ -8,6 +8,8 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$T/a" "$T/b"
 fail() { echo "FAIL: $1"; exit 1; }
 
+sh ./tests/cli-inspect.sh || fail "machine-readable CLI"
+
 ./build/tests/state-safety || fail "VM control flow"
 ./build/tests/vm-numeric || fail "VM numeric lookup boundary"
 ./build/tests/output-errors || fail "output failure propagation"

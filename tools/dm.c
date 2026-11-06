@@ -68,12 +68,14 @@ static void usage(int code) {
   fprintf(code ? stderr : stdout, DM_BANNER
     "usage: dm COMMAND file [options]\n\n"
     "  compile IN [-o OUT.dms] [--disasm]   text -> byte-packed module\n"
-    "  check   IN                           compile and verify only\n"
+    "  check   IN [--json]                  compile and verify only\n"
+    "  stats   IN [--json]                  module and per-program resource usage\n"
     "  disasm  IN                           print every program's bytecode\n"
     "  play    IN [play options]            terminal + audio (IN may be .dmt or .dms)\n"
     "  watch   IN [play options]            play, recompiling whenever the .dmt changes\n"
     "  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--render-scale N]\n"
     "  new     NAME                         write NAME.dmt, a minimal starting point\n\n"
+    "  --version                            engine and module format version\n\n"
     "play options:\n"
     "  --fps N       target frame rate (default 30)      --size WxH   force framebuffer size\n"
     "  --mute        no audio, wall-clock visuals         --start S    start S seconds in\n"
@@ -93,12 +95,122 @@ static void disasm_all(const dm_module *m) {
   for (int i = 0; i < m->npixel; i++) { printf("pixel %s\n", m->pixelname[i]); dm_disasm(m, &m->pixel[i], stdout); }
   if (m->has_post) { printf("post\n"); dm_disasm(m, &m->post, stdout); }
 }
-static void stats(const char *in, const dm_module *m) {
+static void stats(FILE *out, const char *in, const dm_module *m) {
   int npat = 0, cells = 0;
   for (int i = 0; i < DM_MAX_PATTERNS; i++) if (m->pat[i].cells) { npat++; cells += m->pat[i].rows * m->pat[i].channels; }
-  fprintf(stderr, "%s: %d inst, %d pattern(s), %d cells, %d pixel program(s), %d palette(s), %d text(s), %d sample(s), %d texture(s), %d event(s), %u bytes of code\n",
+  fprintf(out, "%s: %d inst, %d pattern(s), %d cells, %d pixel program(s), %d palette(s), %d text(s), %d sample(s), %d texture(s), %d event(s), %u bytes of code\n",
           in, m->ninst, npat, cells, m->npixel, m->npal, m->ntext, m->nsmp, m->ntex, m->nev, m->codelen);
 }
+
+/* JSON is a separate stdout protocol: no banner or human diagnostics. Preserve
+ * UTF-8; encode control characters and invalid filename bytes as escapes. */
+static void json_string(FILE *out, const char *s) {
+  if (!s) { fputs("null", out); return; }
+  fputc('"', out);
+  const unsigned char *p = (const unsigned char *)s;
+  while (*p) {
+    unsigned c = *p;
+    if (c == '"' || c == '\\') { fputc('\\', out); fputc(c, out); p++; }
+    else if (c < 32) { fprintf(out, "\\u%04x", c); p++; }
+    else if (c < 128) { fputc(c, out); p++; }
+    else {
+      int n = c >= 0xc2 && c <= 0xdf ? 2 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+      unsigned cp = n ? c & ((1u << (7 - n)) - 1) : 0;
+      int valid = n != 0;
+      for (int i = 1; i < n; i++) {
+        if ((p[i] & 0xc0) != 0x80) { valid = 0; break; }
+        cp = (cp << 6) | (p[i] & 63);
+      }
+      if (valid && (cp < (n == 2 ? 0x80u : n == 3 ? 0x800u : 0x10000u) || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))) valid = 0;
+      if (valid) { fwrite(p, 1, (size_t)n, out); p += n; }
+      else { fprintf(out, "\\u%04x", c); p++; }
+    }
+  }
+  fputc('"', out);
+}
+
+static int inspect_error(const char *file, int json, const char *kind, const char *message, int status) {
+  if (json) {
+    fputs("{\"schema_version\":1,\"ok\":false,\"file\":", stdout); json_string(stdout, file);
+    fputs(",\"error\":{\"kind\":", stdout); json_string(stdout, kind);
+    fputs(",\"message\":", stdout); json_string(stdout, message); fputs("}}\n", stdout);
+    fflush(stdout);
+  } else fprintf(stderr, "dm: %s\n", message);
+  return status;
+}
+
+static void program_stats(const dm_prog *p, const char *kind, int index, const char *name, int json, int *first) {
+  if (json) {
+    if (!*first) fputc(',', stdout);
+    fputs("{\"kind\":", stdout); json_string(stdout, kind);
+    fprintf(stdout, ",\"index\":%d,\"name\":", index); json_string(stdout, name);
+    printf(",\"offset\":%u,\"bytes\":%u,\"locals\":%u,\"state\":%u,\"delays\":%u,\"reverbs\":%u}",
+      p->off, p->len, p->nlocals, p->nstate, p->ndelay, p->nverb);
+  } else printf("%-7s %3d %-16s %6u %6u %6u %6u %6u\n", kind, index, name,
+    p->len, p->nlocals, p->nstate, p->ndelay, p->nverb);
+  *first = 0;
+}
+
+static void module_stats(const char *file, const dm_module *m, int json) {
+  unsigned patterns = 0, cells = 0;
+  unsigned long long sample_bytes = 0, texture_bytes = 0;
+  for (int i = 0; i < DM_MAX_PATTERNS; i++) if (m->pat[i].cells) { patterns++; cells += m->pat[i].rows * m->pat[i].channels; }
+  for (int i = 0; i < m->nsmp; i++) sample_bytes += m->smp[i].len;
+  for (int i = 0; i < m->ntex; i++) texture_bytes += (unsigned long long)m->tex[i].w * m->tex[i].h * 3;
+  if (json) {
+    fputs("{\"schema_version\":1,\"ok\":true,\"file\":", stdout); json_string(stdout, file);
+    fputs(",\"title\":", stdout); json_string(stdout, m->title);
+    printf(",\"module_version\":%d,\"song\":{\"bpm\":%u,\"speed\":%u,\"rows_per_beat\":%u,\"channels\":%u,\"orders\":%u,\"loop_order\":%u}",
+      DM_VERSION, m->bpm, m->speed, m->rpb, m->channels, m->norder, m->loop);
+    printf(",\"resources\":{\"code_bytes\":%u,\"instruments\":%d,\"patterns\":%u,\"cells\":%u,\"uniforms\":%u,\"pixel_programs\":%d,\"palettes\":%d,\"texts\":%d,\"samples\":%d,\"sample_bytes\":%llu,\"textures\":%d,\"texture_bytes\":%llu,\"envelopes\":%d,\"event_names\":%d,\"events\":%d},\"programs\":[",
+      m->codelen, m->ninst, patterns, cells, m->nuniform, m->npixel, m->npal, m->ntext,
+      m->nsmp, sample_bytes, m->ntex, texture_bytes, m->nvenv, m->nevname, m->nev);
+  } else {
+    printf("%s\n", m->title[0] ? m->title : file);
+    stats(stdout, file, m);
+    printf("%u BPM, %u channels, %u orders, %u uniforms; sample PCM %llu bytes, texture RGB %llu bytes\n",
+      m->bpm, m->channels, m->norder, m->nuniform, sample_bytes, texture_bytes);
+    puts("kind    idx name              bytes locals  state delays reverbs");
+  }
+  int first = 1;
+  for (int i = 0; i < m->ninst; i++) program_stats(&m->inst[i].prog, "inst", i + 1, m->inst[i].name, json, &first);
+  for (int i = 0; i < DM_MAX_CHANNELS; i++) if ((m->has_chanfx >> i) & 1) program_stats(&m->chanfx[i], "chan", i, "", json, &first);
+  if (m->has_master) program_stats(&m->master, "master", 0, "master", json, &first);
+  if (m->has_frame) program_stats(&m->frame, "frame", 0, "frame", json, &first);
+  for (int i = 0; i < m->npixel; i++) program_stats(&m->pixel[i], "pixel", i, m->pixelname[i], json, &first);
+  if (m->has_post) program_stats(&m->post, "post", 0, "post", json, &first);
+  if (json) fputs("]}\n", stdout);
+}
+
+static int wants_json(int argc, char **argv) {
+  for (int i = 0; i < argc && strcmp(argv[i], "--"); i++) if (!strcmp(argv[i], "--json")) return 1;
+  return 0;
+}
+
+static int cmd_inspect(int argc, char **argv, int report) {
+  int json = wants_json(argc, argv), positional = 0;
+  const char *file = NULL;
+  for (int i = 0; i < argc; i++) {
+    if (!positional && !strcmp(argv[i], "--json")) continue;
+    if (!positional && !strcmp(argv[i], "--")) { positional = 1; continue; }
+    if ((!positional && argv[i][0] == '-') || file)
+      return inspect_error(file, json, "usage", "expected one input file and optional --json", 2);
+    file = argv[i];
+  }
+  if (!file) return inspect_error(NULL, json, "usage", "missing input file", 2);
+  dm_module *m = calloc(1, sizeof *m);
+  if (!m) return inspect_error(file, json, "load", "out of memory", 1);
+  int rc = load_any(file, m);
+  if (rc) { free(m); return inspect_error(file, json, "load", dm_error(), 1); }
+  if (report) module_stats(file, m, json);
+  else {
+    fputs("{\"schema_version\":1,\"ok\":true,\"file\":", stdout); json_string(stdout, file);
+    fputs(",\"error\":null}\n", stdout);
+  }
+  dm_module_free(m); free(m);
+  return fflush(stdout) || ferror(stdout) ? 1 : 0;
+}
+
 static int cmd_compile(int argc, char **argv, int check, int disasm) {
   const char *in = NULL, *out = NULL;
   for (int i = 0; i < argc; i++) {
@@ -111,7 +223,7 @@ static int cmd_compile(int argc, char **argv, int check, int disasm) {
   if (!in) usage(2);
   static dm_module m;
   if (load_any(in, &m)) { fprintf(stderr, "%s\n", dm_error()); return 1; }
-  stats(in, &m);
+  stats(stderr, in, &m);
   if (disasm) disasm_all(&m);
   if (check || disasm) return 0;
   char def[1024];
@@ -692,10 +804,16 @@ int main(int argc, char **argv) {
   if (argc < 2) usage(2);
   const char *cmd = argv[1];
   const int base = 2;
+  if (!strcmp(cmd, "--version") || !strcmp(cmd, "-V")) {
+    if (argc != 2) usage(2);
+    printf("dmscene v%d (DMS format %d)\n", DM_VERSION, DM_VERSION);
+    return fflush(stdout) || ferror(stdout) ? 1 : 0;
+  }
   if (!strcmp(cmd, "-h") || !strcmp(cmd, "--help") || !strcmp(cmd, "help")) usage(0);
-  for (int i = base; i < argc; i++) if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) usage(0);
+  for (int i = base; i < argc && strcmp(argv[i], "--"); i++) if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) usage(0);
   if (!strcmp(cmd, "compile")) return cmd_compile(argc - base, argv + base, 0, 0);
-  if (!strcmp(cmd, "check")) return cmd_compile(argc - base, argv + base, 1, 0);
+  if (!strcmp(cmd, "check")) return wants_json(argc - base, argv + base) ? cmd_inspect(argc - base, argv + base, 0) : cmd_compile(argc - base, argv + base, 1, 0);
+  if (!strcmp(cmd, "stats")) return cmd_inspect(argc - base, argv + base, 1);
   if (!strcmp(cmd, "disasm")) return cmd_compile(argc - base, argv + base, 1, 1);
   if (!strcmp(cmd, "new")) { if (argc - base < 1) usage(2); return cmd_new(argv[base]); }
   if (!strcmp(cmd, "play") || !strcmp(cmd, "render") || !strcmp(cmd, "watch")) {

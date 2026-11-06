@@ -110,6 +110,10 @@ The DMS reader's nested machine is header → chunk tag/varint → bounded paylo
 → next chunk → verify. Unknown tags skip their payload. Invalid version,
 overflowing varint, truncation or invalid resource references go to error.
 Partial allocations belong to the candidate and must be freed even on error.
+`stats` and `check --json` use the same candidate/verification path and then
+report without activating playback. JSON mode emits one result object on stdout
+for success or failure, preserving exit codes 0/1/2; details are in
+[CLI reporting](cli-reporting.md). A report is not a render-time estimate.
 Texture chunks additionally require ascending unique IDs, valid dimensions and
 the exact RGB byte count. This format does not promise rejection of every
 noncanonical encoding (for example repeated legacy chunks).
