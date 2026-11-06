@@ -62,6 +62,9 @@ envelopes and timeline events. Each chapter lasts four bars at 180 BPM.
 
 ## Build and run
 
+This experimental branch also supports [native video export](docs/native-export.md):
+compile pixel programs to C and write lossless MOV or raw AVI without ffmpeg.
+
 [![CI](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml/badge.svg)](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml)
 
 CI builds and runs `make test` on macOS and Linux, then does an ffmpeg MP4

@@ -28,8 +28,28 @@ SHOWCASE_CHAPTER := 5.328979592
 all: dm
 
 # Experimental native exporter. Kept out of the public CLI while evaluated.
-avi-prototype: tools/avi-prototype.c $(OBJ) $(POBJ)
+avi-prototype: tools/avi-prototype.c src/dm_mov.c include/dm_mov.h $(OBJ) $(POBJ)
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/dm-aot: tools/dm-aot.c $(OBJ) $(POBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/native/%.c: build/modules/%.dms build/dm-aot src/dm_vm.c
+	mkdir -p build/native
+	./build/dm-aot $< > $@.tmp
+	mv $@.tmp $@
+
+build/native/%: build/native/%.c tools/avi-prototype.c src/dm_mov.c include/dm_mov.h $(filter-out build/obj/dm_vm.o,$(OBJ)) $(POBJ)
+	$(CC) $(CFLAGS) -I. -DDM_AOT -Wno-unused-variable -Wno-unused-label $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+
+native-export: build/native/$(notdir $(DEMO:.dmt=))
+	@echo "Run $< $(DEMO) output.avi [--seconds S] [--size WxH] [--threads N]"
+
+test-native: avi-prototype build/dm-aot dm
+	sh tests/native-export.sh
+	@if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then sh tests/qtrle-equivalence.sh; fi
+
+.PRECIOUS: build/native/%.c
 
 build/obj/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_banner.h | build/obj
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -79,4 +99,4 @@ test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/
 clean:
 	rm -rf build dm
 
-.PHONY: all demo demos videos showcase showcase-preview run test clean avi-prototype
+.PHONY: all demo demos videos showcase showcase-preview run test clean avi-prototype native-export test-native

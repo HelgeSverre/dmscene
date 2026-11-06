@@ -129,7 +129,7 @@ static void write_stsz(dm_mov *m, int video) {
 static void write_stco(dm_mov *m, int video) { FILE *f = m->f; size_t n = video ? m->nv : m->na; uint32_t *o = video ? m->voff : m->aoff; long p = atom(f, "stco"); be32(f, 0); be32(f, (uint32_t)n); for (size_t i = 0; i < n; i++) be32(f, o[i]); end_atom(m, p); }
 static void write_stbl(dm_mov *m, int video) {
   FILE *f = m->f; long p = atom(f, "stbl"); write_stsd(m, video); write_stts(m, video); write_stsc(m, video); write_stsz(m, video); write_stco(m, video);
-  if (video) { long q = atom(f, "stss"); uint32_t keys = ((uint32_t)m->nv + m->keyint - 1) / m->keyint; be32(f, 0); be32(f, keys); for (uint32_t i = 0; i < keys; i++) be32(f, 1 + i * m->keyint); end_atom(m, q); } end_atom(m, p);
+  if (video) { long q = atom(f, "stss"); uint32_t keys = (uint32_t)(((uint64_t)m->nv + m->keyint - 1) / m->keyint); be32(f, 0); be32(f, keys); for (uint32_t i = 0; i < keys; i++) be32(f, 1 + i * m->keyint); end_atom(m, q); } end_atom(m, p);
 }
 static void write_dinf(dm_mov *m) { FILE *f = m->f; long p = atom(f, "dinf"), q = atom(f, "dref"); be32(f, 0); be32(f, 1); be32(f, 12); tag(f, "url "); be32(f, 1); end_atom(m, q); end_atom(m, p); }
 static void write_trak(dm_mov *m, int video, uint32_t id) {
@@ -156,7 +156,8 @@ int dm_mov_close(dm_mov *m) {
     for (int i = 0; i < 6; i++) be32(f, 0); be32(f, m->audio_frames ? 3 : 2); end_atom(m, mvhd);
     write_trak(m, 1, 1); if (m->audio_frames) write_trak(m, 0, 2); end_atom(m, moov);
   }
-  int bad = m->failed || ferror(f) || fclose(f);
+  int bad = m->failed || ferror(f);
+  if (fclose(f)) bad = 1;
   free(m->prev); free(m->pkt); free(m->voff); free(m->vsize); free(m->aoff); free(m->acount); free(m);
   return bad ? -1 : 0;
 }

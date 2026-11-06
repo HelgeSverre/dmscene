@@ -1,6 +1,7 @@
 # build output
 build/
 /dm
+/avi-prototype
 *.o
 *.dms
 # rendered output anywhere except the shipped sample assets
