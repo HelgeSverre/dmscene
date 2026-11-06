@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: make
+
+      - name: Test engine, compiler and demos
+        run: make test
+
+      - name: Install ffmpeg
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Render smoke test
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p build/video build/audio
+          ./dm render demos/plasma.dmt \
+            --mp4 build/video/ci-smoke.mp4 \
+            --wav build/audio/ci-smoke.wav \
+            --seconds 2 --size 320x200 --fps 15
+          test -s build/video/ci-smoke.mp4
+          test -s build/audio/ci-smoke.wav

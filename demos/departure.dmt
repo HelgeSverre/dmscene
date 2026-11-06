@@ -1,0 +1,643 @@
+# DEPARTURE — 04:00, opposite platform, no train.
+# A single miniature set rendered with 2D signed-distance geometry.  The post
+# pass is the wet glass in front of the camera.  Fifteen bars at 120 BPM = 30 s.
+title DEPARTURE
+song bpm=120 speed=6 rpb=4 channels=7 loop=0 volume=0.60 scale=2 dither=1
+order 0 0 1 2 3 0 1 4 0 1 2 3 0 5 6
+pan 0.50 0.64 0.46 0.34 0.55 0.66 0.58
+
+text heading "DEPARTURE"
+text delayed "DELAYED"
+text clock "04:00"
+text drinks "DRINKS"
+text platform "PLATFORM 2"
+
+# ---------------------------------------------------------------------- sound
+inst rail {
+  f = 43 + 150 * exp(-t * 19)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 3.7)
+  sub = sin($p * tau * 0.50) * exp(-t * 2.8) * 0.35
+  air = lp(noise(), 180) * exp(-t * 5.0) * 0.16
+  out(dist((body + sub) * 1.25 + air, 1.18) * 0.48)
+}
+
+inst drip {
+  n = hp(noise(), 6200)
+  ping = sin(tau * (1450 + 900 * vel) * t) * exp(-t * 55) * 0.15
+  out((n * 0.55 + ping) * exp(-t * (38 + 45 * (1 - vel))) * 0.24)
+}
+
+inst bass {
+  e = env(0.018, 0.34, 0.64, 0.42)
+  s = sin(ph * tau) + tri(ph) * 0.24 + sin(ph * tau * 2.003) * 0.12
+  s = lp(s, 155 + 360 * e)
+  out(s * e * 0.40)
+}
+
+inst pad nna=continue {
+  e = env(0.48, 0.72, 0.72, 1.35)
+  a = sin(ph * tau + 0.22 * sin(ph * tau * 0.5 + t * 0.23))
+  b = tri(ph + 0.0015 * t) + tri(ph - 0.0019 * t)
+  s = a * 0.62 + b * 0.18 + sin(ph * tau * 2.002) * 0.09
+  s = svf(s, 390 + 260 * e + 80 * sin(t * 0.31), 0.24)
+  out(s * e * 0.22)
+}
+
+inst bell nna=continue {
+  e = exp(-t * 1.18) * smooth(0.0, 0.008, t)
+  m = sin(ph * tau * 2.007) * (1.45 * exp(-t * 2.8) + 0.12)
+  s = sin(ph * tau + m) + sin(ph * tau * 2.004 + m * 0.22) * 0.28
+  s = s + sin(ph * tau * 3.991) * exp(-t * 4.0) * 0.10
+  out(s * e * 0.20)
+}
+
+chan 3 {
+  w = verb(x, 0.84, 0.52)
+  out(x * 0.84 + w * 0.42)
+}
+chan 4 {
+  w = verb(x, 0.86, 0.48)
+  out(x * 0.82 + w * 0.44)
+}
+chan 5 {
+  w = verb(x, 0.85, 0.50)
+  out(x * 0.84 + w * 0.40)
+}
+chan 6 {
+  d = dly(x, 0.375, 0.34)
+  w = verb(x + d * 0.18, 0.87, 0.43)
+  out(x + d * 0.30 + w * 0.40)
+}
+
+master {
+  dl = dly(l, 0.375, 0.24)
+  dr = dly(r, 0.750, 0.22)
+  vl = verb(l + dr * 0.10, 0.82, 0.53)
+  vr = verb(r + dl * 0.10, 0.82, 0.53)
+  # Rain and two mains-related sounds are room tone, not a fade-out device.
+  gust = 0.78 + 0.14 * sin(time * 0.29) + 0.08 * sin(time * 0.73 + 1.2)
+  nl = noise()
+  nr = noise()
+  rainl = (hp(nl, 2700) * 0.021 + lp(nl, 520) * 0.012) * gust
+  rainr = (hp(nr, 2900) * 0.021 + lp(nr, 480) * 0.012) * gust
+  buzz = 0.68 + 0.32 * hash(floor(time * 31))
+  hum = (sin(time * tau * 60) * 0.009 + sin(time * tau * 120 + 0.3) * 0.004) * buzz
+  motor = sin(time * tau * 47 + 0.6 * sin(time * 0.4)) * 0.004
+  ol = l + dr * 0.14 + vl * 0.14 + rainl + hum + motor
+  or = r + dl * 0.14 + vr * 0.14 + rainr + hum * 0.92 + motor
+  out(dist(hp(ol, 28) * 1.06, 1.16), dist(hp(or, 28) * 1.06, 1.16))
+}
+
+# --------------------------------------------------------------- tracker score
+# 16 rows = one two-second bar.  ch0 rail, ch1 drips, ch2 bass,
+# ch3/4/5 pad triad, ch6 bells.  No notes are released in the final bar.
+pattern 0 rows=16 {
+  00: C-2 1 24 ... | C-6 2 0B ... | D-2 3 26 ... | D-3 4 20 ... | F-3 4 1B ... | A-3 4 18 ... | D-5 5 14 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 07 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 0A ... | . | . | . | . | A-4 5 0E ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 06 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1C ... | C-6 2 09 ... | . | . | . | . | F-5 5 12 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 07 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 0A ... | . | . | . | . | E-5 5 0D ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 06 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 1 rows=16 {
+  00: C-2 1 25 ... | C-6 2 0A ... | A#1 3 28 ... | A#2 4 21 ... | D-3 4 1C ... | F-3 4 19 ... | A#4 5 13 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 0A ... | . | . | . | . | D-5 5 10 ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 07 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1D ... | C-6 2 09 ... | . | . | . | . | F-5 5 13 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 0B ... | . | . | . | . | C-5 5 0E ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 07 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 2 rows=16 {
+  00: C-2 1 23 ... | C-6 2 09 ... | F-2 3 27 ... | F-2 4 20 ... | A-2 4 1B ... | C-3 4 19 ... | F-5 5 13 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 09 ... | . | . | . | . | A-4 5 0F ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 07 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1C ... | C-6 2 08 ... | . | . | . | . | C-5 5 12 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 0A ... | . | . | . | . | G-5 5 0D ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 06 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 3 rows=16 {
+  00: C-2 1 22 ... | C-6 2 09 ... | C-2 3 27 ... | C-3 4 20 ... | E-3 4 1B ... | G-3 4 18 ... | E-5 5 13 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 09 ... | . | . | . | . | G-4 5 0E ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 06 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1B ... | C-6 2 08 ... | . | . | . | . | C-5 5 12 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 09 ... | . | . | . | . | D-5 5 0D ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 06 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 4 rows=16 {
+  00: C-2 1 21 ... | C-6 2 08 ... | G-1 3 27 ... | G-2 4 20 ... | A#2 4 1B ... | D-3 4 18 ... | G-4 5 13 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 08 ... | . | . | . | . | A#4 5 0F ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 06 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1A ... | C-6 2 08 ... | . | . | . | . | D-5 5 12 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 09 ... | . | . | . | . | F-5 5 0D ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 05 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 5 rows=16 {
+  00: C-2 1 24 ... | C-6 2 09 ... | A-1 3 28 ... | A-2 4 21 ... | C#3 4 1C ... | E-3 4 19 ... | E-5 5 14 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 09 ... | . | . | . | . | A-4 5 0F ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 07 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1E ... | C-6 2 09 ... | . | . | . | . | C#5 5 13 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 0A ... | . | . | . | . | E-5 5 10 ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 07 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+pattern 6 rows=16 {
+  00: C-2 1 26 ... | C-6 2 0A ... | D-2 3 29 ... | D-3 4 23 ... | F-3 4 1E ... | A-3 4 1B ... | D-5 5 17 ...
+  01: . | . | . | . | . | . | .
+  02: . | C-6 2 06 ... | . | . | . | . | .
+  03: . | . | . | . | . | . | .
+  04: . | C-6 2 08 ... | . | . | . | . | F-5 5 13 ...
+  05: . | . | . | . | . | . | .
+  06: . | C-6 2 06 ... | . | . | . | . | .
+  07: . | . | . | . | . | . | .
+  08: C-2 1 1C ... | C-6 2 08 ... | . | . | . | . | A-5 5 14 ...
+  09: . | . | . | . | . | . | .
+  10: . | C-6 2 06 ... | . | . | . | . | .
+  11: . | . | . | . | . | . | .
+  12: . | C-6 2 09 ... | . | . | . | . | D-6 5 16 ...
+  13: . | . | . | . | . | . | .
+  14: . | C-6 2 07 ... | . | . | . | . | .
+  15: . | . | . | . | . | . | .
+}
+
+# -------------------------------------------------------------- visual helpers
+uniform flicker vendGlow bellGlow kickGlow rainAmt camX camY breathK boardK lateK
+
+fn box(px, py, bx, by) {
+  dx = abs(px) - bx
+  dy = abs(py) - by
+  return len(max(dx, 0), max(dy, 0)) + min(max(dx, dy), 0)
+}
+fn ell(px, py, rx, ry) {
+  return (len(px / rx, py / ry) - 1) * min(rx, ry)
+}
+fn seg(px, py, ax, ay, bx, by) {
+  vx = bx - ax
+  vy = by - ay
+  qx = px - ax
+  qy = py - ay
+  k = clamp((qx * vx + qy * vy) / (vx * vx + vy * vy + 0.000001), 0, 1)
+  return len(qx - vx * k, qy - vy * k)
+}
+fn smin(a, b, k) {
+  hh = clamp(0.5 + 0.5 * (b - a) / k, 0, 1)
+  return mix(b, a, hh) - k * hh * (1 - hh)
+}
+fn label(s, px, py, ox, oy, sz) {
+  cx = (px - ox) / sz
+  cy = (oy - py) / sz
+  i = floor(cx)
+  return glyph(str(s, i), fract(cx), fract(cy)) * step(0, cx) * step(cx, strlen(s)) * step(0, cy) * step(cy, 1)
+}
+fn figure(px, py) {
+  # Hood, head, long coat, two legs and an arm raised to a dim phone.
+  d = ell(px + 0.008, py - 0.178, 0.067, 0.079)
+  d = smin(d, box(px, py - 0.093, 0.035, 0.042), 0.020)
+  d = smin(d, seg(px, py, 0.0, 0.072, 0.0, -0.245) - 0.105, 0.035)
+  d = smin(d, ell(px, py + 0.235, 0.137, 0.090), 0.035)
+  d = min(d, seg(px, py, -0.052, -0.245, -0.067, -0.420) - 0.026)
+  d = min(d, seg(px, py, 0.050, -0.245, 0.069, -0.420) - 0.026)
+  d = min(d, seg(px, py, -0.068, -0.423, -0.105, -0.423) - 0.018)
+  d = min(d, seg(px, py, 0.068, -0.423, 0.112, -0.423) - 0.018)
+  d = smin(d, seg(px, py, -0.085, 0.040, -0.133, -0.170) - 0.027, 0.018)
+  d = smin(d, seg(px, py, 0.082, 0.040, 0.158, -0.090) - 0.027, 0.018)
+  d = min(d, seg(px, py, 0.158, -0.090, 0.235, -0.018) - 0.022)
+  return d
+}
+
+frame {
+  # Mains flutter plus two longer brown-outs; never a full-screen strobe.
+  flicker = 0.88 + 0.10 * hash(floor(t * 43.0))
+  flicker = flicker * (1 - 0.48 * exp(-pow((t - 11.7) * 5.0, 2)))
+  flicker = flicker * (1 - 0.38 * exp(-pow((t - 23.4) * 6.0, 2)))
+  flicker = flicker * (1 - 0.25 * step(0.975, hash(floor(t * 3.1) + 8.0)))
+  vendGlow = 0.92 + 0.045 * sin(t * 2.1) + 0.025 * sin(t * 37.0)
+  bellGlow = exp(-trig(6) * 1.8)
+  kickGlow = exp(-trig(0) * 4.5)
+  rainAmt = 0.68 + 0.22 * smooth(8.0, 22.0, t) + 0.08 * sin(t * 0.37)
+  camX = 0.007 * sin(t * 0.19) + 0.002 * sin(t * 0.71)
+  camY = 0.004 * sin(t * 0.23 + 1.0)
+  breathK = exp(-fract(t / 7.0) * 4.2) * smooth(0.03, 0.15, fract(t / 7.0))
+  boardK = 0.92 + 0.08 * sin(t * 17.0) + 0.16 * smooth(26.0, 30.0, t)
+  lateK = 0.58 + 0.42 * step(0.42, fract(t * 0.50))
+}
+
+pixel {
+  px = u + camX
+  py = v + camY
+  feet = -0.435
+
+  # ------------------------------------------------ tiled opposite wall
+  wallNoise = fbm(px * 2.8 + 4.0, py * 3.1 + 7.0, 2)
+  r = 0.018 + wallNoise * 0.018
+  g = 0.031 + wallNoise * 0.025
+  b = 0.046 + wallNoise * 0.035
+  lightPool = exp(-abs(py - 0.40) * 1.8) * (0.45 + 0.55 * exp(-abs(px + 0.25) * 0.65))
+  r = r + lightPool * 0.075 * flicker
+  g = g + lightPool * 0.115 * flicker
+  b = b + lightPool * 0.135 * flicker
+  tileX = exp(-abs(fract(px * 2.5 + 0.5) - 0.5) * 48.0)
+  tileY = exp(-abs(fract(py * 5.0 + 0.5) - 0.5) * 55.0)
+  grout = max(tileX, tileY) * 0.34
+  r = mix(r, 0.008, grout)
+  g = mix(g, 0.014, grout)
+  b = mix(b, 0.020, grout)
+  grime = smooth(0.58, 0.82, fbm(px * 5.0, py * 1.3 + 3.0, 2)) * 0.028
+  r = r - grime * 0.35
+  g = g - grime * 0.50
+  b = b - grime * 0.45
+
+  # Structural columns and a low tiled skirting board.
+  columns = 1 - smooth(0.040, 0.052, abs(abs(px - 0.04) - 1.48))
+  r = mix(r, 0.022 + lightPool * 0.030, columns)
+  g = mix(g, 0.033 + lightPool * 0.045, columns)
+  b = mix(b, 0.044 + lightPool * 0.052, columns)
+  skirt = 1 - smooth(-0.34, -0.325, py)
+  r = mix(r, 0.018, skirt)
+  g = mix(g, 0.030, skirt)
+  b = mix(b, 0.038, skirt)
+  skirtEdge = exp(-abs(py + 0.327) * 190.0)
+  r = r + skirtEdge * 0.05 * flicker
+  g = g + skirtEdge * 0.08 * flicker
+  b = b + skirtEdge * 0.09 * flicker
+
+  # ------------------------------------------------ wet platform and track bed
+  floorMask = 1 - smooth(feet - 0.006, feet + 0.006, py)
+  depth = 0.16 / max(feet - py + 0.025, 0.025)
+  floorNoise = fbm(px * depth * 3.0, depth * 5.0, 2)
+  fr = 0.014 + floorNoise * 0.020
+  fg = 0.025 + floorNoise * 0.026
+  fb = 0.034 + floorNoise * 0.034
+  seams = exp(-abs(fract(px * depth * 2.3) - 0.5) * 45.0) + exp(-abs(fract(depth * 4.0) - 0.5) * 42.0)
+  fr = fr + seams * 0.014 * exp(-(feet - py) * 1.5)
+  fg = fg + seams * 0.020 * exp(-(feet - py) * 1.5)
+  fb = fb + seams * 0.023 * exp(-(feet - py) * 1.5)
+  # Broken vertical reflections: fluorescent cold, vending cyan, board amber.
+  ripple = 0.52 + 0.48 * sin(px * 43.0 + sin(py * 39.0 + t * 0.8) * 2.3)
+  wet = (0.30 + 0.70 * ripple) * exp(-(feet - py) * 1.15)
+  tubeRef = exp(-abs(px + 0.72) * 1.6) + exp(-abs(px - 0.62) * 1.9)
+  fr = fr + wet * tubeRef * 0.045 * flicker
+  fg = fg + wet * tubeRef * 0.090 * flicker
+  fb = fb + wet * tubeRef * 0.110 * flicker
+  vendRef = exp(-abs(px - 1.07 - 0.016 * sin(py * 31.0 + t)) * 5.4)
+  fr = fr + wet * vendRef * 0.030 * vendGlow
+  fg = fg + wet * vendRef * 0.210 * vendGlow
+  fb = fb + wet * vendRef * 0.205 * vendGlow
+  boardRef = exp(-abs(px + 0.63) * 2.0)
+  fr = fr + wet * boardRef * 0.105 * boardK
+  fg = fg + wet * boardRef * 0.074 * boardK
+  fb = fb + wet * boardRef * 0.024 * boardK
+  # The yellow safety line is worn and intermittently submerged.
+  yellow = (1 - smooth(0.010, 0.015, abs(py + 0.625 + 0.003 * sin(px * 5.0)))) * (0.68 + 0.32 * ripple)
+  fr = mix(fr, 0.43, yellow * 0.78)
+  fg = mix(fg, 0.31, yellow * 0.78)
+  fb = mix(fb, 0.055, yellow * 0.78)
+  dash = step(0.54, fract(px * 3.5 + 0.2)) * yellow
+  fr = fr - dash * 0.15
+  fg = fg - dash * 0.12
+  # Rails at the bottom edge establish the camera's track-side position.
+  trackMask = 1 - smooth(-0.735, -0.720, py)
+  ballast = hash(floor(px * 75.0) + floor(py * 95.0) * 19.0)
+  fr = mix(fr, 0.011 + ballast * 0.025, trackMask)
+  fg = mix(fg, 0.016 + ballast * 0.024, trackMask)
+  fb = mix(fb, 0.021 + ballast * 0.027, trackMask)
+  sleepers = step(0.72, fract(px * 2.9 + py * 0.8)) * trackMask
+  fr = mix(fr, 0.035, sleepers * 0.65)
+  fg = mix(fg, 0.027, sleepers * 0.65)
+  fb = mix(fb, 0.025, sleepers * 0.65)
+  rails = (exp(-abs(py + 0.805) * 300.0) + exp(-abs(py + 0.945) * 310.0)) * trackMask
+  fr = fr + rails * (0.15 + 0.12 * ripple)
+  fg = fg + rails * (0.20 + 0.16 * ripple)
+  fb = fb + rails * (0.22 + 0.20 * ripple)
+  r = mix(r, fr, floorMask)
+  g = mix(g, fg, floorMask)
+  b = mix(b, fb, floorMask)
+
+  # ------------------------------------------------ empty bench, far left
+  benchBack = box(px + 1.06, py + 0.115, 0.405, 0.090)
+  benchSeat = box(px + 1.06, py + 0.287, 0.440, 0.026)
+  benchLegs = min(box(px + 1.36, py + 0.365, 0.018, 0.080), box(px + 0.76, py + 0.365, 0.018, 0.080))
+  benchD = min(benchBack, min(benchSeat, benchLegs))
+  benchM = 1 - smooth(-0.004, 0.005, benchD)
+  benchSlat = 0.55 + 0.45 * sin((py + 0.11) * 110.0)
+  r = mix(r, 0.020 + benchSlat * 0.018, benchM)
+  g = mix(g, 0.035 + benchSlat * 0.024, benchM)
+  b = mix(b, 0.043 + benchSlat * 0.027, benchM)
+  benchRim = exp(-abs(benchD) * 140.0)
+  g = g + benchRim * 0.028 * flicker
+  b = b + benchRim * 0.038 * flicker
+
+  # ------------------------------------------------ vending machine and spill
+  vendD = box(px - 1.075, py + 0.012, 0.278, 0.418)
+  vendHalo = exp(-max(vendD, 0.0) * 9.0) * vendGlow
+  r = r + vendHalo * 0.018
+  g = g + vendHalo * 0.090
+  b = b + vendHalo * 0.100
+  vendM = 1 - smooth(-0.004, 0.004, vendD)
+  r = mix(r, 0.025, vendM)
+  g = mix(g, 0.092, vendM)
+  b = mix(b, 0.105, vendM)
+  vendEdge = exp(-abs(vendD) * 100.0)
+  r = r + vendEdge * 0.035
+  g = g + vendEdge * 0.210 * vendGlow
+  b = b + vendEdge * 0.235 * vendGlow
+  winD = box(px - 1.045, py - 0.055, 0.198, 0.246)
+  winM = 1 - smooth(-0.003, 0.003, winD)
+  winLight = (0.62 + 0.38 * exp(-abs(px - 0.94) * 3.0)) * vendGlow
+  r = mix(r, 0.018 * winLight, winM)
+  g = mix(g, 0.255 * winLight, winM)
+  b = mix(b, 0.275 * winLight, winM)
+  # Three shelves of tiny bottles/cans, alternating warm and cold labels.
+  cellX = floor((px - 0.848) * 25.0)
+  cellY = floor((py + 0.177) * 15.0)
+  canX = fract((px - 0.848) * 25.0) - 0.5
+  canY = fract((py + 0.177) * 15.0) - 0.5
+  can = (1 - smooth(0.23, 0.29, abs(canX))) * (1 - smooth(0.29, 0.36, abs(canY))) * winM
+  can = can * step(0.848, px) * step(px, 1.242) * step(-0.177, py) * step(py, 0.290)
+  canHue = hash(cellX * 3.7 + cellY * 11.0)
+  r = mix(r, mix(0.12, 0.62, step(0.64, canHue)), can * 0.88)
+  g = mix(g, mix(0.62, 0.24, step(0.64, canHue)), can * 0.88)
+  b = mix(b, mix(0.72, 0.12, step(0.64, canHue)), can * 0.88)
+  shelf = exp(-abs(fract((py + 0.177) * 5.0) - 0.5) * 65.0) * winM
+  r = r + shelf * 0.06
+  g = g + shelf * 0.13
+  b = b + shelf * 0.14
+  panel = 1 - smooth(-0.003, 0.003, box(px - 1.265, py + 0.192, 0.036, 0.105))
+  r = mix(r, 0.024, panel)
+  g = mix(g, 0.030, panel)
+  b = mix(b, 0.035, panel)
+  led = exp(-len((px - 1.265) * 1.4, py + 0.155) * 180.0)
+  r = r + led * (0.65 + 0.25 * lateK)
+  g = g + led * 0.055
+  b = b + led * 0.025
+  drinkText = label(drinks, px, py, 0.907, 0.354, 0.047)
+  r = r + drinkText * 0.42 * vendGlow
+  g = g + drinkText * 0.95 * vendGlow
+  b = b + drinkText * 0.90 * vendGlow
+
+  # ------------------------------------------------ waiting figure + reflection
+  sway = 0.006 * sin(t * 0.63) + 0.002 * sin(t * 2.0)
+  figureX = 0.075 + sway
+  fd = figure(px - figureX, py)
+  # A distorted reflection is computed from the same silhouette, not a blob.
+  reflectY = 2.0 * feet - py
+  reflectedD = figure((px - figureX) * 1.05 + 0.010 * sin(py * 38.0 + t), reflectY)
+  refFigure = (1 - smooth(-0.020, 0.025, reflectedD)) * floorMask * exp(-(feet - py) * 3.8)
+  r = mix(r, 0.008, refFigure * 0.58)
+  g = mix(g, 0.015, refFigure * 0.58)
+  b = mix(b, 0.022, refFigure * 0.58)
+  fm = 1 - smooth(-0.004, 0.004, fd)
+  r = mix(r, 0.006 + wallNoise * 0.005, fm)
+  g = mix(g, 0.011 + wallNoise * 0.007, fm)
+  b = mix(b, 0.017 + wallNoise * 0.010, fm)
+  rim = exp(-abs(fd) * 135.0)
+  rightRim = smooth(-0.03, 0.12, px - figureX)
+  r = r + rim * (0.025 + rightRim * 0.025) * flicker
+  g = g + rim * (0.060 + rightRim * 0.125) * flicker
+  b = b + rim * (0.080 + rightRim * 0.145) * flicker
+  # Coat seam and the small phone are the only interior detail in the silhouette.
+  seam = exp(-abs(px - figureX - 0.006) * 150.0) * fm * smooth(-0.30, 0.03, py)
+  g = g + seam * 0.015
+  b = b + seam * 0.022
+  phoneD = box(px - figureX - 0.239, py + 0.013, 0.019, 0.032)
+  phoneM = 1 - smooth(-0.002, 0.003, phoneD)
+  phoneGlow = exp(-max(phoneD, 0.0) * 28.0) * (0.72 + 0.18 * sin(t * 0.8))
+  r = r + phoneGlow * 0.055
+  g = g + phoneGlow * 0.115
+  b = b + phoneGlow * 0.105
+  r = mix(r, 0.28, phoneM)
+  g = mix(g, 0.62, phoneM)
+  b = mix(b, 0.57, phoneM)
+  # Cold breath catches the fluorescent light for a moment every seven seconds.
+  breathField = fbm((px - figureX) * 13.0 - t * 0.35, py * 18.0 + 2.0, 2)
+  breathD = ell(px - figureX - 0.115 - breathK * 0.055, py - 0.170, 0.115, 0.040)
+  breath = exp(-max(breathD, 0.0) * 30.0) * smooth(0.48, 0.74, breathField) * breathK * 0.12
+  r = r + breath * 0.55
+  g = g + breath * 0.80
+  b = b + breath
+
+  # ------------------------------------------------ departure board and signs
+  # Hangers connect the board to the roof, keeping it inside the set.
+  hangers = (1 - smooth(0.009, 0.013, abs(px + 1.13))) * step(0.72, py) + (1 - smooth(0.009, 0.013, abs(px + 0.17))) * step(0.72, py)
+  r = mix(r, 0.025, min(hangers, 1.0))
+  g = mix(g, 0.040, min(hangers, 1.0))
+  b = mix(b, 0.047, min(hangers, 1.0))
+  boardD = box(px + 0.635, py - 0.505, 0.765, 0.245)
+  boardHalo = exp(-max(boardD, 0.0) * 11.0) * boardK
+  r = r + boardHalo * 0.045
+  g = g + boardHalo * 0.034
+  b = b + boardHalo * 0.014
+  boardM = 1 - smooth(-0.004, 0.004, boardD)
+  r = mix(r, 0.007, boardM)
+  g = mix(g, 0.014, boardM)
+  b = mix(b, 0.016, boardM)
+  boardEdge = exp(-abs(boardD) * 145.0)
+  r = r + boardEdge * 0.11 * boardK
+  g = g + boardEdge * 0.10 * boardK
+  b = b + boardEdge * 0.055 * boardK
+  # The title is a physical dot-matrix sign, present for the whole shot.
+  titleText = label(heading, px, py, -1.272, 0.676, 0.129)
+  titleText = titleText * boardM
+  r = r + titleText * 0.92 * boardK
+  g = g + titleText * 0.78 * boardK
+  b = b + titleText * 0.36 * boardK
+  clockText = label(clock, px, py, -1.265, 0.461, 0.071) * boardM
+  r = r + clockText * 0.32 * boardK
+  g = g + clockText * 0.52 * boardK
+  b = b + clockText * 0.45 * boardK
+  lateText = label(delayed, px, py, -0.525, 0.461, 0.071) * boardM * lateK
+  r = r + lateText * 0.95 * boardK
+  g = g + lateText * 0.33 * boardK
+  b = b + lateText * 0.055 * boardK
+  boardScan = exp(-abs(fract(py * 105.0) - 0.5) * 22.0) * boardM
+  r = r + boardScan * 0.010
+  g = g + boardScan * 0.012
+  # Small platform identifier on the right-hand column.
+  platD = box(px - 0.570, py - 0.525, 0.310, 0.112)
+  platM = 1 - smooth(-0.003, 0.003, platD)
+  r = mix(r, 0.020, platM)
+  g = mix(g, 0.065, platM)
+  b = mix(b, 0.092, platM)
+  platText = label(platform, px, py, 0.328, 0.565, 0.047) * platM
+  r = r + platText * 0.58 * flicker
+  g = g + platText * 0.83 * flicker
+  b = b + platText * 0.86 * flicker
+
+  # ------------------------------------------------ roof and fluorescent tubes
+  roofMask = smooth(0.755, 0.770, py)
+  r = mix(r, 0.008 + wallNoise * 0.008, roofMask)
+  g = mix(g, 0.014 + wallNoise * 0.010, roofMask)
+  b = mix(b, 0.021 + wallNoise * 0.013, roofMask)
+  beams = step(0.77, fract(px * 1.15 + 0.12)) * roofMask
+  r = r - beams * 0.005
+  g = g - beams * 0.008
+  b = b - beams * 0.010
+  tube1 = seg(px, py, -1.37, 0.825, -0.33, 0.825)
+  tube2 = seg(px, py, 0.23, 0.825, 1.24, 0.825)
+  tubeD = min(tube1, tube2)
+  tubeCore = 1 - smooth(0.010, 0.017, tubeD)
+  tubeHalo = exp(-tubeD * 19.0) * flicker
+  r = r + tubeHalo * 0.105 + tubeCore * 0.90 * flicker
+  g = g + tubeHalo * 0.190 + tubeCore * 1.00 * flicker
+  b = b + tubeHalo * 0.230 + tubeCore * 0.96 * flicker
+  # Far red signal: the train still has not come.
+  signalD = len(px - 1.485, py + 0.690)
+  signal = exp(-signalD * 75.0) + exp(-signalD * 15.0) * 0.15
+  r = r + signal * (0.62 + 0.12 * sin(t * 1.7))
+  g = g + signal * 0.018
+  b = b + signal * 0.025
+
+  # Audio-reactive light is restrained: the station breathes, never raves.
+  r = r * (0.96 + 0.025 * kickGlow) + bellGlow * 0.004
+  g = g * (0.97 + 0.035 * kickGlow) + bellGlow * 0.007
+  b = b * (0.98 + 0.040 * kickGlow) + bellGlow * 0.010
+  rgb(max(r, 0.0), max(g, 0.0), max(b, 0.0))
+}
+
+post {
+  # ------------------------------------------------ running water on the lens
+  # Two independently gridded droplet layers.  Their local deformation also
+  # refracts the finished set via tap(), rather than drawing white noise on it.
+  rx1 = x * 31.0
+  ry1 = y * 17.0 + t * (1.05 + 0.24 * rainAmt)
+  ix1 = floor(rx1)
+  iy1 = floor(ry1)
+  h1 = hash(ix1 * 3.17 + iy1 * 17.31)
+  fx1 = fract(rx1) - (0.18 + 0.64 * hash(ix1 * 7.7 + iy1 * 2.3))
+  fy1 = fract(ry1) - 0.5
+  drop1 = exp(-fx1 * fx1 * 95.0 - fy1 * fy1 * 10.0) * step(0.56, h1) * rainAmt
+  trail1 = exp(-fx1 * fx1 * 210.0) * smooth(-0.48, 0.40, fy1) * step(0.73, h1) * 0.32 * rainAmt
+
+  rx2 = x * 53.0 + 0.37
+  ry2 = y * 29.0 + t * 0.63
+  ix2 = floor(rx2)
+  iy2 = floor(ry2)
+  h2 = hash(ix2 * 5.31 + iy2 * 13.73 + 8.0)
+  fx2 = fract(rx2) - (0.20 + 0.60 * hash(ix2 * 1.9 + iy2 * 9.1))
+  fy2 = fract(ry2) - 0.5
+  drop2 = exp(-fx2 * fx2 * 120.0 - fy2 * fy2 * 18.0) * step(0.72, h2) * rainAmt
+
+  dx = (fx1 * drop1 * 4.2 + fx2 * drop2 * 2.4)
+  dy = (fy1 * drop1 * 3.2 + fy2 * drop2 * 2.0)
+  base = tap(dx, dy)
+  baseG = r1
+  baseB = r2
+  # Four broad, four diagonal taps: a soft halation around tubes and signage.
+  br = 0.0
+  bg = 0.0
+  bb = 0.0
+  s = tap(-4, 0)
+  br = br + s
+  bg = bg + r1
+  bb = bb + r2
+  s = tap(4, 0)
+  br = br + s
+  bg = bg + r1
+  bb = bb + r2
+  s = tap(0, -4)
+  br = br + s
+  bg = bg + r1
+  bb = bb + r2
+  s = tap(0, 4)
+  br = br + s
+  bg = bg + r1
+  bb = bb + r2
+  s = tap(-6, -6)
+  br = br + s * 0.65
+  bg = bg + r1 * 0.65
+  bb = bb + r2 * 0.65
+  s = tap(6, 6)
+  br = br + s * 0.65
+  bg = bg + r1 * 0.65
+  bb = bb + r2 * 0.65
+  s = tap(-6, 6)
+  br = br + s * 0.65
+  bg = bg + r1 * 0.65
+  bb = bb + r2 * 0.65
+  s = tap(6, -6)
+  br = br + s * 0.65
+  bg = bg + r1 * 0.65
+  bb = bb + r2 * 0.65
+  br = br / 6.6
+  bg = bg / 6.6
+  bb = bb / 6.6
+  # A tiny cold split on the brown-outs and low rail hits.
+  split = 0.35 + (1.0 - flicker) * 2.2 + kickGlow * 0.30
+  ar = tap(dx - split, dy)
+  ab = tap(dx + split, dy)
+  rr = base + br * 0.115 + (ar - base) * 0.14
+  gg = baseG + bg * 0.125
+  bb2 = baseB + bb * 0.145 + (r2 - baseB) * 0.14
+  # Bead rims and slender upward trails reveal the glass in bright areas.
+  water = drop1 * 0.070 + drop2 * 0.045 + trail1 * 0.045
+  rr = rr + water * 0.48
+  gg = gg + water * 0.76
+  bb2 = bb2 + water * 0.90
+  # Film grain, a cool shadow toe, and a soft optical vignette.
+  grain = (hash(x * w * 0.41 + y * h * 0.79 + frame * 13.1) - 0.5) * 0.024
+  rr = rr + grain + 0.0015
+  gg = gg + grain * 0.88 + 0.0025
+  bb2 = bb2 + grain * 0.80 + 0.0040
+  vd = len(u * 0.69, v * 0.78)
+  vig = 1.0 - 0.30 * vd * vd
+  rgb(max(rr * vig, 0.0), max(gg * vig, 0.0), max(bb2 * vig, 0.0))
+}

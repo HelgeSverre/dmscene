@@ -1,0 +1,1254 @@
+# ============================================================================
+#  CHIMAERA  --  part 1 of 4  --  0:00 .. 0:12
+#  A creature wakes up in pieces: armature rings lock around a closed eye,
+#  the lid opens, an iris of wet fibres ignites, and the last three seconds
+#  dive into the slit pupil.  Ends mid-dive, inside the tunnel.
+#
+#  120 bpm / 6 ticks per row / 4 rows per beat -> one row = 125 ms
+#  pattern 0 is 24 rows (3 s, a 6-beat phrase) and loops four times in 12 s.
+#  Arrangement is done with `time` inside the instruments, not with the order.
+# ============================================================================
+title CHIMAERA
+song bpm=120 speed=6 rpb=4 channels=8 loop=0 volume=0.60 dither=1
+order 0 0 0 0 1 1 1 1 2 2 2 2 3 3 3 3
+pan 0.50 0.50 0.62 0.50 0.44 0.36 0.66 0.72
+
+# ------------------------------------------------------------------ palettes
+palette abyss {
+  0.00  0.000 0.000 0.004
+  0.38  0.006 0.004 0.022
+  0.68  0.020 0.012 0.055
+  0.86  0.050 0.020 0.070
+  1.00  0.000 0.000 0.006
+}
+palette hide {
+  0.00  0.006 0.002 0.008
+  0.30  0.055 0.008 0.035
+  0.55  0.170 0.020 0.060
+  0.76  0.420 0.060 0.075
+  0.90  0.700 0.180 0.110
+  1.00  0.040 0.005 0.010
+}
+palette iris {
+  0.00  0.010 0.004 0.004
+  0.18  0.120 0.012 0.020
+  0.36  0.480 0.060 0.020
+  0.52  0.920 0.220 0.030
+  0.66  1.000 0.520 0.060
+  0.80  1.000 0.830 0.300
+  0.90  1.000 0.980 0.880
+  1.00  0.250 0.030 0.020
+}
+palette venom {
+  0.00  0.002 0.006 0.006
+  0.28  0.004 0.180 0.150
+  0.48  0.020 0.640 0.380
+  0.64  0.300 0.980 0.440
+  0.80  0.820 1.000 0.620
+  0.92  1.000 1.000 0.920
+  1.00  0.010 0.060 0.040
+}
+# section 2: bioluminescent gullet walls, and the amber furnace it warms into
+palette brine {
+  0.00  0.004 0.008 0.016
+  0.22  0.004 0.055 0.075
+  0.40  0.008 0.190 0.150
+  0.58  0.020 0.480 0.320
+  0.74  0.180 0.720 0.300
+  0.88  0.700 0.900 0.420
+  1.00  0.960 1.000 0.850
+}
+palette tallow {
+  0.00  0.010 0.006 0.004
+  0.30  0.110 0.040 0.014
+  0.55  0.480 0.170 0.030
+  0.78  0.980 0.520 0.110
+  0.92  1.000 0.880 0.520
+  1.00  1.000 0.990 0.940
+}
+
+# section 4: the final furnace (blood-red -> amber -> white-hot)
+palette ember {
+  0.00  0.080 0.006 0.002
+  0.25  0.400 0.020 0.004
+  0.50  0.850 0.120 0.008
+  0.70  1.000 0.420 0.060
+  0.85  1.000 0.820 0.250
+  0.95  1.000 0.980 0.720
+  1.00  0.200 0.020 0.004
+}
+
+text logo "CHIMAERA"
+
+# ------------------------------------------------------------------ instruments
+# ch 0: kick.  Full weight from the first beat; click brightens as it goes.
+inst kick {
+  f = 42 + 205 * exp(-t * 23) + 58 * exp(-t * 4.2)
+  $p = fract($p + f / sr)
+  body = sin($p * tau) * exp(-t * 7.6)
+  click = hp(noise(), 2400) * exp(-t * 180) * (0.35 + 0.30 * smooth(0, 10, time))
+  out(dist((body * 1.3 + click) * 1.55, 1.9) * 0.40)
+}
+
+# ch 1: three-burst clap with a short body, dry and wide.
+inst clap {
+  n = hp(noise(), 1300)
+  b1 = exp(-t * 33)
+  b2 = 0.72 * exp(-max(0, t - 0.011) * 54) * step(0.010, t)
+  b3 = 0.52 * exp(-max(0, t - 0.022) * 72) * step(0.021, t)
+  tone = sin(tau * 190 * t) * exp(-t * 42) * 0.42
+  out((n * (b1 + b2 + b3) * 0.95 + tone) * 0.92 * (0.20 + 0.80 * smooth(3.6, 5.0, time)))
+}
+
+# ch 2: hats.  p0 opens the filter and lengthens the tail; later passes ring.
+inst hat {
+  n = hp(noise(), 6600 + 2600 * p0)
+  d = (64 + 58 * p0) * (1 - 0.30 * smooth(4, 11, time))
+  out(n * exp(-t * d) * 0.52 * (0.38 + 0.62 * smooth(0.6, 6.5, time)))
+}
+
+# ch 3: acid bass.  p0 = filter cutoff.  The whole channel opens over 9 s.
+inst bass {
+  e = env(0.003, 0.135, 0.32, 0.045)
+  $sub = fract($sub + freq * 0.5 / sr)
+  body = bsaw(ph, freq) * 0.50 + bsqr(ph, 0.36, freq) * 0.30 + sin($sub * tau) * 0.55
+  cut = (95 + 300 * smooth(3.5, 10.0, time)) + (520 + 2800 * p0) * e * (0.45 + 0.55 * smooth(1.5, 9.5, time))
+  body = svf(body, cut, 0.58)
+  body = hp(body, 27)                 # short low notes would otherwise leave DC
+  out(dist(body, 1.35) * e * 0.82 * (0.72 + 0.36 * smooth(1.5, 8.0, time)))
+}
+
+# ch 4: drone bed.  Continues across notes, filter cracks open over the section.
+inst drone nna=continue {
+  e = env(1.0, 1.2, 0.82, 2.2)
+  a = usaw(freq, 0.30)
+  b = usaw(freq * 1.4983, 0.20)
+  s = a * 0.40 + b * 0.22 + sin(ph * tau) * 0.42
+  cut = 150 + 540 * smooth(0.0, 9.0, time) + 90 * sin(t * 0.55)
+  s = svf(s, cut, 0.32)
+  out(s * e * 0.34 * (0.70 + 0.50 * smooth(1.5, 8.0, time)))
+}
+
+# ch 5: siren / call.  FM bell that bends a little; long release into the delay.
+inst siren {
+  e = env(0.008, 0.30, 0.30, 0.55)
+  vib = 1 + 0.012 * sin(t * 5.2) * min(t * 4, 1)
+  $p = fract($p + freq * vib / sr)
+  m = sin($p * tau * 2.02) * 2.8 * exp(-t * 2.4)
+  s = sin($p * tau + m) * 0.75 + sin($p * tau * 1.4983) * 0.22
+  s = hp(lp(s, 1500 + 2300 * e), 220)
+  out(dist(s, 1.3) * e * 0.50)
+}
+
+# ch 6: breath / riser.  Retriggered every pass, band climbs with song time.
+inst breath nna=continue {
+  e = env(1.4, 0.9, 0.86, 1.6)
+  hz = 280 + 1450 * smooth(0, 11, time) + 520 * (0.5 + 0.5 * sin(t * 0.7 + time))
+  s = svf(noise(), hz, 0.78)
+  band = s * 0.45 + r2 * 0.95
+  out(band * e * 0.26 * (0.65 + 1.70 * smooth(8.2, 12.0, time)))
+}
+
+# ch 7: anvil.  Inharmonic struck metal on the offbeats.
+inst anvil {
+  e = exp(-t * 7.0)
+  m = sin(tau * freq * 3.71 * t) * 2.6 * exp(-t * 12)
+  s = sin(tau * freq * t + m) * 0.55 + sin(tau * freq * 2.37 * t) * 0.25
+  s = s + hp(noise(), 4200) * exp(-t * 55) * 0.5
+  out(dist(s, 1.5) * e * 0.42 * smooth(4.6, 5.8, time))
+}
+
+# ------------------------------------------------------------------ section 2
+# ch 3: grub.  The drop bass: detuned reese + sub, p0 = accent cutoff + wobble.
+inst grub {
+  e = env(0.004, 0.10, 0.60, 0.05)
+  $sub = fract($sub + freq * 0.25 / sr)
+  wob = sin(t * (9 + 30 * p0))
+  a = bsaw(ph, freq) * (1 - 0.30 * wob) * 0.42
+  a2 = bsaw(ph * 0.501, freq * 0.5) * 0.35
+  s = a + a2 + sin($sub * tau) * 0.80
+  cut = 120 + 180 * e + 2400 * p0 * (0.4 + 1.6 * e)
+  s = svf(s, cut, 0.58)
+  s = hp(s, 26)
+  out(dist(s, 1.7) * e * 0.76)
+}
+
+# ch 5: toll.  Deep bronze gong that marks every pass start (12 / 15 / 18 / 21 s).
+inst toll {
+  e = env(0.004, 1.4, 0.10, 2.4)
+  m1 = sin(ph * tau * 1.4941) * 2.4 * exp(-t * 3.2)
+  m2 = sin(ph * tau * 2.7182) * 1.1 * exp(-t * 6.0)
+  s = sin(ph * tau + m1 + m2) * 0.62 + sin(ph * tau * 0.4997) * 0.45
+  s = svf(s, 620 + 2400 * exp(-t * 4.0), 0.40)
+  shk = hp(noise(), 3300) * exp(-t * 90) * 0.30
+  out(dist(s + shk, 1.25) * e * exp(-t * 0.9) * 0.38)
+}
+
+# ch 7: sting.  Glass arp, p0 = cutoff accent.  Enters at 15.0 s via time gate.
+inst sting {
+  e = env(0.006, 0.14, 0.16, 0.20)
+  $p = fract($p + freq / sr)
+  body = sin($p * tau) * 0.42 + sin($p * tau * 2) * 0.28 + sin($p * tau * 3.01) * 0.16
+  tw = sin($p * tau * 4.02) * 0.55 * exp(-t * 20)
+  body = body + sin($p * tau * 2 + tw)
+  body = svf(body, 1000 + 3600 * p0 + 900 * exp(-t * 10), 0.66)
+  gate = smooth(15.0, 15.6, time)
+  out(dist(body, 1.25) * e * 0.42 * gate)
+}
+
+# ch 6: gale.  One riser per pass, only the 21 s pass is audible: feed the cut out.
+inst gale nna=continue {
+  e = env(2.2, 0.6, 0.85, 2.4)
+  rise = smooth(21.2, 23.9, time) ^ 2
+  s = svf(noise(), 320 + 3400 * rise, 0.85)
+  roar = s * 0.5 + r2 * 1.35
+  gate = smooth(21.0, 21.4, time) * (0.55 + 0.45 * rise)
+  out((roar * 0.65 + sin(ph * tau) * 0.22) * e * 0.30 * gate)
+}
+
+# ------------------------------------------------------------------ master
+master {
+  wl = verb(l, 0.88, 0.42)
+  wr = verb(r, 0.88, 0.42)
+  dl = dly(l, 0.3750, 0.34)          # dotted eighth at 120
+  dr = dly(r, 0.5625, 0.30)          # dotted quarter
+  out(dist(hp(l * 0.90 + dr * 0.20 + wl * 0.30, 17), 1.02) * 1.12,
+      dist(hp(r * 0.90 + dl * 0.20 + wr * 0.30, 17), 1.02) * 1.12)
+}
+
+# ------------------------------------------------------------------ timeline
+timeline {
+  0:00 act=0
+  4:00 act=1
+  8:00 act=2
+  12:00 act=3
+}
+
+# ------------------------------------------------------------------ score
+# 24 rows = a 6-beat phrase.  Four passes of this loop = the 12 s opening.
+# ch:   0 kick      1 clap      2 hat       3 bass
+#       4 drone     5 siren     6 breath    7 anvil
+pattern 0 rows=24 {
+  00: C-2 1 40 ... | .      | C-6 3 14 ... | D-2 4 40 S00 | D-2 5 32 ... | .         | C-3 7 22 ... | .
+  01: .            | .      | .            | D-3 4 22 S30 | .            | .         | .            | .
+  02: .            | .      | C-6 3 10 ... | .            | .            | .         | .            | .
+  03: .            | .      | .            | F-2 4 30 S50 | .            | .         | .            | .
+  04: C-2 1 40 ... | .      | C-6 3 14 ... | D-3 4 20 ... | .            | .         | .            | .
+  05: .            | .      | .            | .            | .            | .         | .            | .
+  06: .            | .      | C-6 3 10 ... | G-2 4 34 S60 | .            | .         | .            | A-5 8 18 ...
+  07: .            | .      | .            | D-3 4 22 ... | .            | .         | .            | .
+  08: C-2 1 40 ... | D-5 2 20 ... | C-6 3 18 ... | D-2 4 38 S10 | .    | A-4 6 26 ... | .           | .
+  09: .            | .      | C-6 3 08 ... | A-2 4 26 ... | .            | .         | .            | .
+  10: .            | .      | C-6 3 10 ... | D-3 4 22 ... | .            | .         | .            | .
+  11: .            | .      | .            | C-3 4 30 S70 | .            | .         | .            | .
+  12: C-2 1 40 ... | .      | C-6 3 14 ... | D-2 4 38 S00 | A-2 5 30 ... | .         | .            | .
+  13: .            | .      | .            | D-3 4 22 ... | .            | .         | .            | .
+  14: .            | .      | C-6 3 10 ... | A#2 4 34 S50 | .           | E-5 6 22 ... | .          | D-6 8 18 ...
+  15: .            | .      | .            | A-2 4 26 ... | .            | .         | .            | .
+  16: C-2 1 40 ... | .      | C-6 3 14 ... | G-2 4 36 S60 | .            | .         | .            | .
+  17: .            | .      | C-6 3 08 ... | F-2 4 30 ... | .            | .         | .            | .
+  18: .            | .      | C-6 3 10 ... | D#2 4 26 ... | .            | .         | .            | .
+  19: .            | .      | .            | D-2 4 24 ... | .            | .         | .            | .
+  20: C-2 1 40 ... | D-5 2 22 ... | C-6 3 18 ... | G#2 4 38 S80 | .    | G#4 6 28 ... | .           | .
+  21: .            | .      | .            | A-2 4 30 ... | .            | .         | .            | .
+  22: .            | .      | C-6 3 10 ... | C-3 4 28 ... | .            | .         | .            | F-5 8 18 ...
+  23: .            | .      | C-6 3 14 ... | D-2 4 40 S20 | .            | .         | .            | .
+}
+
+# ---------------------------------------------------------------- section 2
+# 24 rows = 3 s, plays four times (order 4..7) for the 12..24 s section.
+# ch:   0 kick      1 clap      2 hat       3 grub(new bass)
+#       4 drone     5 toll+siren 6 gale     7 sting(new arp)
+# Pass builds are time-gated inside the instruments: sting in at 15 s,
+# gale only at 21 s.  Instruments: 1 kick 2 clap 3 hat 4 bass 5 drone
+# 6 siren 7 breath 8 anvil 9 grub 10 toll 11 sting 12 gale.
+pattern 1 rows=24 {
+  00: C-2 1 40 ... | .      | C-6 3 14 ... | D-2 4 40 S00 | D-2 5 32 ... | .         | C-3 7 22 ... | .
+  01: .            | .      | .            | D-2 9 20 S20 | .            | D-3 10 26 ... | C-2 12 30 ... | D-5 11 18 S10
+  02: .            | .      | .            | D-2 9 20 S20 | .            | .            | .            | F-5 11 18 S10
+  03: .            | .      | .            | D-2 9 20 S30 | .            | .            | .            | A-5 11 18 S10
+  04: C-2 1 40 ... | D-5 2 22 ... | .      | D-2 9 40 S80 | .            | .            | .            | F-5 11 18 S10
+  05: .            | .      | .            | D-2 9 20 S20 | .            | .            | .            | D-5 11 18 S10
+  06: .            | .      | C-6 3 16 S60 | D-2 9 20 S20 | .            | A-5 6 24 ... | .            | F-5 11 18 S10
+  07: .            | .      | .            | D-2 9 20 S30 | .            | .            | .            | A-5 11 18 S10
+  08: C-2 1 40 ... | .      | .            | A#1 9 40 S80 | A#1 5 40 ... | .            | .            | C-6 11 24 S40
+  09: .            | .      | .            | A#1 9 20 S20 | .            | .            | .            | A#4 11 18 S10
+  10: .            | .      | C-6 3 12 ... | A#1 9 20 S20 | .            | .            | .            | D-5 11 18 S10
+  11: .            | .      | .            | A#1 9 20 S30 | .            | .            | .            | F-5 11 18 S10
+  12: C-2 1 40 ... | D-5 2 22 ... | .      | C-2 9 40 S80 | .            | .            | .            | D-5 11 24 S40
+  13: .            | .      | .            | C-2 9 20 S20 | .            | .            | .            | C-5 11 18 S10
+  14: .            | .      | C-6 3 16 S60 | C-2 9 20 S20 | .            | .            | .            | E-5 11 18 S10
+  15: .            | .      | .            | C-2 9 20 S30 | .            | .            | .            | G-5 11 18 S10
+  16: C-2 1 40 ... | .      | .            | D-2 9 40 S80 | C-2 5 40 ... | .            | .            | E-5 11 24 S40
+  17: .            | .      | .            | D-2 9 20 S20 | .            | .            | .            | D-5 11 18 S10
+  18: .            | .      | C-6 3 12 ... | D-2 9 20 S20 | .            | .            | .            | F-5 11 18 S10
+  19: .            | .      | .            | D-2 9 20 S30 | .            | .            | .            | A-5 11 18 S10
+  20: C-2 1 40 ... | D-5 2 22 ... | .      | G#1 9 40 S80 | .            | .            | .            | F-5 11 24 S40
+  21: .            | .      | .            | G#1 9 20 S20 | .            | .            | .            | G#4 11 18 S10
+  22: .            | .      | C-6 3 18 S60 | G#1 9 20 S20 | .            | E-5 6 24 ... | .            | D-5 11 18 S10
+  23: .            | .      | .            | G#1 9 20 S40 | .            | .            | .            | F-5 11 18 S10
+}
+
+# ------------------------------------------------------------------ visuals
+uniform kickE clapE hatE bassE sirenE open dive glow spin slit tilt
+
+frame {
+  kickE  = exp(-trig(0) * 13) * step(0.01, vel(0))
+  clapE  = exp(-trig(1) * 17)
+  hatE   = exp(-trig(2) * 40)
+  bassE  = exp(-trig(3) * 9)
+  sirenE = exp(-trig(5) * 2.6)
+
+  # 0..12 s arc, all driven by song time so the loop keeps evolving
+  open  = 0.045 + 0.300 * smooth(1.4, 7.8, time) + 0.012 * kickE
+  dive  = smooth(8.2, 11.7, time) ^ 2
+  glow  = 0.22 + 0.78 * smooth(1.0, 7.0, time) + 0.30 * kickE + 0.22 * sirenE
+  spin  = time * 0.05 + 0.18 * sin(time * 0.43)
+  slit  = 0.018 + 0.066 * dive
+  tilt  = 0.10 + 0.04 * sin(time * 0.6)
+
+  select(evt(act))
+}
+
+# helper: assemble-on wordmark.  Letters drop in one by one, then burn off.
+fn wordmark(s, cy0, sz, amp) {
+  n = strlen(s)
+  cw = u / sz + n * 0.5
+  i = floor(cw)
+  gx = fract(cw)
+  cy = (cy0 - v) / sz
+  ti = 0.10 + i * 0.085
+  a = smooth(ti, ti + 0.42, time) * (1 - smooth(2.75 + i * 0.05, 3.45 + i * 0.05, time))
+  jit = (1 - a) * 0.09 * (hash(i * 7.3 + floor(time * 18)) - 0.5)
+  sy = cy + (1 - a) * 0.60 * (0.35 + hash(i * 3.1)) + jit
+  ink = glyph(str(s, i), fract(gx), fract(sy))
+  return ink * a * amp * step(0, sy) * step(sy, 1) * step(0, cw) * step(cw, n)
+}
+
+pixel wake {
+  # ---------------------------------------------------------------- camera
+  zm = 1.0 + 0.030 * sin(t * 0.62) + dive * 7.6
+  camx = 0.012 * sin(t * 0.41)
+  camy = 0.018 + 0.010 * sin(t * 0.57)
+  rx = rot(u - camx, v - camy, spin)
+  ry = r1
+  ex = rx / zm
+  ey = ry / zm
+  rr = len(ex, ey)
+  aa = atan2(ey, ex)
+
+  # ---------------------------------------------------------------- void
+  neb = fbm(ex * 2.3 + 7.1, ey * 2.3 - 3.4, 4)
+  pal(abyss, 0.10 + 0.55 * neb)
+  cr = cget(0)
+  cg = cget(1)
+  cb = cget(2)
+  dim = 0.16 + 0.34 * neb + 0.22 * glow
+  cr *= dim
+  cg *= dim
+  cb *= dim
+
+  # ---------------------------------------------------------------- lid
+  wid = 0.68
+  lid = open * max(0, 1 - (ex / wid) ^ 2) ^ 0.60
+  lid = lid * (1 + tilt * ex / wid)
+  inside = (1 - smooth(lid - 0.006, lid + 0.006, abs(ey))) * (1 - smooth(0.58, 0.70, abs(ex)))
+
+  irisR = 0.182
+
+  # ---------------------------------------------------------------- skin
+  wob = fbm(ex * 3.1 + 11.0, ey * 3.1 - 5.0, 2)
+  vd = vor(ex * 6.5 + 4.0 + 0.35 * wob, ey * 6.5 - 2.0 + 0.35 * wob)
+  d1 = vd
+  cid = r1
+  d2 = r2
+  edge = d2 - d1
+  seam = exp(-edge * 30)
+  dome = smooth(0.0, 0.15, edge)
+  plate = hash(cid * 137.1)
+  pal(hide, 0.30 + 0.56 * plate + 0.09 * sin(t * 0.9 + cid * 30))
+  hr = cget(0)
+  hg = cget(1)
+  hb = cget(2)
+  pls = 0.55 + 0.45 * smooth(0.25, 0.85, kickE)
+  hm = (1 - inside) * min(1, 0.20 + 0.78 * seam * pls + 0.60 * dome * (0.45 + 0.55 * wob))
+  lit = 0.30 + 0.70 * exp(-rr * 1.45) + 0.20 * smooth(0.1, 0.9, kickE)
+  cr = mix(cr, hr * 0.95 * lit, hm)
+  cg = mix(cg, hg * 0.95 * lit, hm)
+  cb = mix(cb, hb * 0.95 * lit, hm)
+
+  # warm halo that the eyeball throws on its own socket
+  halo = exp(-abs(rr - irisR) * 2.6) * (0.10 + 0.22 * glow) * (1 - inside)
+  cr += halo * 0.55
+  cg += halo * 0.20
+  cb += halo * 0.08
+
+  # wet eyelid seam: the only light before the eye opens
+  lidline = exp(-abs(abs(ey) - lid) * 70) * (1 - smooth(0.55, 0.72, abs(ex)))
+  hot = 0.55 + 0.75 * glow + 1.10 * kickE
+  cr += lidline * hot * 1.05
+  cg += lidline * hot * 0.55
+  cb += lidline * hot * 0.20
+
+  # ---------------------------------------------------------------- sclera
+  scl = inside
+  vein = fbm(ex * 12 + ey * 3.0, ey * 12 - 4.0, 3)
+  vln = exp(-abs(vein - 0.5) * 24)
+  wet = exp(-abs(ey - lid * 0.62) * 34) * inside * (1 - smooth(0.05, 0.58, abs(ex)))
+  wet = wet * (0.55 + 0.45 * sin(ex * 5.0 + 1.2)) + exp(-abs(ey + lid * 0.80) * 40) * inside * 0.22 * (1 - smooth(0.02, 0.45, abs(ex)))
+  ball = 0.50 + 0.50 * (1 - smooth(0.0, 0.34, rr)) + 0.22 * smooth(-0.20, 0.06, ey)
+  s1 = (0.175 * ball + 0.42 * vln + 0.68 * wet * (0.35 + 0.65 * glow)) * scl
+  s2 = (0.030 * ball + 0.05 * vln + 0.64 * wet * (0.35 + 0.65 * glow)) * scl
+  s3 = (0.042 * ball + 0.08 * vln + 0.62 * wet * (0.35 + 0.65 * glow)) * scl
+  cr = mix(cr, s1, min(scl * 1.6, 1))
+  cg = mix(cg, s2, min(scl * 1.6, 1))
+  cb = mix(cb, s3, min(scl * 1.6, 1))
+
+  # ---------------------------------------------------------------- iris
+  ann = (1 - smooth(irisR - 0.025, irisR, rr)) * smooth(0.012, 0.05, rr) * inside
+  fv = 0.65 + 0.35 * sin(aa * 7.0 + 1.3 + 0.8 * sin(aa * 3.0 - t * 0.6))
+  fib = 0.5 + 0.5 * sin(aa * 23 + 2.2 * fbm(rr * 7 + 1.3, aa * 3.0, 2) + 0.7 * sin(rr * 38 - t * 1.4))
+  fib = clamp(fib * fv, 0, 1)
+  band = 0.5 + 0.5 * sin(rr * 66 - t * 2.0 + 2.0 * fbm(rr * 12, aa * 2.0, 2))
+  tone = 0.06 + 0.60 * fib * (0.34 + 0.66 * band) + 0.20 * (rr / irisR) + 0.04 * sin(t * 0.5)
+  pal(iris, tone)
+  ir = cget(0)
+  ig = cget(1)
+  ib = cget(2)
+  pal(venom, tone + 0.10 * sin(aa * 3 + t))
+  vr = cget(0)
+  vg = cget(1)
+  vb = cget(2)
+  vk = min(0.80 * dive * dive + 0.15 * kickE * dive, 1)
+  ir = mix(ir, vr, vk)
+  ig = mix(ig, vg, vk)
+  ib = mix(ib, vb, vk)
+  coll = 1 - 0.55 * exp(-abs(rr - 0.62 * irisR) * 90)
+  igain = ann * (0.30 + 1.35 * glow) * (0.45 + 0.55 * fib) * coll
+  cr = mix(cr, ir * igain, min(ann * 1.8, 1))
+  cg = mix(cg, ig * igain, min(ann * 1.8, 1))
+  cb = mix(cb, ib * igain, min(ann * 1.8, 1))
+
+  # radial dark spokes from the pupil collar
+  spk0 = exp(-abs(sin(aa * 29 + 0.9 * sin(rr * 9))) * 7) * ann * (0.20 + 0.35 * (1 - dive))
+  cr = mix(cr, cr * 0.35 + 0.04, spk0)
+
+  # ---------------------------------------------------------------- pupil
+  pd = len(ex / (slit * 0.85 + 0.004 * sin(t * 2.3) + 0.008 * kickE), ey / (0.072 + 0.33 * dive))
+  pup = (1 - smooth(0.86, 1.0, pd)) * inside
+  tunn = 0.5 + 0.5 * sin(log(max(pd, 0.02)) * 7.0 - t * (2.0 + 5.0 * dive))
+  pr = 0.004 + 0.010 * tunn
+  pg = 0.004 + 0.030 * tunn * dive
+  pb = 0.006 + 0.022 * tunn * dive
+  core = exp(-pd * 2.4) * (0.35 + 0.65 * dive)
+  cr = mix(cr, pr + 0.55 * core * dive, pup)
+  cg = mix(cg, pg + 0.85 * core * dive, pup)
+  cb = mix(cb, pb + 0.45 * core * dive, pup)
+
+  # bright pupil collar
+  rim = exp(-abs(pd - 1.0) * 22) * inside
+  rc = 0.55 + 0.75 * glow + 0.9 * kickE
+  cr += rim * rc * (0.95 - 0.35 * dive)
+  cg += rim * rc * (0.62 - 0.10 * dive)
+  cb += rim * rc * (0.26 + 0.28 * dive)
+
+  # corneal catchlight
+  cl = exp(-len(ex + 0.062, ey - 0.085) * 62) * inside
+  cr += cl * (0.65 + 0.45 * glow)
+  cg += cl * (0.70 + 0.35 * glow)
+  cb += cl * (0.75 + 0.25 * glow)
+
+  # ---------------------------------------------------------------- armature
+  coh = smooth(0.4, 6.4, t)
+  glw = 0
+  repeat k 3 {
+    rad = mix(0.78 - 0.11 * k, 0.375 + 0.030 * k, coh)
+    wdt = 0.005 + 0.020 * (1 - coh)
+    rng = exp(-abs(rr - rad) / wdt)
+    sg2 = step(0.40 - 0.40 * coh, 0.5 + 0.5 * sin(aa * (6 + 3 * k) + t * (0.9 + 0.55 * k) + k * 1.7))
+    glw += rng * sg2 * (0.28 + 0.72 * (1 - coh) ^ 2)
+  }
+  gr = 1.00 - 0.45 * dive
+  gg = 0.42 + 0.50 * dive
+  gb = 0.10 + 0.28 * dive
+  gp = 0.55 + 0.45 * kickE
+  cr += glw * gr * gp * 0.85
+  cg += glw * gg * gp * 0.85
+  cb += glw * gb * gp * 0.85
+
+  # ---------------------------------------------------------------- motes
+  rw = rr + 0.006 * sin(aa * 7.0 + t * 0.8) + 0.003 * sin(aa * 17.0 - t)
+  fs = fract(rw * 5.0 - t * (0.6 + 5.2 * dive))
+  mote = exp(-abs(fs - 0.5) * 26) * (0.22 + 0.55 * dive) * smooth(irisR * 0.6, irisR * 1.2, rr)
+  mote = mote * (0.45 + 0.55 * sin(aa * 11.0 + rw * 6.0))
+  cr += mote * (0.55 + 0.45 * dive)
+  cg += mote * (0.48 + 0.30 * dive)
+  cb += mote * (0.55 - 0.30 * dive)
+
+  # dive speed lines, radial and angular
+  spl = exp(-abs(sin(aa * 36 + t * 3.0)) * 26) * dive * smooth(0.04, 0.35, rr)
+  cr += spl * 0.75
+  cg += spl * 0.95
+  cb += spl * 0.35
+  tun2 = exp(-abs(fract(rr * 2.6 - t * 3.4) - 0.5) * 22) * dive * (1 - inside)
+  cr += tun2 * 0.35
+  cg += tun2 * 0.55
+  cb += tun2 * 0.20
+
+  # ---------------------------------------------------------------- wordmark
+  wm = wordmark(logo, 0.330, 0.1010, 1.0)
+  cr += wm * 1.00
+  cg += wm * 0.90
+  cb += wm * 0.72
+
+  # beat flash: two frames of warm light from the kick, a softer one on the clap
+  fl = 0.075 * kickE + 0.045 * clapE
+  cr += fl * 1.00
+  cg += fl * 0.52
+  cb += fl * 0.22
+
+  # ---------------------------------------------------------------- grade
+  vg = 1 - 0.48 * clamp(len(u * 0.82, v * 1.05), 0, 1) ^ 2
+  cr *= vg
+  cg *= vg
+  cb *= vg
+  rgb(min(cr, 1), min(cg, 1), min(cb, 1))
+}
+
+# ============================================================================
+# SCENE 2: the maw  --  12..24 s, inside the creature after the pupil dive
+# A 7-fold log-polar gullet: voronoi flesh plates, fbm veins, beat rings
+# racing out from the throat, a bioluminescent core, and a cprevz long-exposure
+# that keeps the stage-1 tunnel alive across the cut.  Warm amber takes over
+# from 16 s; 20.6 s on, the tunnel accelerates into a white-cyan dive that
+# stage 3 can pull out of.
+# ============================================================================
+pixel maw {
+  # ---------------------------------------------------------------- sync
+  kickE = exp(-trig(0) * 10) * step(0.01, vel(0))
+  clapE = exp(-trig(1) * 16)
+  bassE = exp(-trig(3) * 6)
+  tollE = exp(-trig(5) * 1.7)
+
+  # ---------------------------------------------------------------- arcs
+  cut = exp(-(time - 12.0) * 5.0) * step(11.97, time)
+  spread = smooth(12.6, 16.5, time)
+  warmk = 0.10 + 0.30 * smooth(16.0, 20.5, time) + 0.45 * smooth(20.5, 23.9, time)
+  dive2 = smooth(20.6, 23.95, time) ^ 2
+  breath = 0.5 + 0.5 * sin(time * 0.62)
+
+  # ---------------------------------------------------------------- tunnel
+  px = u * 1.08
+  pr = len(px, v) + 0.012 * kickE + 0.010 * breath
+  ang = atan2(v, px) + time * (0.025 + 0.085 * dive2)
+  fold = tau / 7.0
+  fa = abs(fract(ang / fold + 0.5) - 0.5) * fold
+  fa = fa + 0.10 * sin(time * 0.4) * smooth(13.0, 18.0, time)
+  depth = log(max(pr, 0.015)) * 1.30
+  dz = depth - time * (0.26 + 0.20 * spread + 0.85 * dive2)
+
+  # ---------------------------------------------------------------- wall
+  wob = fbm(fa * 2.4 + 7.9, dz * 1.1 - time * 0.35, 3)
+  vd = vor(fa * 3.6 + 0.45 * wob, dz * 2.2 + 3.3)
+  d1 = vd
+  cid = r1
+  d2 = r2
+  edge = clamp(d2 - d1, 0, 1)
+  ridge = exp(-edge * 30)
+  vein = fbm(fa * 8.0, dz * 6.0 + 11.0, 3)
+  vln = exp(-abs(vein - 0.5) * 20)
+
+  tone = clamp(0.30 * d1 + 0.40 * wob + 0.24 * ridge + 0.14 * vln + 0.06 * sin(dz * 7.0 - time), 0, 1)
+  pal(brine, tone)
+  wr = cget(0)
+  wg = cget(1)
+  wb = cget(2)
+  pal(tallow, 0.15 + 0.85 * tone)
+  kr = cget(0)
+  kg = cget(1)
+  kb = cget(2)
+  wk = clamp(warmk, 0, 1)
+  wr = mix(wr, kr, wk)
+  wg = mix(wg, kg, wk)
+  wb = mix(wb, kb, wk)
+
+  wallk = smooth(0.14, 0.34, pr) * (0.35 + 0.65 * ridge + 0.45 * spread)
+  wallk = clamp(wallk, 0, 1)
+  lit = 0.45 + 0.85 * exp(-pr * 0.55) + 0.25 * kickE + 0.35 * bassE
+  cr = 0.010 + 0.05 * breath
+  cg = 0.016 + 0.05 * breath
+  cb = 0.030 + 0.04 * breath
+  cr = mix(cr, wr * lit * 1.05, wallk)
+  cg = mix(cg, wg * lit * 1.05, wallk)
+  cb = mix(cb, wb * lit * 1.05, wallk)
+
+  # gill filaments along the folds
+  fil = exp(-abs(sin(fa * 9.0 + dz * 3.0)) * 12) * (0.12 + 0.30 * spread) * wallk
+  cr += fil * (0.15 + 0.45 * warmk)
+  cg += fil * 0.70
+  cb += fil * 0.25
+
+  # beat rings racing outward from the throat
+  rng = exp(-abs(fract(pr * (2.6 + 1.8 * spread) - beat * 0.55) - 0.5) * 16)
+  ringk = rng * (0.16 + 0.84 * kickE) * smooth(0.03, 0.30, pr) * (1 - wallk * 0.4)
+  cr += ringk * (0.10 + warmk * 0.55)
+  cg += ringk * (0.85 + 0.15 * dive2)
+  cb += ringk * 0.45
+
+  # bioluminescent core / gullet glow
+  gul = exp(-pr * (6.0 - 2.0 * dive2)) * (0.22 + 0.30 * bassE + 0.55 * dive2)
+  cr += gul * (0.65 + 0.75 * warmk)
+  cg += gul * (0.90 + 0.35 * dive2)
+  cb += gul * (0.30 + 0.50 * dive2)
+
+  # motes streaming past the camera
+  fs = fract(pr * 5.0 + beat * 0.42)
+  mote = exp(-abs(fs - 0.5) * 20) * smooth(0.5, 0.98, pr) * 0.30
+  cr += mote * 0.35
+  cg += mote * 0.55
+  cb += mote * 0.40
+
+  # cut flash, gong wash, clap
+  fld = cut * 0.65 + tollE * exp(-abs(pr - 0.5) * 1.3) * 0.35 + clapE * 0.05
+  cr += fld * (0.50 + 0.60 * warmk)
+  cg += fld * 0.85
+  cb += fld * (0.75 - 0.30 * warmk)
+
+  # finale dive streaks
+  sl = exp(-abs(sin(ang * 34 + time * 3.2)) * 30) * dive2 * smooth(0.02, 0.40, pr)
+  cr += sl * (0.35 + 0.65 * warmk)
+  cg += sl * 0.75
+  cb += sl * (0.30 + 0.70 * dive2)
+
+  # ---------------------------------------------------------------- grade
+  vg = 1 - 0.44 * clamp(len(u * 0.85, v * 1.05), 0, 1) ^ 2
+  cr *= vg
+  cg *= vg
+  cb *= vg
+  rgb(min(cr, 1), min(cg, 1), min(cb, 1))
+  wf = 0.5 + 0.5 * sin(time * 0.21)
+  cprevz(0.5, 0.5, 1.02 + 0.16 * dive2, 0.03 * wf, 0.30 + 0.34 * dive2)
+}
+
+# ============================================================================
+# HANDOFF  --  section 1 of 4, 0:00 .. 0:12
+# ----------------------------------------------------------------------------
+# KEY / TEMPO
+#   D minor / Phrygian colour (D Eb F G A Bb C, plus a G# tritone stab).
+#   120 BPM, speed 6, rpb 4  ->  one row = 125 ms.
+#   pattern 0 is 24 rows = 3.0 s = a 6-beat phrase, NOT 12 s. With `order 0`
+#   it loops four times during the 12 s render. If every stage is meant to
+#   own 12 s, repeat the order entry per stage (order 0 0 0 0 1 1 1 1 ...);
+#   the whole 0..12 s arc below is driven by `time`, not by order/pos.
+#
+# CHANNELS / INSTRUMENTS (instruments are numbered by definition order)
+#   0 kick    inst kick                    rows 0 4 8 12 16 20
+#   1 clap    inst clap                    rows 8 and 20, fades in ~3.6 s
+#   2 hat     inst hat                     eighth notes, p0 = bright/decay
+#   3 bass    inst bass                    acid 16ths, p0 = filter cutoff
+#   4 drone   inst drone  nna=continue     D-2 at row 0, A-2 at row 12
+#   5 siren   inst siren                   A-4 / E-5 / G#-4 at rows 8/14/20
+#   6 breath  inst breath nna=continue     noise riser, one trigger per pass
+#   7 anvil   inst anvil                   metal hits rows 6/14/22, in at 4.6 s
+#   master = freeverb + dotted-eighth and dotted-quarter delays.
+#
+# PALETTES
+#   abyss  void background            hide  voronoi hide plates (maroon/rust)
+#   iris   gold iris fibres           venom acid green (mixed in during dive)
+#
+# UNIFORMS (frame writes, pixel reads; persist across frames)
+#   kickE clapE hatE bassE sirenE   per-channel envelopes
+#   open   0..0.35  eyelid aperture, time-driven (0.045 -> 0.345 by 7.8 s)
+#   dive   0..1     dive amount: zoom, slit widening, venom mix, speed lines
+#   glow   0.2..1.4 iris brightness (time + kick + siren)
+#   spin   camera rotation          slit  pupil slit half-width
+#   tilt   eyelid asymmetry
+#
+# SCENE MECHANISM
+#   timeline { 0:00 act=0 }  and the frame block ends with select(evt(act)).
+#   NOTE: the compiler wants a bare event name -- evt(act), not evt("act").
+#   The single pixel program is the *named* program `wake` (index 0).
+#   Later stages append e.g. `1:00 act=1` to switch to pixel program 1.
+#   Do not rename `wake` and do not add events before 0:00.
+#
+# WHAT SECTION 2 CAN PICK UP
+#   - We end inside the slit pupil: a vertical acid-green tunnel, camera still
+#     accelerating (dive hits 1 at 11.7 s, zoom ~8.6x, speed lines on). Keep
+#     falling, cut on a hit, or pull back out of the throat.
+#   - `venom` is already on screen at the cut; starting stage 2 in that green
+#     and swinging to a new palette will read as one continuous shot.
+#   - Motif: siren A-4 / E-5 / G#-4 with the G#-against-D tritone in the bass
+#     (row 20). Channels 3 and 5 are the melodic leads; answer it there.
+#   - Arrangement is time-gated inside the instruments (clap, anvil, hat,
+#     riser all use smooth(...time)). Keep that trick if you need a build
+#     without touching the score.
+# ============================================================================
+
+# ============================================================================
+# HANDOFF 2  --  section 2 of 4, 0:12 .. 0:24
+# ----------------------------------------------------------------------------
+# SCENE / PIXEL PROGRAM
+#   `pixel maw` = pixel program index 1. Timeline `4:00 act=1` switches to it.
+#   NOT `1:00`: timeline positions are ORDER-LIST INDICES (src/dm_seq.c uses
+#   cumrows[e->order]), not pattern ids. With order 0 0 0 0 1 1 1 1 the first
+#   pattern-1 entry sits at order position 4 (= 12.0 s), so the event is 4:00.
+#   To time a scene switch in your own section, count order entries: each is
+#   24 rows = 3 s; my entries are positions 4..7 (12..24 s).
+#
+# TIMING TRAP (important for stage 3)
+#   Tick length is quantised to an integer number of samples (918, not
+#   918.75 at 120bpm/speed6). "12.000 s" in wall time is therefore sequencer
+#   row 96 = sample 528768 = 11.9902 s: the tail of a `--seconds 12` render
+#   contains the first 432 samples (~10 ms) of the NEXT order entry's row 0.
+#   That is why pattern 1 row 0 is an EXACT copy of pattern 0 row 0:
+#   00: C-2 1 40 ... | . | C-6 3 14 ... | D-2 4 40 S00 | D-2 5 32 ... | . |
+#       C-3 7 22 ... | .
+#   Stage 3 must copy pattern 1's row 0 verbatim as pattern 2's row 0 (any
+#   difference is audible in the last 10 ms of a truncated 12..24 s render).
+#   The visual cut is still clean: frames snap to ~12.0 s where act flips.
+#
+# PATTERN / ORDER
+#   order 0 0 0 0 1 1 1 1.  pattern 1 rows=24 plays at order positions 4..7
+#   (12, 15, 18, 21 s). Same 24-row phrase every pass; arrangement is time-
+#   gated INSIDE the instruments (sting in at 15 s, gale only at 21 s).
+#
+# INSTRUMENTS (1-based by definition order; 9..12 are new; channels reuse)
+#   1 kick, 2 clap, 3 hat, 4 bass, 5 drone, 6 siren, 7 breath, 8 anvil (stage 1)
+#   9 grub   ch3   drop reese+sub bass, p0 accent = cutoff + wobble
+#   10 toll  ch5   bronze gong, hits row 1 every pass (12.125 s marker)
+#   11 sting ch7   glass arp, p0 cutoff accent, time-gated in at 15.0 s
+#   12 gale  ch6   noise riser nna=continue, audible only from 21 s
+#   Music stays D minor + tritone G# (grub row 20 G#1, sting G#4). 16th grub
+#   roots per group: D-2 / A#1 / C-2 / D-2 / G#1 at rows (8,12,16,20).
+#
+# PALETTES (new)
+#   brine   deep teal -> acid green -> sulfur (the gullet walls)
+#   tallow  ember -> amber -> white-hot (mixed in by warmk 16..24 s)
+#
+# UNIFORMS
+#   None added (frame untouched). `maw` derives everything from `time`, `beat`
+#   and trig()/vel() read directly in the pixel program.
+#
+# SCENE MECHANIC / WHAT STAGE 3 CAN PICK UP
+#   `maw` is a 7-fold log-polar throat: voronoi flesh plates + fbm veins,
+#   beat rings racing outward (fract(pr*k - beat*0.55)), glowing core, and a
+#   cprevz long-exposure (zoom 1.02 + 0.16*dive2, k 0.30 + 0.34*dive2).
+#   Arc: hard cut at 12.0 (cut flash, green continues stage 1's venom) ->
+#   gills spread + slow camera spin (0.025 + 0.085*dive2 rad/s) -> warm amber
+#   takes over 16..21 s -> dive2 from 20.6 s: accelerating spin/streaks,
+#   tunnel speed ramps 0.26 -> 1.10, long-exposure zooms quicker, core hits
+#   white-hot. At 24.0 s we are INSIDE a bright amber furnace eye at ~9 deg/s
+#   spin and falling fast.
+#   Stage 3 options: blast out of the amber core (it is the brightest point on
+#   screen at the cut), keep the cprevz momentum, or drop pixel-trig() state.
+#   Leave pattern 2 row 0 = pattern 1 row 0 (see TIMING TRAP) and add your
+#   scene event at `8:00 act=2` (order position 8, after appending four `2`
+#   entries to the order; that position starts at 24.0 s).
+# ============================================================================
+
+# ============================================================================
+# SCENE 3: the breach  --  24..36 s, out of the furnace and into the night
+# The amber core the maw dives into at 24 s was the creature's own eye, seen
+# from inside: we burst out through it into a cold night sky and watch the
+# thing swim the cloud tops below the moon.  Halftime groove: kick 0/8/16,
+# clap on 12, sub roots A#1 -> A-1, choir stacks the Dm triad over the drone,
+# horn calls A-4/G-4/F-4.  Mote arp + shimmer fade in for the 30 s build;
+# 33-36 s the eye flares and the camera pushes in (stage 4's target).
+# ============================================================================
+
+# section 3: night sky (deep indigo -> teal -> aurora green -> pale cyan)
+palette night {
+  0.00  0.004 0.006 0.016
+  0.30  0.010 0.030 0.060
+  0.52  0.008 0.100 0.120
+  0.70  0.030 0.280 0.240
+  0.85  0.120 0.560 0.380
+  0.95  0.550 0.900 0.720
+  1.00  0.900 1.000 0.950
+}
+
+# ------------------------------------------------------------------ section 3
+# ch 5: horn.  The creature's call heard from outside: detuned saw pair with
+# slow vibrato and a long release.  p0 = extra brightness.
+inst horn nna=continue {
+  e = env(0.07, 0.45, 0.50, 1.05)
+  vib = 1 + 0.012 * sin(t * 4.7) * smooth(0.15, 0.70, t)
+  $p = fract($p + freq * vib / sr)
+  $q = fract($q + freq * 1.006 * vib / sr)
+  s = bsaw($p, freq) * 0.36 + bsaw($q, freq * 1.006) * 0.32 + sin($p * tau) * 0.28
+  s = svf(s, 420 + 2300 * e + 1500 * p0, 0.42)
+  out(dist(s, 1.25) * e * 0.38)
+}
+
+# ch 7: mote.  Glassy pluck arp, time-gated in for the 30 s build. p0 = cutoff.
+inst mote nna=continue {
+  e = env(0.004, 0.09, 0.22, 0.16)
+  $p = fract($p + freq / sr)
+  s = sin($p * tau) * 0.46 + sin($p * tau * 2.01) * 0.22 + sin($p * tau * 3.97) * 0.12 * exp(-t * 16)
+  s = svf(s, 1300 + 4200 * p0 + 900 * exp(-t * 9), 0.52)
+  out(dist(s, 1.3) * e * 0.42 * smooth(29.2, 31.4, time))
+}
+
+# ch 3: sub.  Deep sine root under the halftime kicks (A#1 row 8, A-1 row 16).
+inst sub nna=continue {
+  e = env(0.012, 0.28, 0.72, 0.32)
+  $p = fract($p + freq / sr)
+  s = sin($p * tau) + sin($p * tau * 2.0) * 0.30 * e
+  out(dist(s * 1.25, 1.55) * e * 0.80)
+}
+
+# ch 6: shimmer.  High airy band above the breath, enters for the build.
+inst shimmer nna=continue {
+  e = env(0.70, 0.80, 0.70, 1.50)
+  s = svf(noise(), 5200 + 1500 * sin(t * 0.8 + time * 0.4), 0.75)
+  band = s * 0.25 + r2 * 0.85
+  out(band * e * 0.20 * smooth(29.6, 31.8, time))
+}
+
+# ch 4: choir.  Slow pad; F-3 (row 8) and A-3 (row 16) stack the Dm triad
+# against the drone's D-2.  nna=continue lets everything ring together.
+inst choir nna=continue {
+  e = env(0.55, 0.80, 0.78, 1.60)
+  $p = fract($p + freq / sr)
+  $q = fract($q + freq * 1.007 / sr)
+  s = bsaw($p, freq) * 0.28 + bsaw($q, freq * 1.007) * 0.26 + sin($p * tau) * 0.24
+  s = svf(s, 280 + 1400 * e + 200 * sin(t * 0.5), 0.50)
+  out(dist(s, 1.15) * e * 0.30)
+}
+
+# ------------------------------------------------------------------ section 4
+# ch 5: flare.  Soaring detuned lead for the final climb.
+inst flare nna=continue {
+  e = env(0.008, 0.55, 0.45, 1.2)
+  vib = 1 + 0.018 * sin(t * 6.2) * smooth(0.1, 0.8, t)
+  $p = fract($p + freq * vib / sr)
+  $q = fract($q + freq * 1.004 * vib / sr)
+  s = bsaw($p, freq) * 0.32 + bsaw($q, freq * 1.004) * 0.30 + sin($p * tau * 2.0) * 0.22
+  s = svf(s, 680 + 3200 * e + 1800 * p0, 0.45)
+  gate = smooth(39.8, 41.0, time) * (0.55 + 0.45 * smooth(42.0, 47.0, time))
+  out(dist(s, 1.2) * e * 0.42 * gate)
+}
+
+# ch 6: rupture.  Noise riser that carries the last four seconds.
+inst rupture nna=continue {
+  e = env(2.0, 0.8, 0.90, 2.4)
+  rise = smooth(43.0, 47.5, time) ^ 2
+  s = svf(noise(), 280 + 5200 * rise, 0.82)
+  roar = s * 0.55 + r2 * 1.25
+  gate = smooth(42.0, 43.5, time)
+  out((roar * 0.75 + sin(ph * tau) * 0.18) * e * 0.32 * gate)
+}
+
+# ---------------------------------------------------------------- section 3
+# 24 rows = 3 s, plays four times (order positions 8..11) for 24..36 s.
+# Row 0 is a BYTE-EXACT copy of pattern 1 row 0 (see HANDOFF 2 TIMING TRAP).
+# ch:   0 kick      1 clap      2 hat       3 bass/sub
+#       4 drone/choir   5 horn  6 breath/shimmer  7 mote
+# Instruments: 13 horn, 14 mote, 15 sub, 16 shimmer, 17 choir.
+pattern 2 rows=24 {
+  00: C-2 1 40 ... | .      | C-6 3 14 ... | D-2 4 40 S00 | D-2 5 32 ... | .         | C-3 7 22 ... | .
+  01: .            | .      | .            | .            | .            | .            | .            | .
+  02: .            | .      | C-6 3 0C ... | .            | .            | A-4 13 28 S10 | .           | .
+  03: .            | .      | .            | .            | .            | .            | .            | .
+  04: .            | .      | .            | .            | .            | .            | .            | D-5 14 20 S20
+  05: .            | .      | .            | .            | .            | .            | .            | .
+  06: .            | .      | C-6 3 0C ... | .            | .            | .            | .            | F-5 14 20 S20
+  07: .            | .      | .            | off          | .            | .            | .            | .
+  08: C-2 1 3C ... | .      | .            | A#1 15 38 ... | F-3 17 30 ... | .           | .            | A-5 14 20 S30
+  09: .            | .      | .            | .            | .            | .            | .            | .
+  10: .            | .      | C-6 3 0C ... | .            | .            | G-4 13 28 S20 | .           | C-6 14 20 S20
+  11: .            | .      | .            | .            | .            | .            | .            | .
+  12: .            | D-5 2 20 ... | .      | .            | .            | .            | D-6 16 30 ... | D-5 14 20 S20
+  13: .            | .      | .            | .            | .            | .            | .            | .
+  14: .            | .      | C-6 3 0C ... | .            | .            | .            | .            | F-5 14 20 S20
+  15: .            | .      | .            | off          | .            | .            | .            | .
+  16: C-2 1 3C ... | .      | .            | A-1 15 38 ... | A-3 17 30 ... | .           | .            | A-5 14 20 S30
+  17: .            | .      | .            | .            | .            | .            | .            | .
+  18: .            | .      | C-6 3 0C ... | .            | .            | F-4 13 2C S30 | .           | C-6 14 20 S20
+  19: .            | .      | .            | .            | .            | .            | .            | .
+  20: .            | .      | .            | .            | .            | .            | .            | D-5 14 24 S40
+  21: .            | .      | .            | .            | .            | .            | .            | .
+  22: .            | .      | C-6 3 0C ... | .            | .            | .            | .            | G#5 14 24 S40
+  23: .            | .      | .            | off          | .            | .            | .            | .
+}
+
+# ---------------------------------------------------------------- section 4
+# 24 rows = 3 s, plays four times (order positions 12..15) for 36..48 s.
+# Row 0 is a BYTE-EXACT copy of pattern 2 row 0 (TIMING TRAP).
+# ch:   0 kick      1 clap      2 hat       3 grub
+#       4 choir     5 flare     6 shimmer/rupture   7 mote
+pattern 3 rows=24 {
+  00: C-2 1 40 ... | .      | C-6 3 14 ... | D-2 4 40 S00 | D-2 5 32 ... | .         | C-3 7 22 ... | .
+  01: .            | .      | .            | D-2 9 20 S20 | .            | .            | .            | .
+  02: .            | .      | C-6 3 0C ... | D-2 9 20 S20 | .            | A-4 18 24 ... | .            | .
+  03: .            | .      | .            | D-2 9 20 S30 | .            | .            | .            | .
+  04: C-2 1 40 ... | D-5 2 22 ... | .      | D-2 9 40 S80 | .            | .            | .            | .
+  05: .            | .      | .            | D-2 9 20 S20 | .            | .            | .            | .
+  06: .            | .      | C-6 3 0C ... | A#1 9 20 S20 | .            | .            | .            | .
+  07: .            | .      | .            | D-2 9 20 S30 | .            | .            | .            | .
+  08: C-2 1 3C ... | .      | .            | A#1 9 40 S80 | F-3 17 30 ... | .            | .            | D-5 14 20 S20
+  09: .            | .      | .            | A#1 9 20 S20 | .            | .            | .            | F-5 14 20 S20
+  10: .            | .      | C-6 3 0C ... | A#1 9 20 S20 | .            | G-4 18 28 ... | .            | A-5 14 20 S30
+  11: .            | .      | .            | A#1 9 20 S30 | .            | .            | .            | C-6 14 20 S20
+  12: .            | D-5 2 20 ... | .      | C-2 9 40 S80 | .            | .            | D-6 16 30 ... | D-5 14 20 S20
+  13: .            | .      | .            | C-2 9 20 S20 | .            | .            | .            | F-5 14 20 S20
+  14: .            | .      | C-6 3 0C ... | C-2 9 20 S20 | .            | A-4 18 2C ... | .            | A-5 14 20 S30
+  15: .            | .      | .            | C-2 9 20 S30 | .            | .            | .            | C-6 14 20 S20
+  16: C-2 1 3C ... | .      | .            | A-1 9 40 S80 | A-3 17 30 ... | .            | .            | D-5 14 20 S20
+  17: .            | .      | .            | A-1 9 20 S20 | .            | .            | .            | F-5 14 20 S20
+  18: .            | .      | C-6 3 0C ... | A-1 9 20 S20 | .            | F-4 18 30 ... | .            | A-5 14 20 S30
+  19: .            | .      | .            | A-1 9 20 S30 | .            | .            | .            | C-6 14 20 S20
+  20: C-2 1 40 ... | D-5 2 22 ... | .      | G#1 9 40 S80 | .            | .            | .            | G#5 14 24 S40
+  21: .            | .      | .            | G#1 9 20 S20 | .            | .            | .            | .
+  22: .            | .      | C-6 3 18 S60 | G#1 9 20 S20 | .            | E-5 18 34 ... | .            | .
+  23: .            | .      | .            | G#1 9 20 S40 | .            | .            | .            | .
+}
+
+# ----------------------------------------------------------------------------
+# The breach: whiteout pop at the cut, then the reveal -- night sky, moon,
+# aurora, clouds, and the creature swimming below with its furnace eye.
+# Everything is derived from time/beat/trig(); no new uniforms.
+pixel breach {
+  # ---------------------------------------------------------------- sync
+  kickE = exp(-trig(0) * 9) * step(0.01, vel(0))
+  hornA = trig(5)
+  hornE = exp(-hornA * 1.5)
+
+  # ---------------------------------------------------------------- arcs
+  flash = exp(-(time - 24.0) * 3.0) * step(23.98, time)
+  outk = smooth(24.30, 25.80, time)
+  push = smooth(30.0, 35.9, time)
+  eyeup = 1.0 + 1.8 * smooth(33.0, 35.9, time)
+
+  # ---------------------------------------------------------------- camera
+  zm = 1.0 + 0.12 * push
+  cx = (u + 0.012 * sin(time * 0.31)) / zm
+  cy = (v + 0.014 * sin(time * 0.23 + 1.7) - 0.02) / zm
+
+  # ---------------------------------------------------------------- sky
+  neb = fbm(cx * 1.7 + 5.2, cy * 1.7 - time * 0.010, 4)
+  pal(night, 0.10 + 0.42 * neb + 0.18 * (cy + 0.5))
+  skdim = 0.55 + 0.45 * neb
+  cr = cget(0) * skdim
+  cg = cget(1) * skdim
+  cb = cget(2) * skdim
+
+  # stars: two twinkling hash-grid layers
+  sx = cx * 60.0
+  sy = cy * 60.0
+  fx = floor(sx)
+  fy = floor(sy)
+  h1 = hash(fx * 12.99 + fy * 78.23)
+  ddx = fract(sx) - (0.25 + 0.5 * hash(fx * 3.1 + fy * 1.7))
+  ddy = fract(sy) - (0.25 + 0.5 * hash(fx * 1.3 + fy * 4.3))
+  st1 = exp(-(ddx * ddx + ddy * ddy) * 300.0) * step(0.80, h1)
+  tw1 = 0.45 + 0.55 * sin(time * (1.0 + 2.5 * h1) + h1 * 39.0)
+  sx2 = cx * 113.0 + 7.0
+  sy2 = cy * 113.0 - 3.0
+  gx = floor(sx2)
+  gy = floor(sy2)
+  h2 = hash(gx * 5.39 + gy * 41.17)
+  ddx2 = fract(sx2) - (0.25 + 0.5 * hash(gx * 7.7 + gy * 2.9))
+  ddy2 = fract(sy2) - (0.25 + 0.5 * hash(gx * 2.3 + gy * 6.1))
+  st2 = exp(-(ddx2 * ddx2 + ddy2 * ddy2) * 340.0) * step(0.86, h2)
+  tw2 = 0.40 + 0.60 * sin(time * (1.4 + 2.0 * h2) + h2 * 57.0)
+  star = (st1 * tw1 + st2 * tw2 * 0.65) * smooth(-0.15, 0.25, cy)
+  cr += star * 0.70
+  cg += star * 0.78
+  cb += star * 1.00
+
+  # ---------------------------------------------------------------- moon
+  mdx = cx + 0.46
+  mdy = cy - 0.30
+  md = len(mdx, mdy)
+  moon = 1 - smooth(0.078, 0.087, md)
+  mtex = fbm(cx * 26.0 + 9.1, cy * 26.0, 2)
+  mshade = (0.95 - 0.38 * smooth(0.35, 0.65, mtex)) * (0.60 + 0.40 * (1 - smooth(-0.05, 0.09, mdx)))
+  cr = mix(cr, 0.82 * mshade, moon)
+  cg = mix(cg, 0.86 * mshade, moon)
+  cb = mix(cb, 0.95 * mshade, moon)
+  mhalo = exp(-md * 6.5) * (1 - moon)
+  cr += mhalo * 0.070
+  cg += mhalo * 0.085
+  cb += mhalo * 0.120
+
+  # ---------------------------------------------------------------- aurora
+  au1 = fbm(cx * 1.3 + time * 0.040, 2.2, 3)
+  aband = exp(-abs(cy - (0.13 + 0.20 * au1)) * 5.0)
+  acurt = 0.30 + 0.70 * (0.5 + 0.5 * sin(cx * 7.0 + au1 * 9.0 + time * 0.30))
+  aur = aband * acurt * smooth(-0.05, 0.15, cy)
+  pal(night, 0.58 + 0.34 * au1)
+  cr += aur * cget(0) * 0.50
+  cg += aur * cget(1) * 0.72
+  cb += aur * cget(2) * 0.62
+
+  # ---------------------------------------------------------------- clouds
+  clf = fbm(cx * 2.4 + time * 0.018, cy * 4.5 + 13.0, 3)
+  cld = smooth(0.42, 0.78, clf) * (1 - smooth(-0.30, 0.10, cy))
+  clit = 0.30 + 0.70 * exp(-md * 0.9)
+  cr = mix(cr, 0.030 + 0.070 * clit + 0.045 * clf, cld * 0.85)
+  cg = mix(cg, 0.045 + 0.080 * clit + 0.045 * clf, cld * 0.85)
+  cb = mix(cb, 0.080 + 0.105 * clit + 0.055 * clf, cld * 0.85)
+
+  # ---------------------------------------------------------------- creature
+  # serpentine body swimming the cloud tops; thicker skull around the eye
+  yc = -0.26 + 0.085 * sin(cx * 2.4 - time * 1.15) + 0.038 * sin(cx * 5.7 + time * 0.55)
+  headw = 0.080 * exp(-(cx - 0.28) * (cx - 0.28) * 9.0)
+  th = 0.045 + 0.020 * (0.5 + 0.5 * sin(cx * 3.6 + 1.2)) + headw
+  bd = abs(cy - yc)
+  body = 1 - smooth(th * 0.70, th, bd)
+  sv = vor(cx * 8.0, (cy - yc) * 8.0 + 3.0)
+  cid = r1
+  sedg = r2 - sv
+  seam = exp(-sedg * 24)
+  plate = hash(cid * 137.1)
+  pal(hide, 0.18 + 0.38 * plate + 0.12 * seam)
+  hr = cget(0)
+  hg = cget(1)
+  hb = cget(2)
+  toplit = 0.22 + 0.55 * smooth(-th, th, cy - yc)
+  moonk = 0.35 + 0.65 * exp(-md * 1.0)
+  eyeX = 0.28
+  eyeY = -0.26 + 0.085 * sin(eyeX * 2.4 - time * 1.15) + 0.038 * sin(eyeX * 5.7 + time * 0.55) + 0.014
+  ed = len(cx - eyeX, cy - eyeY)
+  under = exp(-ed * 2.6)
+  bcr = hr * (0.16 + 0.45 * toplit * moonk) + under * (0.40 + 0.35 * kickE) * eyeup
+  bcg = hg * (0.16 + 0.45 * toplit * moonk) + under * (0.20 + 0.16 * kickE) * eyeup
+  bcb = hb * (0.18 + 0.50 * toplit * moonk) + under * 0.10 * eyeup
+  rimt = exp(-abs(bd - th) * 34) * clamp((cy - yc) / max(th, 0.001), 0, 1)
+  bcr += rimt * 0.10 * moonk
+  bcg += rimt * 0.16 * moonk
+  bcb += rimt * 0.20 * moonk
+  cr = mix(cr, bcr, body)
+  cg = mix(cg, bcg, body)
+  cb = mix(cb, bcb, body)
+
+  # ---------------------------------------------------------------- the eye
+  # the amber furnace of scene 2 seen from outside: kick-pulsed, slow blink
+  blink = 1 - 0.93 * smooth(0.984, 0.998, sin(time * 0.85))
+  irisg = exp(-ed * 60) * blink * eyeup * (0.85 + 0.55 * kickE)
+  ehalo = exp(-ed * 8) * blink * eyeup * (0.16 + 0.12 * kickE)
+  cr += irisg * 1.00 + ehalo * 0.55
+  cg += irisg * 0.62 + ehalo * 0.30
+  cb += irisg * 0.22 + ehalo * 0.12
+
+  # ripple expanding from the eye on every horn call
+  ringr = hornA * 0.45
+  ring = exp(-abs(ed - ringr) * 26) * hornE
+  cr += ring * 0.35
+  cg += ring * 0.22
+  cb += ring * 0.10
+
+  # ---------------------------------------------------------------- whiteout
+  core = exp(-len(cx, cy + 0.12) * 3.5)
+  wo = (1 - outk) * (0.75 + 0.45 * core)
+  cr = mix(cr, 1.00, min(wo, 1))
+  cg = mix(cg, 0.93, min(wo, 1))
+  cb = mix(cb, 0.80, min(wo, 1))
+
+  # exit-flash streaks over the whiteout, dying into the night
+  pa = atan2(cy + 0.12, cx)
+  streak = exp(-abs(sin(pa * 22.0 + time * 2.4)) * 22) * flash
+  cr += streak * 0.90 + core * flash * 1.40
+  cg += streak * 0.62 + core * flash * 1.05
+  cb += streak * 0.30 + core * flash * 0.65
+
+  # ---------------------------------------------------------------- grade
+  vgk = 1 - 0.42 * clamp(len(u * 0.85, v * 1.05), 0, 1) ^ 2
+  cr *= vgk
+  cg *= vgk
+  cb *= vgk
+  rgb(min(cr, 1), min(cg, 1), min(cb, 1))
+
+  # keep the maw's long-exposure momentum at the cut, then let it die out
+  trail = 0.50 * exp(-(time - 24.0) * 1.5) * step(23.98, time)
+  cprevz(0.5, 0.44, 1.06, 0.015 * sin(time * 0.4), trail)
+}
+
+# ============================================================================
+# SCENE 4: the surge  --  36..48 s, back into the eye and through the furnace
+# The amber eye that breach pushed into at 35.9 s becomes the entry wound:
+# we dive back inside, race a seven-fold fire tunnel, and burst into white.
+# No new uniforms; everything is derived from time/beat/trig() and evt(act).
+# ============================================================================
+pixel surge {
+  kickE = exp(-trig(0) * 9) * step(0.01, vel(0))
+  clapE = exp(-trig(1) * 16)
+  bassE = exp(-trig(3) * 6)
+  flareA = trig(5)
+  flareE = exp(-flareA * 1.4)
+
+  dive = smooth(36.0, 39.0, time)
+  climb = smooth(40.0, 44.0, time) ^ 2
+  burst = smooth(44.0, 47.5, time) ^ 2
+  calm = smooth(47.0, 48.0, time)
+
+  eyeX = 0.28
+  eyeY = -0.26 + 0.085 * sin(eyeX * 2.4 - time * 1.15) + 0.038 * sin(eyeX * 5.7 + time * 0.55) + 0.014
+
+  z0 = 1.0 + 6.0 * dive + 14.0 * climb * (1 - calm)
+  cx = (u - eyeX * (1 - calm)) / z0
+  cy = (v - eyeY * (1 - calm)) / z0
+
+  ang = atan2(cy, cx) + time * (0.04 + 0.18 * climb)
+  rr = len(cx, cy)
+
+  fold = tau / 7.0
+  fa = abs(fract(ang / fold + 0.5) - 0.5) * fold
+  depth = log(max(rr, 0.008)) * 1.4
+  dz = depth - time * (0.4 + 1.2 * climb + 4.0 * burst)
+
+  wob = fbm(fa * 3.2 + 8.0, dz * 1.3 - time * 0.9, 3)
+  vd = vor(fa * 4.2 + 0.5 * wob, dz * 2.6 + 2.5)
+  edge = clamp(r2 - vd, 0, 1)
+  ridge = exp(-edge * 26)
+  tone = clamp(0.22 * vd + 0.48 * wob + 0.28 * ridge + 0.12 * sin(dz * 9.0 - time), 0, 1)
+
+  pal(ember, 0.12 + 0.88 * tone)
+  fr = cget(0)
+  fg = cget(1)
+  fb = cget(2)
+  pal(tallow, 0.08 + 0.92 * tone)
+  tr = cget(0)
+  tg = cget(1)
+  tb = cget(2)
+
+  wk = smooth(0.2, 0.7, climb)
+  fr = mix(fr, tr, wk)
+  fg = mix(fg, tg, wk)
+  fb = mix(fb, tb, wk)
+
+  lit = 0.55 + 1.60 * exp(-rr * 1.4) + 0.40 * kickE + 0.50 * bassE
+  cr = fr * lit
+  cg = fg * lit
+  cb = fb * lit
+
+  rng = exp(-abs(fract(rr * (3.2 + 2.2 * climb) - beat * 0.70) - 0.5) * 18)
+  ringk = rng * (0.25 + 0.75 * kickE) * smooth(0.02, 0.35, rr)
+  cr = cr + ringk * 1.00
+  cg = cg + ringk * 0.55
+  cb = cb + ringk * 0.12
+
+  core = exp(-rr * (6.0 + 10.0 * burst)) * (0.5 + 1.0 * burst + 0.35 * kickE)
+  cr = cr + core * 1.00
+  cg = cg + core * 0.95
+  cb = cb + core * 0.85
+
+  streak = exp(-abs(sin(ang * 28 + time * 4.5)) * 24) * climb * smooth(0.04, 0.55, rr)
+  cr = cr + streak * 0.90
+  cg = cg + streak * 0.75
+  cb = cb + streak * 0.30
+
+  wo = burst * (0.65 + 0.35 * sin(time * 22.0))
+  cr = mix(cr, 1.00, wo)
+  cg = mix(cg, 0.98, wo)
+  cb = mix(cb, 0.92, wo)
+
+  vgk = 1 - 0.42 * clamp(len(u * 0.85, v * 1.05), 0, 1) ^ 2
+  cr = cr * vgk
+  cg = cg * vgk
+  cb = cb * vgk
+  rgb(min(cr, 1), min(cg, 1), min(cb, 1))
+
+  trail = 0.50 * (1 - calm)
+  cprevz(0.5, 0.5, 1.08 + 0.24 * climb, 0.02 * climb, trail)
+}
+
+# ============================================================================
+# HANDOFF 3  --  section 3 of 4, 0:24 .. 0:36
+# ----------------------------------------------------------------------------
+# SCENE / PIXEL PROGRAM
+#   `pixel breach` = pixel program index 2.  Timeline `8:00 act=2` (order
+#   position 8 = 24.0 s; timeline positions are DECIMAL order:row indices and
+#   the order list now has 12 entries 0..11).  The maw's amber core is
+#   revealed as the creature's own eye seen from outside: whiteout pop
+#   24.0..25.8 (outk), then night sky -- two hash star layers, fbm moon at
+#   (-0.46, 0.30), aurora curtains (palette night), fbm cloud deck, and a
+#   voronoi-hide serpent swimming the cloud tops (palette hide reused).  Its
+#   amber eye at (0.28, ~-0.25) pulses on the kick, blinks every ~7.4 s,
+#   ripples on every horn call (trig(5)), and flares 33.0..35.9 s
+#   (eyeup x2.8) while the camera pushes in x1.12 (push).  A cprevz trail
+#   (k = 0.50 decaying, zoom 1.06) keeps the maw's momentum for ~1.5 s.
+#   No new uniforms; the frame block is untouched.
+#
+# TIMING TRAP (still applies to stage 4)
+#   pattern 2 row 0 is a BYTE-EXACT copy of pattern 1 row 0.  Stage 4: copy
+#   pattern 2 row 0 verbatim into pattern 3 row 0.  Tick quantisation (918
+#   samples/tick) makes a truncated render end ~29 ms into the NEXT order
+#   entry's row 0 at 36 s (288 rows * 5508 = 1586304 vs 1587600 samples).
+#
+# PATTERN / ORDER
+#   order 0 0 0 0 1 1 1 1 2 2 2 2.  pattern 2 rows=24 plays at order
+#   positions 8..11 (24, 27, 30, 33 s).  Halftime groove: kick rows 0/8/16,
+#   clap row 12, hat offbeats; ch3 = acid bass D-2 (row 0, fixed) -> sub
+#   A#1 (row 8) -> sub A-1 (row 16) with `off` releases at rows 7/15/23;
+#   ch4 = drone D-2 (fixed) + choir F-3 (8) + A-3 (16), a Dm triad ringing
+#   across the loop; ch5 horn calls A-4 / G-4 / F-4 at rows 2/10/18
+#   (p0 crescendo S10/S20/S30); ch7 mote arp D5 F5 A5 C6 ... with the G#5
+#   tritone stab at row 22 (S40), time-gated in 29.2..31.4 s; ch6 breath
+#   (fixed) + shimmer D-6 at row 12, gated 29.6..31.8 s.  Four passes =
+#   sparse (24-29 s) -> full (31.4-36 s) build with no pattern changes.
+#
+# INSTRUMENTS (13..17 are new; 1..12 untouched)
+#   13 horn    ch5  nna=continue  detuned saw call, vibrato, p0 = brightness
+#   14 mote    ch7  nna=continue  glass pluck, p0 = cutoff, gate 29.2..31.4 s
+#   15 sub     ch3  nna=continue  deep sine root, pairs with kick rows 8/16
+#   16 shimmer ch6  nna=continue  airy band-passed noise, gate 29.6..31.8 s
+#   17 choir   ch4  nna=continue  slow pad, stacks F-3 / A-3 over drone D-2
+#   NNA RULE (src/dm_synth.c:67): the OLD voice's instrument flag decides
+#   release-vs-cut.  toll (cut type) would be chopped by any same-channel
+#   note inside its 2.4 s release, so section 3 leaves toll silent.
+#
+# PALETTES
+#   night added -- 7 of 8 palette slots used, ONE slot left for stage 4.
+#   breach also reuses `hide` for the creature's scales.
+#
+# WHAT STAGE 4 CAN PICK UP
+#   - At 36.0 s the camera is mid push-in on the eye, which is at 2.8x
+#     brightness and kick-pulsed, at screen pos (0.28, ~-0.25): dive back
+#     INTO it (mirror of scene 1's dive), or let the creature turn/attack.
+#   - The texture is full by now (mote arp + shimmer running); the groove is
+#     halftime -- doubling back to 16th bass reads as an instant lift.
+#   - Add your scene event at `12:00 act=3` after appending four `3`s to the
+#     order (order position 12 = 36.0 s; positions are decimal).  Your
+#     `pixel` block becomes program index 3.
+# ============================================================================
+
+# ============================================================================
+# HANDOFF 4  --  section 4 of 4, 0:36 .. 0:48
+# ----------------------------------------------------------------------------
+# SCENE / PIXEL PROGRAM
+#   `pixel surge` = pixel program index 3.  Timeline `12:00 act=3` (order
+#   position 12 = 36.0 s).  The finale dives back into the amber eye that
+#   breach flared at 35.9 s: the camera pulls the eye to centre and zooms
+#   1x -> 7x -> 15x over 36..44 s, while a seven-fold log-polar furnace tunnel
+#   (palette ember mixed into tallow) races inward.  Beat rings, a white core,
+#   angular fire streaks and a cprevz trail build the intensity; 44..47.5 s
+#   a sinusoidal whiteout (`burst`) washes the screen, and 47..48 s `calm`
+#   pulls the camera back to leave a fading ember after-image.
+#
+# TIMING TRAP (verified)
+#   pattern 3 row 0 is a BYTE-EXACT copy of pattern 2 row 0.  A --seconds 36
+#   render ends ~29 ms into order position 12's row 0; copying the row keeps
+#   the first 36 s byte-identical.
+#
+# PATTERN / ORDER
+#   order 0 0 0 0 1 1 1 1 2 2 2 2 3 3 3 3.  pattern 3 rows=24 plays at order
+#   positions 12..15 (36, 39, 42, 45 s).  Row 0 is identical to pattern 2 row 0;
+#   rows 1..23 intensify the groove: kick every 4 rows, clap on rows 8/20,
+#   hat offbeats, ch3 = grub 16th roots (D-2 / A#1 / C-2 / A-1 / G#1),
+#   ch4 choir F-3/A-3, ch5 drone D-2 + flare lead A-4/G-4/A-4/F-4/E-5,
+#   ch6 breath C-3 + shimmer D-6 + rupture noise riser, ch7 mote arp.
+#
+# INSTRUMENTS (18..19 are new; 1..17 untouched)
+#   18 flare   ch5  nna=continue  detuned saw lead, gated 39.8..47.0 s
+#   19 rupture ch6  nna=continue  noise riser, gated 42.0..47.5 s
+#
+# PALETTES
+#   ember added -- the 8th and final palette slot.  Reuses tallow for the
+#   white-hot mix and ember for the blood-amber furnace.
+#
+# WHAT WAS DELIVERED
+#   This is the final section; no later stage exists.  The 48 s demo renders
+#   to build/video/chimaera.mp4 and build/audio/chimaera.wav.
+# ============================================================================

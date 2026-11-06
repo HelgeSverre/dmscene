@@ -1,0 +1,1153 @@
+# platform.dmt - 04:00, a station platform seen through rain on the glass.
+# 120 bpm, 15 bars of 2 s = exactly 30 s. One continuous shot, no cuts.
+title PLATFORM
+
+song bpm=120 speed=6 rpb=4 channels=8 loop=0 volume=0.62 scale=2 dither=1
+order 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14
+pan 0.44 0.58 0.66 0.50 0.60 0.50 0.50 0.42
+
+text word "PLATFORM"
+
+# ------------------------------------------------------------------ timeline
+# order:row. The last train is late; the headlight only starts to grow at 18 s.
+timeline {
+  0:00  train=0.00 board=0
+  8:00  train=0.02 board=0
+  9:00  train=0.10 board=1
+  11:00 train=0.30 board=1
+  13:00 train=0.62 board=2
+  14:00 train=1.00 board=2
+}
+
+# ------------------------------------------------------------------ instruments
+# 1 soft heartbeat  2 clock tick  3 sub  4 pad  5 FM bell  6 glass arp
+# 7 rain on glass   8 approaching train
+
+inst heart {
+  f = 40 + 70 * exp(-t * 13)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 3.4)
+  thud = lp(noise(), 220) * exp(-t * 22) * 0.18
+  out(dist((body * 1.5 + thud), 1.12) * 0.62)
+}
+
+inst tick {
+  # a clock, or water finding a gutter: a short filtered click with a faint pitch
+  e = exp(-t * 85)
+  n = hp(noise(), 3200) * 0.55 + sin(tau * 1750 * t) * 0.25
+  out(n * e * 0.20)
+}
+
+inst sub {
+  e = env(0.025, 0.90, 0.58, 0.90)
+  s = sin(ph * tau) * 0.9 + sin(ph * tau * 2.004) * 0.16
+  s = lp(s, 150 + 320 * e)
+  out(dist(s * e, 1.10) * 0.52)
+}
+
+inst pad nna=continue {
+  e = env(0.85, 1.40, 0.56, 2.40)
+  det = 0.0018 + 0.0008 * sin(t * 0.07)
+  a = sin(ph * tau) * 0.50
+  a = a + saw(ph + det) * 0.26 + saw(ph - det * 0.8) * 0.26
+  a = a + sin(ph * tau * 2.002) * 0.08
+  s = svf(a, 360 + 1500 * e * (0.45 + 0.55 * p0), 0.32)
+  s = s + r2 * 0.38
+  out(s * e * 0.19)
+}
+
+inst bell nna=continue {
+  e = env(0.002, 1.6, 0.20, 2.6)
+  idx = 1.7 * exp(-t * 1.1) + 0.16
+  m = sin(ph * tau * 2.01) * idx
+  a = sin(ph * tau + m) * 0.70 + sin(ph * tau * 3.99) * 0.16 * exp(-t * 2.0)
+  out(a * e * 0.30)
+}
+
+inst arp {
+  e = env(0.002, 0.16, 0.0, 0.12)
+  m = sin(ph * tau * 3.0) * 2.0 * exp(-t * 9)
+  a = sin(ph * tau + m) + sin(ph * tau * 2.0) * 0.10
+  out(a * e * 0.20)
+}
+
+inst rain nna=continue {
+  e = env(2.4, 1.2, 0.88, 3.0)
+  n = noise()
+  hi = hp(n, 1400) * 0.45
+  lo = lp(n, 380) * 0.55
+  g = 0.66 + 0.22 * sin(t * 0.19) + 0.12 * sin(t * 0.53 + 2.1)
+  out((hi + lo) * e * g * 0.48)
+}
+
+inst train nna=continue {
+  # long attack, low rumble and a thin steel shimmer on top
+  e = env(8.0, 2.0, 0.92, 2.0)
+  sub = sin(tau * 29 * t) * 0.55 + sin(tau * 43.5 * t) * 0.30
+  rum = lp(noise(), 110) * 1.4 + lp(noise(), 420) * 0.32
+  shm = hp(noise(), 5200) * (0.10 + 0.14 * sin(t * 1.3))
+  out(dist((sub + rum + shm) * e, 1.25) * 0.46)
+}
+
+# ------------------------------------------------------------------ channel fx
+chan 0 {
+  # pad: one long hall, dark
+  v = verb(x, 0.87, 0.46)
+  out(x + v * 0.55)
+}
+
+chan 1 {
+  # bell: dotted-eighth repeats
+  d = dly(x, 0.375, 0.34)
+  v = verb(x, 0.86, 0.42)
+  out(x + d * 0.30 + v * 0.50)
+}
+
+chan 2 {
+  # arp: short room, a little echo
+  d = dly(x, 0.1875, 0.30)
+  out(x + d * 0.28)
+}
+
+chan 6 {
+  # rain: lift the air slightly
+  out(hp(x, 90) * 1.05)
+}
+
+# ------------------------------------------------------------------ master
+master {
+  # the fluorescent hum and the room's hiss live here, always on
+  hum = sin(tau * 100 * t) * 0.60 + sin(tau * 200 * t) * 0.24 + sin(tau * 300 * t) * 0.09
+  hum = hum * (0.55 + 0.45 * sin(tau * 0.31 * t + 0.7))
+  hiss = hp(noise(), 6000) * 0.009
+  dl = dly(l, 0.375, 0.30)
+  dr = dly(r, 0.5625, 0.26)
+  vl = verb(l + dr * 0.20, 0.84, 0.50)
+  vr = verb(r + dl * 0.20, 0.84, 0.50)
+  ol = l + dl * 0.16 + vl * 0.22 + hum * 0.020 + hiss
+  or = r + dr * 0.16 + vr * 0.22 + hum * 0.016 + hiss
+  out(dist(ol * 1.06, 1.18), dist(or * 1.06, 1.18))
+}
+
+pattern 0 rows=16 {
+  # Dm. 4 a.m.: pad, rain, one bell far away.
+  D-3 4 22 S28 | ... | ... | ... | ... | ... | C-4 7 30 ...
+  ...
+  F-3 4 18 S28
+  ...
+  A-3 4 18 S28
+  ...
+  ...
+  ...
+  ...
+  ...
+  ...
+  ...
+  ... | A-4 5 16 ...
+  ...
+  ...
+  ...
+}
+
+pattern 1 rows=16 {
+  # Bb
+  Bb2 4 22 S30
+  ...
+  D-3 4 18 S30
+  ...
+  F-3 4 18 S30
+  ...
+  ...
+  ...
+  ... | D-5 5 14 ...
+  ...
+  ...
+  ...
+  ...
+  ...
+  ...
+  ...
+}
+
+pattern 2 rows=16 {
+  # Gm. the heartbeat and the clock begin.
+  G-2 4 22 S32 | ... | ... | C-2 1 0C ... | C-6 2 06 ... | G-1 3 1A ...
+  ...
+  Bb2 4 18 S32
+  ...
+  D-3 4 18 S32 | ... | ... | ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | ... | ... | C-2 1 0C ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | ... | ... | ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+}
+
+pattern 3 rows=16 {
+  # A major: the first small lift.
+  A-2 4 22 S36 | ... | ... | C-2 1 0C ... | C-6 2 06 ... | A-1 3 1A ...
+  ...
+  C#3 4 18 S36
+  ...
+  E-3 4 18 S36 | ... | ... | ... | C-6 2 06 ...
+  ...
+  ... | A-4 5 15 ...
+  ...
+  ... | ... | ... | C-2 1 0C ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | ... | ... | ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+}
+
+pattern 4 rows=16 {
+  # Dm. a phrase in the bell.
+  D-3 4 22 S30 | ... | ... | C-2 1 0C ... | C-6 2 06 ... | D-1 3 1A ...
+  ...
+  F-3 4 18 S30
+  ...
+  A-3 4 18 S30 | ... | ... | ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | A-4 5 17 ... | ... | C-2 1 0C ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | ... | ... | ... | C-6 2 06 ...
+  ...
+  ... | F-4 5 14 ...
+  ...
+}
+
+pattern 5 rows=16 {
+  # Bb
+  Bb2 4 22 S34 | ... | ... | C-2 1 0C ... | C-6 2 06 ... | Bb1 3 1A ...
+  ...
+  D-3 4 18 S34
+  ...
+  F-3 4 18 S34 | D-5 5 16 ... | ... | ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | ... | ... | C-2 1 0C ... | C-6 2 06 ...
+  ...
+  ...
+  ...
+  ... | C-5 5 13 ... | ... | ... | C-6 2 06 ...
+  ...
+  ... | ... | ... | C-2 1 0A ...
+  ...
+}
+
+pattern 6 rows=16 {
+  # Gm. the arp starts, slow eighths.
+  G-2 4 22 S32 | ... | G-4 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | G-1 3 1A ...
+  ...
+  Bb2 4 18 S32 | ... | Bb4 6 0A ... | ... | C-6 2 05 ...
+  ...
+  D-3 4 18 S32 | ... | D-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb4 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | G-4 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb4 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | D-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb4 6 0A ... | ... | C-6 2 05 ...
+  ...
+}
+
+pattern 7 rows=16 {
+  # A
+  A-2 4 22 S38 | ... | A-4 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | A-1 3 1A ...
+  ...
+  C#3 4 18 S38 | ... | C#5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  E-3 4 18 S38 | ... | E-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | C#5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | E-5 5 15 ... | A-4 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | C#5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | E-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | C#5 6 0A ... | ... | C-6 2 05 ...
+  ...
+}
+
+pattern 8 rows=16 {
+  # Dm, warmer now.
+  D-3 4 22 S32 | ... | D-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | D-1 3 1A ...
+  ...
+  F-3 4 18 S32 | ... | F-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  A-3 4 18 S32 | ... | A-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | F-5 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | D-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | F-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | F-5 5 16 ... | A-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | D-6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+}
+
+pattern 9 rows=16 {
+  # Bb. the train enters far away.
+  Bb2 4 22 S34 | ... | Bb4 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | Bb1 3 1B ... | ... | C-2 8 20 ...
+  ...
+  D-3 4 18 S34 | ... | D-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  F-3 4 18 S34 | ... | F-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | D-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | D-5 5 15 ... | Bb4 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | D-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | F-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb5 6 0A ... | ... | C-6 2 05 ...
+  ...
+}
+
+pattern 10 rows=16 {
+  # Gm. the pulse quickens.
+  G-2 4 22 S36 | ... | G-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | G-1 3 1B ...
+  ...
+  Bb2 4 18 S36 | ... | Bb5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  D-3 4 18 S36 | ... | D-6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | Bb4 5 14 ... | Bb5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | G-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | D-6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb5 6 0A ... | ... | C-6 2 05 ...
+  ...
+}
+
+pattern 11 rows=16 {
+  # A. the light is coming.
+  A-2 4 22 S3A | ... | A-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | A-1 3 1B ...
+  ...
+  C#3 4 18 S3A | ... | C#6 6 0A ... | ... | C-6 2 05 ...
+  ...
+  E-3 4 18 S3A | ... | E-6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | C#6 5 17 ... | C#6 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | A-5 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | C#6 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | E-6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | A-6 6 0A ... | ... | C-6 2 05 ...
+  ...
+}
+
+pattern 12 rows=16 {
+  # Eb: the ceiling seems higher for a moment.
+  Eb3 4 22 S3E | ... | Eb5 6 0A ... | C-2 1 0C ... | C-6 2 05 ... | Eb1 3 1B ...
+  ...
+  G-3 4 18 S3E | ... | G-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  Bb3 4 18 S3E | ... | Bb5 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | G-5 5 17 ... | G-5 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | Eb5 6 0A ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | ... | G-5 6 0A ... | ... | C-6 2 05 ...
+  ...
+  ... | ... | Bb5 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | Eb6 6 0A ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+}
+
+pattern 13 rows=16 {
+  # A7: the last train is a promise, not an arrival.
+  A-2 4 22 S42 | ... | A-5 6 09 ... | C-2 1 0C ... | C-6 2 05 ... | A-1 3 1B ...
+  C#3 4 18 S42
+  E-3 4 18 S42 | ... | C#6 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  G-3 4 18 S42
+  ... | A-5 5 18 ... | E-6 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | A-6 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | E-6 6 09 ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ... | E-6 5 15 ... | C#6 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | A-5 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+  ... | ... | E-6 6 09 ... | C-2 1 0A ... | C-6 2 05 ...
+  ...
+}
+
+pattern 14 rows=16 {
+  # Dm add 9. everything rings into the last sample.
+  D-3 4 22 S3C | ... | D-5 6 09 ... | C-2 1 0C ... | C-6 2 05 ... | D-1 3 1B ...
+  ...
+  F-3 4 18 S3C | ... | F-5 6 09 ...
+  ...
+  A-3 4 18 S3C | ... | A-5 6 09 ... | ... | C-6 2 05 ...
+  E-4 4 18 S3C
+  ... | ... | D-6 6 09 ...
+  ...
+  ... | D-6 5 18 ... | ... | C-2 1 0C ... | C-6 2 05 ...
+  ...
+  ...
+  ...
+  ... | A-5 5 13 ... | ... | ... | C-6 2 05 ...
+  ...
+  ...
+  ...
+}
+
+# ------------------------------------------------------------------ visuals
+# One analytic camera on a platform: floor, ceiling, right wall and the far wall
+# are selected per pixel by nearest intersection. Fluorescent battens recede in
+# z; a vending machine, one waiting figure and rain on the near glass sit on top.
+
+uniform kickE tickE arpE bellE trainA board titleA
+
+fn sdbox(px, py, bx, by) {
+  dx = abs(px) - bx
+  dy = abs(py) - by
+  return len(max(dx, 0), max(dy, 0)) + min(max(dx, dy), 0)
+}
+
+fn sdseg(px, py, ax, ay, cx, cy) {
+  pax = px - ax
+  pay = py - ay
+  bax = cx - ax
+  bay = cy - ay
+  kk = clamp((pax * bax + pay * bay) / (bax * bax + bay * bay + 0.000001), 0, 1)
+  return len(pax - bax * kk, pay - bay * kk)
+}
+
+fn smin(a, b, k) {
+  hh = clamp(0.5 + 0.5 * (b - a) / k, 0, 1)
+  return mix(b, a, hh) - k * hh * (1 - hh)
+}
+
+fn fig(px, py) {
+  # signed distance to a person standing with their back to us, in metres.
+  # py is height above the floor (0 at the shoes).
+  sway = 0.010 * sin(time * 0.27) + 0.006 * sin(time * 0.61 + 1.2)
+  bx = px - sway
+  breathe = 1 + 0.005 * sin(time * 1.05)
+  # legs
+  legL = sdseg(bx, py, -0.105, 0.74, -0.125, 0.10) - 0.062
+  legR = sdseg(bx, py, 0.095, 0.74, 0.115, 0.10) - 0.062
+  d = min(legL, legR)
+  # shoes
+  shoeL = len((bx + 0.135) * 1.5, (py - 0.030) * 8.0) - 0.048
+  shoeR = len((bx - 0.125) * 1.5, (py - 0.030) * 8.0) - 0.048
+  d = min(d, min(shoeL, shoeR))
+  # long coat, hem wider than the shoulders
+  cw = 0.195 + 0.075 * smooth(1.46, 0.50, py)
+  coat = sdbox(bx / cw, (py - 0.955) / (0.49 * breathe), 1.0, 1.0) * cw
+  # coat vent: a thin notch at the hem so the legs read
+  vent = sdbox((bx + 0.005) / 0.030, (py - 0.60) / 0.14, 1.0, 1.0) * 0.030
+  coat = max(coat, -vent + 0.020)
+  d = smin(d, coat, 0.040)
+  # sleeves
+  armL = sdseg(bx, py, -0.150, 1.36, -0.225, 0.83) - 0.050
+  armR = sdseg(bx, py, 0.145, 1.36, 0.225, 0.83) - 0.050
+  d = smin(d, min(armL, armR), 0.030)
+  # neck
+  neck = sdbox(bx / 0.043, (py - 1.455) / 0.060, 1.0, 1.0) * 0.043
+  d = smin(d, neck, 0.020)
+  # scarf: a band and a tail that moves in the draft
+  sc = sdbox(bx / 0.128, (py - 1.442) / 0.042, 1.0, 1.0) * 0.042
+  tl = 0.030 * sin(time * 1.5 + 0.7) + 0.012 * sin(time * 3.1)
+  tail = sdseg(bx, py, 0.085, 1.41, 0.115 + tl, 1.18) - 0.032
+  d = smin(d, sc, 0.018)
+  d = smin(d, tail, 0.018)
+  # head, tipping up at the end
+  ha = -0.30 * titleA
+  hx = rot(bx, py - 1.585, ha)
+  hy = r1
+  head = (len(hx / 0.086, hy / 0.108) - 1) * 0.09
+  d = smin(d, head, 0.022)
+  # knitted beanie: crown plus a rolled brim
+  cap = (len((hx + 0.004) / 0.094, (hy - 0.040) / 0.082) - 1) * 0.09
+  brim = sdbox((hx + 0.002) / 0.098, (hy - 0.005) / 0.020, 1.0, 1.0) * 0.020
+  d = min(d, min(cap, brim) + 0.004)
+  return d
+}
+
+frame {
+  kickE = exp(-trig(3) * 7.0)
+  tickE = exp(-trig(4) * 16.0)
+  arpE  = exp(-trig(2) * 7.0)
+  bellE = exp(-trig(1) * 2.4)
+  trainA = evtl(train)
+  board = evt(board)
+  # the title sign settles on over the last two bars
+  titleA = smooth(25.0, 28.5, time)
+  wind = 0.5 + 0.5 * sin(time * 0.23 + 1.0)
+}
+
+pixel {
+  # engine u,v span [-1.6,1.6] and [-1,1]; work in half units
+  su = u * 0.5
+  sv = v * 0.5
+
+  # ---------------------------------------------------------------- rain glass
+  # two layers of running drops refract the scene; no overlay fog, only water
+  rox = 0.0
+  roy = 0.0
+  rgli = 0.0
+  rdk = 0.0
+
+  # large slow drops and their trails
+  q = su * 10.5
+  rw = sv * 7.4 + time * 0.19
+  qi = floor(q)
+  wi = floor(rw)
+  qf = fract(q) - 0.5
+  wf = fract(rw) - 0.5
+  rh = hash(qi * 17.3 + wi * 5.7)
+  ron = step(0.50, rh)
+  rox0 = (hash(qi * 3.7 + wi * 9.1) - 0.5) * 0.38
+  roy0 = (hash(qi * 8.3 + wi * 1.9) - 0.5) * 0.30
+  rrx = 0.13 + 0.20 * hash(qi * 2.1 + wi * 4.3)
+  rry = 0.52 + 0.55 * hash(qi * 6.7 + wi * 3.1)
+  rex = (qf - rox0) / rrx
+  rey = (wf - roy0) / rry
+  rdd = len(rex, rey)
+  rdm = (1 - smooth(0.80, 1.0, rdd)) * ron
+  rox = rox - rex * rdm * 0.013
+  roy = roy - rey * rdm * 0.009
+  # the wet trail a drop leaves above itself
+  rtr = (1 - smooth(0.0, 0.035, abs(qf - rox0))) * step(wf, roy0) * exp((wf - roy0) * 5.0) * ron
+  rox = rox + (hash(qi * 1.7 + 3.0) - 0.5) * rtr * 0.006
+  rgli = rgli + exp(-(rex * rex * 3.5 + (rey - 0.50) * (rey - 0.50) * 5.0) * 7.0) * rdm * 0.55
+  rgli = rgli + exp(-abs(rdd - 0.96) * 16.0) * rdm * 0.55
+  rdk = rdk + exp(-abs(rdd - 0.9) * 10.0) * rdm
+  rgli = rgli + rtr * 0.12
+
+  # fine beads, sparse
+  q = su * 22.0
+  rw = sv * 17.0 + time * 0.52
+  qi = floor(q)
+  wi = floor(rw)
+  qf = fract(q) - 0.5
+  wf = fract(rw) - 0.5
+  rh = hash(qi * 7.9 + wi * 3.3)
+  ron = step(0.68, rh)
+  rox0 = (hash(qi * 5.1 + wi * 8.7) - 0.5) * 0.40
+  roy0 = (hash(qi * 2.7 + wi * 6.1) - 0.5) * 0.34
+  rrx = 0.14 + 0.16 * hash(qi * 9.3 + wi * 1.7)
+  rry = 0.22 + 0.30 * hash(qi * 4.9 + wi * 5.3)
+  rex = (qf - rox0) / rrx
+  rey = (wf - roy0) / rry
+  rdd = len(rex, rey)
+  rdm = (1 - smooth(0.74, 1.0, rdd)) * ron
+  rox = rox - rex * rdm * 0.006
+  roy = roy - rey * rdm * 0.004
+  rgli = rgli + exp(-(rex * rex * 4.0 + (rey - 0.4) * (rey - 0.4) * 7.0) * 6.0) * rdm * 0.30
+
+  # long runners: thin columns of water with a bright head
+  q = su * 9.5
+  qi = floor(q)
+  qf = fract(q) - 0.5
+  hh = hash(qi * 4.3 + 1.7)
+  ron = step(0.42, hh)
+  spd = 0.045 + 0.055 * hh
+  heady = 1.05 - 2.10 * fract(hh * 11.0 + time * spd)
+  dxr = qf - (hash(qi * 2.2 + 7.0) - 0.5) * 0.42
+  drr = len(dxr / 0.010, (sv - heady) / 0.13)
+  rm = (1 - smooth(0.55, 1.0, drr)) * ron
+  rox = rox + dxr * 0.006 * rm
+  rgli = rgli + (1 - smooth(0.0, 0.85, drr)) * rm * 0.30
+
+  # a few still beads of condensation
+  bq = fract(su * 74.0)
+  bw = fract(sv * 74.0)
+  bd = len(bq - 0.5, bw - 0.5)
+  bead = step(0.94, hash(floor(su * 74.0) * 7.1 + floor(sv * 74.0) * 3.7))
+  rgli = rgli + exp(-bd * bd * 22.0) * bead * 0.25
+
+  uu = su + rox
+  vv = sv + roy
+
+  # slow push in, and a hand-held breath on the vanishing point
+  up = 0.060 + 0.006 * sin(time * 0.09)
+  vh = 0.040 + 0.003 * sin(time * 0.13 + 0.4)
+  zm = 1.0 + 0.030 * smooth(0.0, 30.0, time)
+  uu = up + (uu - up) / zm
+  vv = vh + (vv - vh) / zm
+
+  # ---------------------------------------------------------------- geometry
+  HH = 1.55
+  CH = 3.25
+  WR = 2.40
+  WL = 4.65
+  ZB = 34.0
+
+  zf = HH / max(0.0005, vh - vv)
+  zc = (CH - HH) / max(0.0005, vv - vh)
+  zr = WR / max(0.0005, uu - up)
+  zl = WL / max(0.0005, up - uu)
+  dn = min(min(zf, zc), min(zr, zl))
+  mback = step(ZB, dn)
+  dz = min(dn, ZB)
+
+  mf = (1 - step(0.02, abs(zf - dz))) * (1 - mback)
+  mc = (1 - step(0.02, abs(zc - dz))) * (1 - mback)
+  mr = (1 - step(0.02, abs(zr - dz))) * (1 - mback)
+  ml = (1 - step(0.02, abs(zl - dz))) * (1 - mback)
+  mb = mback
+
+  xf = (uu - up) * zf
+  xc = (uu - up) * zc
+  yr = HH + (vv - vh) * zr
+  yl = HH + (vv - vh) * zl
+  xb = (uu - up) * ZB
+  yb = HH + (vv - vh) * ZB
+
+  px = xf * mf + xc * mc + WR * mr - WL * ml + xb * mb
+  py = 0.0 * mf + CH * mc + yr * mr + yl * ml + yb * mb
+  pz = zf * mf + zc * mc + zr * mr + zl * ml + ZB * mb
+
+  # ---------------------------------------------------------------- surfaces
+  # floor: concrete slabs, a tactile edge, the track bed with two rails
+  sxa = abs(fract(px / 1.35 + 0.5) - 0.5)
+  sza = abs(fract(pz / 1.35 + 0.5) - 0.5)
+  seam = 1 - smooth(0.0, 0.010, min(sxa, sza))
+  grain = 0.5 + 0.5 * sin(px * 23.0 + pz * 17.0 + sin(px * 3.1) * 2.0)
+  grain = grain * 0.5 + 0.5 * hash(floor(px * 12.0) + floor(pz * 12.0) * 3.1)
+  wet = smooth(0.44, 0.66, 0.5 + 0.5 * sin(px * 0.55 + 1.3) * sin(pz * 0.37 - 0.7))
+  floorA = (0.225 + 0.125 * grain - 0.085 * seam) * (1.0 - 0.18 * wet)
+
+  # tactile warning strip
+  tacx = step(-2.34, px) * (1 - step(-1.98, px))
+  tdash = 0.5 + 0.5 * sin(px * 42.0 + pz * 3.0)
+  tac = tacx * (0.55 + 0.35 * tdash)
+  floorA = mix(floorA, 0.42 + 0.12 * tdash, tacx * 0.88)
+
+  # track bed: darker, ballast, sleepers, rails
+  trk = 1 - smooth(-2.42, -2.30, px)
+  trkA = 0.070 + 0.045 * hash(floor(px * 9.0) + floor(pz * 7.0) * 5.3)
+  slp = step(0.45, fract(pz / 0.58)) * 0.020
+  trkA = trkA + slp
+  rail = exp(-abs(px + 2.92) * 55.0) + exp(-abs(px + 3.86) * 55.0)
+  rail = rail * (0.35 + 0.65 * (0.5 + 0.5 * sin(pz * 9.0)))
+  floorA = mix(floorA, trkA, trk)
+  floorA = floorA + rail * (0.16 + 0.9 * trainA) * (1 - trk * 0.2)
+
+  # right wall: glazed tiles with grout, a darker dado
+  gz = abs(fract(pz / 0.46 + 0.5) - 0.5)
+  gy = abs(fract(py / 0.33 + 0.5) - 0.5)
+  grout = 1 - smooth(0.0, 0.018, min(gz, gy))
+  tilev = hash(floor(pz / 0.46) * 3.7 + floor(py / 0.33) * 8.1)
+  wallA = 0.33 + 0.06 * tilev - 0.16 * grout
+  wallA = wallA * (0.75 + 0.25 * smooth(0.0, 2.8, py))
+  dado = step(py, 0.95) * (1 - smooth(0.90, 0.96, py))
+  wallA = mix(wallA, 0.075 + 0.02 * tilev, dado * 0.9)
+
+  # the far side of the tracks: a glazed wall with rain on it
+  gmz = abs(fract(pz / 1.85 + 0.5) - 0.5)
+  gmy = abs(fract(py / 1.15 + 0.5) - 0.5)
+  gmul = 1 - smooth(0.0, 0.045, min(gmz * 1.85, gmy * 1.15))
+  gbase = 0.040 + 0.020 * smooth(-1.0, 3.0, py)
+  gbase = mix(gbase, 0.012, gmul)
+  # city lights behind the glass
+  ccity = step(0.93, hash(floor(pz * 7.0) + floor(py * 5.0) * 5.9))
+  ccity = ccity * smooth(0.05, 0.8, py) * (0.5 + 0.5 * sin(time * (0.3 + ccity) + pz * 3.0))
+  gbase = gbase + ccity * 0.16
+  ledge = exp(-abs(py - 0.02) * 70.0) * 0.22
+  gbase = gbase + ledge
+  # rain water running down the inside of the glass
+  gstr = fract(py * 3.0 + pz * 0.6 + time * 0.8)
+  gbase = gbase + exp(-gstr * 9.0) * 0.030
+
+  # far wall and tunnel mouth
+  far = 0.080 + 0.03 * hash(floor(xb * 3.0) + floor(yb * 3.0) * 7.0)
+  mouth = step(-1.85, xb) * step(xb, 1.35) * step(0.0, yb) * step(yb, 2.75)
+  far = mix(far, 0.004, mouth)
+  # a lit sign band over the tunnel
+  lip = exp(-abs(yb - 2.92) * 55.0) * step(-2.1, xb) * step(xb, 1.6)
+  far = far + lip * 0.55
+
+  alb = floorA * mf + wallA * mr + gbase * ml + far * (mb + mc * 0.0)
+  alb = alb + 0.060 * mc
+  # back wall is also where the ceiling ends: keep the ceiling dark
+  alb = alb + 0.030 * mc * (0.5 + 0.5 * hash(floor(px * 4.0) + floor(pz * 4.0)))
+
+  # ---------------------------------------------------------------- lighting
+  tubez = 1.6 + 3.0 * floor((pz - 1.6) / 3.0 + 0.5)
+  tid = floor((pz - 1.6) / 3.0 + 0.5)
+  tfl = 0.78 + 0.22 * hash(tid * 9.1 + 0.7)
+  tfl = tfl * (1 - 0.62 * step(0.90, hash(tid * 4.3 + floor(time * 10.0))))
+  vdist = CH - 0.20 - py
+  tlight = tfl * (0.55 + 0.45 * exp(-abs(pz - tubez) * 0.55))
+  tlight = tlight / (1.0 + max(0.0, vdist) * 0.24)
+
+  # warm vending light
+  vdx = px - 1.66
+  vdy = py - 1.05
+  vdz = pz - 3.90
+  vd2 = vdx * vdx + vdy * vdy + vdz * vdz
+  vlight = 2.6 / (1.0 + vd2 * 1.45)
+
+  # headlight in the tunnel
+  tdx = px + 0.25
+  tdy = py - 1.00
+  tdz = pz - (ZB - 2.0)
+  td2 = tdx * tdx + tdy * tdy + tdz * tdz
+  hlight = (0.10 + 26.0 * trainA * trainA) / (1.0 + td2 * 0.16)
+
+  amb = 0.022 + 0.014 * smooth(-0.5, 3.2, py)
+  # the open left side leaks cold blue
+  cold = smooth(0.5, -3.5, px) * 0.055
+
+  litr = amb + tlight * 1.02 + vlight * 0.72 + hlight * 0.42 + cold * 0.5
+  litg = amb + tlight * 1.06 + vlight * 0.48 + hlight * 0.40 + cold * 0.8
+  litb = amb + tlight * 1.14 + vlight * 0.26 + hlight * 0.32 + cold * 1.1
+
+  r = alb * litr
+  g = alb * litg
+  b = alb * litb
+
+  # the glass wall stays cold and takes the city's colour
+  r = r + gbase * ml * (0.10 + 0.20 * ccity)
+  g = g + gbase * ml * (0.16 + 0.16 * ccity)
+  b = b + gbase * ml * (0.26 + 0.10 * ccity)
+
+  # the platform lip and the tactile strip, the things that make it a platform
+  taclit = tacx * (0.35 + 0.65 * tdash)
+  r = r + taclit * (0.070 + 0.030 * trainA)
+  g = g + taclit * (0.048 + 0.018 * trainA)
+  b = b + taclit * (0.010 + 0.006 * trainA)
+  lip = exp(-abs(px + 2.34) * 55.0) * mf
+  lip = lip * (0.20 + 0.55 * trainA + 0.15 * sin(pz * 1.7))
+  r = r + lip * 0.34
+  g = g + lip * 0.36
+  b = b + lip * 0.38
+  # a shadow in the gap beyond the lip
+  gap = smooth(-2.62, -2.40, px) * (1 - smooth(-2.40, -2.28, px)) * mf
+  r = r * (1 - gap * 0.55)
+  g = g * (1 - gap * 0.55)
+  b = b * (1 - gap * 0.55)
+  # ballast and sleepers, still wet
+  ball = exp(-abs(px + 3.4) * 0.55) * (1 - smooth(-2.42, -2.34, px)) * mf
+  sl2 = step(0.45, fract(pz / 0.58)) * 0.045
+  r = r + ball * sl2 * 0.5
+  g = g + ball * sl2 * 0.45
+  b = b + ball * sl2 * 0.38
+
+  # haze in the light under each batten
+  haze = exp(-abs(pz - tubez) * 0.55) * exp(-max(0.0, py) * 0.35) * 0.012
+  r = r + haze * 0.55
+  g = g + haze * 0.75
+  b = b + haze * 1.00
+
+  # wet floor holds the tube bands and the machine's colour
+  zref = (HH + CH - 0.20) / max(0.001, vh - vv)
+  refband = exp(-abs(fract((zref - 1.6) / 3.0 + 0.5) - 0.5) * 6.0)
+  refl = refband * (0.55 + 0.55 * wet) * mf * (0.30 + 0.55 * trainA)
+  wob = 0.55 + 0.45 * sin(vv * 70.0 + time * 1.7 + px * 3.0)
+  refl = refl * wob / (1.0 + zref * 0.04)
+  r = r + refl * 0.80
+  g = g + refl * 0.92
+  b = b + refl * 1.10
+
+  # a broad sheen on the wet slabs, and the rails catching the ceiling
+  sheen = exp(-abs(vv + 0.20) * 2.6) * mf * (0.35 + 0.45 * wet) * 0.10
+  r = r + sheen * 0.7
+  g = g + sheen * 0.9
+  b = b + sheen * 1.2
+  railg = exp(-abs(px + 2.92) * 26.0) + exp(-abs(px + 3.86) * 26.0)
+  railg = railg * mf * (0.30 + 0.90 * trainA) * (0.6 + 0.4 * sin(pz * 3.0 + 1.0))
+  r = r + railg * (0.55 + 0.45 * trainA) * 0.8
+  g = g + railg * (0.58 + 0.40 * trainA) * 0.8
+  b = b + railg * (0.62 + 0.25 * trainA) * 0.8
+
+  # three drip rings in the near water
+  rp1 = len((su - 0.30) * 1.1, (sv + 0.80) * 1.6)
+  rp2 = len((su + 0.42) * 1.0, (sv + 0.62) * 1.5)
+  rp3 = len((su - 0.78) * 1.1, (sv + 0.55) * 1.5)
+  ring = exp(-abs(rp1 - fract(time * 0.31 + 0.1) * 0.34) * 110.0)
+  ring = ring + exp(-abs(rp2 - fract(time * 0.23 + 0.5) * 0.28) * 120.0) * 0.8
+  ring = ring + exp(-abs(rp3 - fract(time * 0.19 + 0.8) * 0.26) * 130.0) * 0.6
+  ring = ring * (1 - smooth(0.0, 0.5, rp1)) * mf * wet * 0.14
+  r = r + ring * 0.7
+  g = g + ring * 0.85
+  b = b + ring * 1.0
+
+  # vending machine spill on the floor and wall
+  spill = exp(-len((uu - 0.49) * 1.45, (vv + 0.28) * 1.05) * 7.0)
+  spill = spill * (0.7 + 0.5 * tickE) * 1.4
+  r = r + spill * 0.28
+  g = g + spill * 0.17
+  b = b + spill * 0.06
+
+  # puddle returns a little of the sign and the machine as vertical streaks
+  streak = exp(-abs(uu - 0.47) * 26.0) * smooth(-0.36, -0.50, vv)
+  streak = streak * (0.35 + 0.65 * (0.5 + 0.5 * sin(vv * 95.0 + time * 2.6)))
+  r = r + streak * 0.9
+  g = g + streak * 0.62
+  b = b + streak * 0.26
+
+  # ---------------------------------------------------------------- fluorescent battens
+  # only meaningful on the ceiling, but evaluated once; the bar is a thin band
+  # in z around each fixture.
+  barz = abs(pz - tubez)
+  lbarm = (1 - smooth(0.07, 0.16, barz)) * mc
+  lbarm = lbarm * step(abs(px), 2.35) * step(2.6, pz)
+  tglow = exp(-barz * 2.4) * mc * step(abs(px), 3.2) * (0.5 + 0.5 * tfl)
+  tglow = tglow / (1.0 + pz * 0.06)
+  housing = (1 - smooth(0.14, 0.30, barz)) * mc * step(abs(px), 2.5)
+  r = r - housing * 0.02
+  g = g - housing * 0.02
+  b = b - housing * 0.02
+  r = r + lbarm * 1.55 + tglow * 0.28
+  g = g + lbarm * 1.62 + tglow * 0.31
+  b = b + lbarm * 1.55 + tglow * 0.36
+
+  # a second row of small downlights on the right wall? no: keep the lamps singular.
+
+  # ---------------------------------------------------------------- the person
+  # world (x,z) to screen at their depth
+  pz0 = 3.60
+  pxs = up + (-0.50) / pz0
+  pys = vh - HH / pz0
+  ps = 1.0 / pz0
+  ppx = (uu - pxs) / ps
+  ppy = (vv - pys) / ps
+  pmir = step(vv, pys)
+  pfy = mix(ppy, -ppy, pmir)
+  pd = fig(ppx + pmir * 0.02 * sin(ppy * 7.0 + time * 1.6), pfy)
+  pm = (1 - smooth(-0.012, 0.012, pd)) * step(0.0, ppy) * step(ppy, 2.05) * (1 - pmir)
+  pedge = exp(-abs(pd) * 70.0)
+  # coat and rim: cold from above, warm from the machine
+  fillr = 0.009
+  fillg = 0.011
+  fillb = 0.018
+  warm = smooth(-0.2, 0.7, ppx) * (0.35 + 0.65 * smooth(0.2, 1.2, ppy))
+  rimtop = smooth(0.55, 1.15, ppy) * pedge
+  # coat: a faint vertical fold and a lighter shoulder line
+  fold = exp(-abs(ppx - 0.015) * 52.0) * smooth(0.55, 1.35, ppy) * 0.020
+  shoulder = smooth(1.30, 1.42, ppy) * 0.035
+  rr2 = fillr + pedge * (0.46 + 0.85 * warm) + rimtop * 0.28 + fold + shoulder
+  gg2 = fillg + pedge * (0.50 + 0.50 * warm) + rimtop * 0.32 + fold * 0.8 + shoulder * 0.9
+  bb2 = fillb + pedge * (0.54 + 0.18 * warm) + rimtop * 0.38 + fold * 0.7 + shoulder * 0.8
+  # the beanie and the scarf catch a little of the colours around them
+  capm = smooth(1.605, 1.660, ppy) * pm
+  rr2 = rr2 + capm * (0.095 + 0.06 * warm)
+  gg2 = gg2 + capm * (0.045 + 0.02 * warm)
+  bb2 = bb2 + capm * (0.030 + 0.01 * warm)
+  scarf = exp(-abs(ppy - 1.445) * 22.0) * pm
+  rr2 = rr2 + scarf * (0.105 + 0.05 * warm)
+  gg2 = gg2 + scarf * 0.045
+  bb2 = bb2 + scarf * 0.028
+  r = mix(r, rr2, pm)
+  g = mix(g, gg2, pm)
+  b = mix(b, bb2, pm)
+  # reflection on the wet floor: the same figure, mirrored and smeared
+  prm = (1 - smooth(-0.05, 0.05, pd)) * step(-1.1, pfy) * step(pfy, 0.0)
+  prm = prm * pmir * (0.15 + 0.15 * wet) * step(-0.50, vv) * 0.55
+  r = mix(r, 0.06, prm * 0.45)
+  g = mix(g, 0.065, prm * 0.45)
+  b = mix(b, 0.08, prm * 0.45)
+
+  # ---------------------------------------------------------------- the far night
+  # beyond the left edge of the station: a wet city breathing out there
+  night = mb * step(xb, -5.0)
+  blink = hash(floor(xb * 1.3) + floor(yb * 2.1) * 7.7)
+  city = step(0.86, blink) * (0.5 + 0.5 * sin(time * (0.4 + blink) + blink * 9.0))
+  cityr = city * (0.40 + 0.35 * hash(floor(xb * 2.0) + 3.0))
+  cityg = city * (0.26 + 0.25 * hash(floor(xb * 2.0) + 5.0))
+  cityb = city * (0.16 + 0.20 * hash(floor(xb * 2.0) + 7.0))
+  r = mix(r, 0.008 + cityr * 0.5, night * 0.85)
+  g = mix(g, 0.010 + cityg * 0.5, night * 0.85)
+  b = mix(b, 0.020 + cityb * 0.5, night * 0.85)
+
+  # ---------------------------------------------------------------- grade
+  # glass tint, vignette, rain glints
+  r = r * (0.985 - rdk * 0.030) + rgli * 0.12
+  g = g * (1.000 - rdk * 0.028) + rgli * 0.135
+  b = b * (1.010 - rdk * 0.024) + rgli * 0.15
+  wash = trainA * trainA * 0.075
+  r = r + wash * 1.00
+  g = g + wash * 0.82
+  b = b + wash * 0.58
+  vg = len(su * 0.86, sv * 0.92)
+  cm = (1.0 - 0.34 * vg * vg) * (1.0 - 0.10 * smooth(29.0, 30.0, time))
+  rgb(max(r * cm, 0.0), max(g * cm, 0.0), max(b * cm, 0.0))
+  cadd(0.0010, 0.0012, 0.0026)
+}
+
+post {
+  su = u * 0.5
+  sv = v * 0.5
+
+  # gentle bloom, halation, grain and a touch of vertical smear
+  cr = tap(0, 0)
+  cg = r1
+  cb = r2
+  br = 0.0
+  bg = 0.0
+  bb = 0.0
+  s0 = tap(-2, 0)
+  br = br + s0
+  bg = bg + r1
+  bb = bb + r2
+  s0 = tap(2, 0)
+  br = br + s0
+  bg = bg + r1
+  bb = bb + r2
+  s0 = tap(0, -2)
+  br = br + s0
+  bg = bg + r1
+  bb = bb + r2
+  s0 = tap(0, 2)
+  br = br + s0
+  bg = bg + r1
+  bb = bb + r2
+  s0 = tap(-5, -3)
+  br = br + s0 * 0.6
+  bg = bg + r1 * 0.6
+  bb = bb + r2 * 0.6
+  s0 = tap(5, 3)
+  br = br + s0 * 0.6
+  bg = bg + r1 * 0.6
+  bb = bb + r2 * 0.6
+  s0 = tap(0, -7)
+  br = br + s0 * 0.45
+  bg = bg + r1 * 0.45
+  bb = bb + r2 * 0.45
+  s0 = tap(-9, 0)
+  br = br + s0 * 0.30
+  bg = bg + r1 * 0.30
+  bb = bb + r2 * 0.30
+
+  br = br * 0.085
+  bg = bg * 0.085
+  bb = bb * 0.085
+  r = cr + br * 0.34
+  g = cg + bg * 0.33
+  b = cb + bb * 0.35
+
+  # ---------------------------------------------------------------- overlays
+  # screen-space props, drawn after the analytic scene
+  up = 0.060 + 0.006 * sin(time * 0.09)
+  vh = 0.040 + 0.003 * sin(time * 0.13 + 0.4)
+  zm = 1.0 + 0.030 * smooth(0.0, 30.0, time)
+  uu = up + (su - up) / zm
+  vv = vh + (sv - vh) / zm
+
+  # departure board: amber dot matrix, right of centre
+  bdx = (uu - 0.215) / 0.090
+  bdy = (vv - 0.138) / 0.030
+  bin = (1 - smooth(0.94, 1.0, abs(bdx))) * (1 - smooth(0.94, 1.0, abs(bdy)))
+  bdot = step(0.42, fract(bdx * 15.0 + 0.5)) * step(0.40, fract(bdy * 4.0 + 0.5))
+  bpat = 0.35 + 0.65 * step(0.30, hash(floor(bdx * 15.0) * 3.1 + board * 7.0 + floor(bdy * 4.0)))
+  bam = bin * (0.10 + 0.90 * bdot) * bpat
+  r = r + bam * (0.85 + 0.15 * tickE)
+  g = g + bam * 0.50
+  b = b + bam * 0.10
+  bhalo = exp(-max(0.0, abs(uu - 0.215) - 0.090) * 16.0) * exp(-max(0.0, abs(vv - 0.138) - 0.030) * 16.0)
+  r = r + bhalo * 0.10
+  g = g + bhalo * 0.06
+  b = b + bhalo * 0.02
+
+  # platform sign: the word PLATFORM
+  szx0 = -0.181
+  szx1 = 0.337
+  szy0 = 0.210
+  szy1 = 0.308
+  sxl = (uu - szx0) / (szx1 - szx0)
+  syl = (vv - szy0) / (szy1 - szy0)
+  sinm = step(0.0, sxl) * step(sxl, 1.0) * step(0.0, syl) * step(syl, 1.0)
+  edgel = min(min(sxl, 1.0 - sxl) * (szx1 - szx0), min(syl, 1.0 - syl) * (szy1 - szy0))
+  signg = 0.6 + 0.4 * smooth(0.0, 0.006, edgel)
+  sgr = 0.008 + 0.005 * sin(syl * 9.0)
+  sgg = 0.036 + 0.008 * sin(syl * 9.0)
+  sgb = 0.032 + 0.006 * sin(syl * 9.0)
+  tcx = (sxl - 0.035) / 0.1090
+  tcy = (0.850 - syl) / 0.7000
+  ti = floor(tcx)
+  tg = glyph(str(word, ti), fract(tcx), fract(tcy)) * step(0.0, tcx) * step(tcx, 7.99) * step(0.0, tcy) * step(tcy, 1.0)
+  sgr = sgr + tg * 0.60
+  sgg = sgg + tg * 0.68
+  sgb = sgb + tg * 0.60
+  sgr = sgr + signg * 0.05
+  sgg = sgg + signg * 0.07
+  sgb = sgb + signg * 0.06
+  r = mix(r, sgr, sinm)
+  g = mix(g, sgg, sinm)
+  b = mix(b, sgb, sinm)
+  halo = exp(-max(0.0, abs(uu - 0.078) - 0.26) * 14.0) * exp(-max(0.0, abs(vv - 0.259) - 0.049) * 14.0)
+  halo = halo * 0.07 * (0.6 + 0.4 * titleA)
+  r = r + halo * 0.6
+  g = g + halo * 0.8
+  b = b + halo * 0.7
+  rodl = exp(-abs(uu + 0.135) * 380.0) * step(0.308, vv) * step(vv, 0.49)
+  rodr = exp(-abs(uu + 0.255) * 380.0) * step(0.308, vv) * step(vv, 0.49)
+  rods = (rodl + rodr) * 0.11 + exp(-abs(vv - 0.312) * 220.0) * step(-0.19, uu) * step(uu, 0.35) * 0.06
+  r = r + rods
+  g = g + rods
+  b = b + rods
+
+  # vending machine, standing at z = 3.9
+  mz = 3.90
+  mx0 = up + 1.18 / mz
+  mx1 = up + 2.12 / mz
+  my0 = vh - 1.55 / mz
+  my1 = vh + (2.02 - 1.55) / mz
+  mcx = (mx0 + mx1) * 0.5
+  mcy = (my0 + my1) * 0.5
+  mhw = (mx1 - mx0) * 0.5
+  mhh = (my1 - my0) * 0.5
+  mdmx = max(0.0, abs(uu - mcx) - mhw)
+  mdmy = max(0.0, abs(vv - mcy) - mhh)
+  mdist = len(mdmx, mdmy)
+  mh = (1 - smooth(-0.0015, 0.0015, mdist))
+  mlx = (uu - mx0) / (mx1 - mx0)
+  mly = (vv - my0) / (my1 - my0)
+  mbody = 0.020 + 0.012 * hash(floor(mly * 40.0) + 1.0)
+  mglass = step(0.74, mly) * step(0.06, mly) * step(0.93, mly) * step(0.05, mlx) * step(mlx, 0.95)
+  mrow = floor((mly - 0.10) / 0.16)
+  mcol = floor((mlx - 0.10) / 0.105)
+  mrowf = fract((mly - 0.10) / 0.16)
+  mcolf = fract((mlx - 0.10) / 0.105)
+  mcan = step(0.16, mcolf) * step(mcolf, 0.84) * step(0.24, mrowf) * step(mrowf, 0.76)
+  mcan = mcan * step(0.08, mly) * step(mly, 0.70) * step(0.08, mlx) * step(mlx, 0.92)
+  mhue = fract(0.56 + mcol * 0.13 + mrow * 0.29 + 0.02 * sin(time * 0.3))
+  mcr = 0.35 + 0.65 * (1.0 - 2.0 * abs(fract(mhue + 0.0) - 0.5))
+  mcg = 0.30 + 0.70 * (1.0 - 2.0 * abs(fract(mhue + 0.33) - 0.5))
+  mcb = 0.28 + 0.72 * (1.0 - 2.0 * abs(fract(mhue + 0.67) - 0.5))
+  mint = 0.55 + 0.30 * sin(mly * 21.0) * sin(time * 0.7)
+  mrr = mbody
+  mgg = mbody
+  mbb = mbody
+  mrr = mix(mrr, 0.30 + mcr * 0.42, mglass * 0.95)
+  mgg = mix(mgg, 0.38 + mcg * 0.36, mglass * 0.95)
+  mbb = mix(mbb, 0.40 + mcb * 0.32, mglass * 0.95)
+  mrr = mrr + mcan * mcr * 0.55 * mint
+  mgg = mgg + mcan * mcg * 0.55 * mint
+  mbb = mbb + mcan * mcb * 0.55 * mint
+  mrr = mrr + mcan * 0.05
+  mgg = mgg + mcan * 0.055
+  mbb = mbb + mcan * 0.06
+  mhead = step(0.79, mly) * step(0.0, mlx) * step(mlx, 1.0) * step(0.06, mlx) * step(mlx, 0.94)
+  mrr = mix(mrr, 0.74 + 0.10 * tickE, mhead * 0.95)
+  mgg = mix(mgg, 0.86 + 0.06 * tickE, mhead * 0.95)
+  mbb = mix(mbb, 0.82 + 0.06 * tickE, mhead * 0.95)
+  mlog = step(0.86, mly) * step(mly, 0.93) * step(0.18, mlx) * step(mlx, 0.70) * step(0.5, fract(mlx * 9.0))
+  mrr = mrr - mlog * 0.5
+  mgg = mgg - mlog * 0.4
+  mbb = mbb - mlog * 0.3
+  mslot = step(0.80, mlx) * step(0.88, mlx) * step(0.12, mly) * step(mly, 0.44)
+  mrr = mix(mrr, 0.05, mslot)
+  mgg = mix(mgg, 0.05, mslot)
+  mbb = mix(mbb, 0.05, mslot)
+  mbtn = exp(-len((mlx - 0.845) * 18.0, (mly - 0.50) * 18.0)) * step(0.0, mlx) * step(mlx, 1.0)
+  mrr = mrr + mbtn * 0.9
+  mgg = mgg + mbtn * 0.4
+  mbb = mbb + mbtn * 0.2
+  r = mix(r, mrr, mh)
+  g = mix(g, mgg, mh)
+  b = mix(b, mbb, mh)
+  mshadow = exp(-len((uu - 0.485) * 2.4, (vv + 0.380) * 4.2) * 3.2) * 0.30
+  r = r * (1 - mshadow)
+  g = g * (1 - mshadow)
+  b = b * (1 - mshadow)
+  mhalo = exp(-mdist * 16.0) * (0.55 + 0.15 * tickE)
+  r = r + mhalo * 0.34
+  g = g + mhalo * 0.30
+  b = b + mhalo * 0.24
+
+  # the suitcase by the figure's feet
+  scx = up + 0.16 / 3.95
+  scy = vh - 1.55 / 3.95
+  scs = 1.0 / 3.95
+  scdx = abs(uu - scx) / scs - 0.26
+  scdy = abs(vv - scy - 0.19 * scs) / scs - 0.19
+  scd = len(max(scdx, 0.0), max(scdy, 0.0)) + min(max(scdx, scdy), 0.0)
+  scm = (1 - smooth(-0.01, 0.01, scd))
+  sch = exp(-abs(scd) * 40.0)
+  r = mix(r, 0.040 + sch * 0.22 + 0.010, scm)
+  g = mix(g, 0.030 + sch * 0.15, scm)
+  b = mix(b, 0.026 + sch * 0.09, scm)
+  scl = exp(-abs(len((uu - scx) / scs, (vv - scy - 0.42 * scs) / scs) - 0.09) * 70.0) * step(0.20, vv)
+  r = r + scl * 0.05
+  g = g + scl * 0.045
+  b = b + scl * 0.035
+
+  # headlight: a pin of light that will not arrive
+  hlx = up + (-0.25) / 32.0
+  hly = vh + (1.00 - 1.55) / 32.0
+  hd = len((uu - hlx) * 1.1, (vv - hly) * 1.5)
+  core = exp(-hd * hd * (5200.0 - 4600.0 * trainA))
+  glow = exp(-hd * (120.0 - 105.0 * trainA)) * (0.14 + 0.86 * trainA * trainA)
+  flk = 0.92 + 0.08 * sin(time * 31.0) * sin(time * 3.1)
+  r = r + core * 2.2 * flk + glow * 0.22 * trainA
+  g = g + core * 2.0 * flk + glow * 0.18 * trainA
+  b = b + core * 1.7 * flk + glow * 0.12 * trainA
+  streak2 = exp(-abs(vv - hly) * 260.0) * exp(-abs(uu - hlx) * 2.4) * trainA * trainA
+  r = r + streak2 * 0.20
+  g = g + streak2 * 0.17
+  b = b + streak2 * 0.11
+  sigr = exp(-len((uu - hlx - 0.020) * 900.0, (vv - hly - 0.010) * 900.0))
+  r = r + sigr * mix(0.9, 0.25, trainA)
+  g = g + sigr * mix(0.08, 0.55, trainA)
+  b = b + sigr * mix(0.04, 0.55, trainA)
+
+  # contrast and a warm/cool split: cold water, warm machine light
+  r = clamp(r * 1.04, 0.0, 2.0)
+  g = clamp(g * 1.02, 0.0, 2.0)
+  b = clamp(b * 1.00, 0.0, 2.0)
+  r = mix(r, r * r * (3.0 - 2.0 * clamp(r, 0.0, 1.0)), 0.22)
+  g = mix(g, g * g * (3.0 - 2.0 * clamp(g, 0.0, 1.0)), 0.22)
+  b = mix(b, b * b * (3.0 - 2.0 * clamp(b, 0.0, 1.0)), 0.22)
+  lumg = 0.30 * r + 0.59 * g + 0.11 * b
+  shade = 1.0 - smooth(0.0, 0.28, lumg)
+  r = r + shade * 0.004 + smooth(0.35, 0.9, lumg) * 0.012
+  g = g + shade * 0.007 + smooth(0.35, 0.9, lumg) * 0.010
+  b = b + shade * 0.016 + smooth(0.35, 0.9, lumg) * 0.006
+  sat = 1.10
+  r = lumg + (r - lumg) * sat
+  g = lumg + (g - lumg) * sat
+  b = lumg + (b - lumg) * sat
+  # grain
+  gr = (hash(x * w * 0.37 + y * h * 0.71 + frame * 9.7) - 0.5) * 0.030
+  r = r + gr
+  g = g + gr * 0.85
+  b = b + gr * 0.70
+  d = len(su, sv)
+  r = r * (1 - 0.26 * d * d)
+  g = g * (1 - 0.26 * d * d)
+  b = b * (1 - 0.24 * d * d)
+  rgb(max(r, 0.0), max(g, 0.0), max(b, 0.0))
+}

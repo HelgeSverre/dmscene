@@ -1,0 +1,394 @@
+# waitingroom.dmt - 4 a.m. platform, one person, late train
+# 120 BPM, 30 s, 960x600 @ 30 fps. Atmospheric ambient/industrial.
+
+title WAITINGROOM
+song bpm=120 speed=6 rpb=4 channels=6 loop=0 volume=0.58
+order 0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7
+pan 0.5 0.5 0.5 0.4 0.6 0.5
+
+palette night {
+  0.00 0.050 0.070 0.110
+  0.18 0.090 0.120 0.170
+  0.35 0.160 0.180 0.220
+  0.52 0.280 0.270 0.290
+  0.68 0.520 0.420 0.320
+  0.82 0.800 0.600 0.260
+  1.00 0.950 0.910 0.840
+}
+
+palette amber {
+  0.00 0.06 0.03 0.00
+  0.25 0.35 0.14 0.01
+  0.50 0.85 0.45 0.04
+  0.72 1.00 0.70 0.14
+  1.00 1.00 0.88 0.38
+}
+
+fn sdSegment(px, py, ax, ay, bx, by) {
+  abx = bx - ax
+  aby = by - ay
+  tt = clamp(((px - ax) * abx + (py - ay) * aby) / (abx * abx + aby * aby + 0.0001), 0, 1)
+  return len(px - (ax + abx * tt), py - (ay + aby * tt))
+}
+
+fn sdBox(px, py, cx, cy, sx, sy) {
+  dx = abs(px - cx) - sx
+  dy = abs(py - cy) - sy
+  return len(max(dx, 0), max(dy, 0)) + min(max(dx, dy), 0)
+}
+
+fn sdCircle(px, py, cx, cy, r) {
+  return len(px - cx, py - cy) - r
+}
+
+# ------------------------------------------------------------------ audio
+inst kick {
+  f = 42 + 360 * exp(-t * 28)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 7)
+  air = lp(noise(), 600) * exp(-t * 55)
+  out(dist(body * 1.8 + air * 0.2, 1.25) * 0.55)
+}
+
+inst hat {
+  n = hp(noise(), 7000)
+  out(n * exp(-t * (28 + 60 * (1 - vel))) * 0.10 * vel)
+}
+
+inst bass {
+  e = env(0.05, 0.35, 0.55, 0.45)
+  s = sin(ph * tau)
+  s = s + sin(ph * tau * 2 + 0.4) * 0.35
+  s = lp(s, 240 + 700 * e)
+  out(s * e * 0.38)
+}
+
+inst pad {
+  e = env(0.35, 0.8, 0.72, 1.1)
+  a = saw(ph + t * 0.0009)
+  b = saw(ph - t * 0.0011)
+  s = svf(a * 0.5 + b * 0.5, 500 + 900 * e + 300 * sin(t * 0.19), 0.35)
+  out(s * e * 0.22)
+}
+
+inst rain {
+  n = hp(noise(), 800)
+  n = lp(n, 2200)
+  g = 0.55 + 0.45 * sin(t * 0.13)
+  out(n * g * 0.055)
+}
+
+inst hum {
+  e = env(0.6, 0.6, 1.0, 0.8)
+  s = sin(ph * tau) * 0.5 + sin(ph * tau * 2.01) * 0.25
+  s = s + lp(noise(), 140) * 0.3
+  out(s * e * 0.09)
+}
+
+inst bell {
+  e = env(0.001, 0.6, 0.0, 0.55)
+  m = sin(ph * tau * 2.7) * exp(-t * 3.5) * 2.0
+  s = sin(ph * tau + m)
+  s = s + sin(ph * tau * 1.41) * 0.5
+  s = lp(s, 3000 + 5000 * e)
+  out(s * e * 0.18)
+}
+
+master {
+  dl = dly(l, 0.50, 0.32)
+  dr = dly(r, 0.375, 0.32)
+  vl = verb(l + r, 0.78, 0.50)
+  out(dist(l + dr * 0.22 + vl * 0.12, 1.12), dist(r + dl * 0.22 + vl * 0.12, 1.12))
+}
+
+# ------------------------------------------------------------------ patterns (15 rows = 3.75 beats, 8 patterns = 30 s)
+# channels: 0 kick  1 hats  2 bass  3 pad  4 rain  5 hum/bell
+pattern 0 rows=15 {
+  .        | . .. ... | .        | A-2 4 24 | A-4 6 22 | A-2 7 30
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 34 | . .. ... | .        | E-2 4 22 | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 18 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 12 | .        | A-2 4 24 | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 16 | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 1 rows=15 {
+  C-2 1 36 | . .. ... | A-1 3 30 | A-2 4 26 | A-4 6 24 | A-2 7 32
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | E-2 4 22 | A-4 6 20 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 34 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 18 | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 2 rows=15 {
+  C-2 1 38 | . .. ... | A-1 3 32 | A-2 4 28 | A-4 6 26 | A-2 7 34
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 12 | .        | .        | .        | .
+  .        | . .. ... | .        | E-2 4 24 | A-4 6 22 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 36 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 20 | .
+  .        | C-6 2 12 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 3 rows=15 {
+  C-2 1 36 | . .. ... | F-1 3 30 | F-2 4 26 | A-4 6 24 | A-2 7 32
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | C-3 4 24 | A-4 6 22 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 34 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 20 | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 4 rows=15 {
+  C-2 1 32 | . .. ... | D-1 3 28 | D-2 4 24 | A-4 6 22 | A-2 7 30
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | F-2 4 22 | A-4 6 20 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 30 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 18 | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 5 rows=15 {
+  C-2 1 36 | . .. ... | A-1 3 32 | A-2 4 28 | A-4 6 26 | A-2 7 34
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 12 | .        | .        | .        | .
+  .        | . .. ... | .        | E-2 4 24 | A-4 6 24 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 38 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 22 | .
+  .        | C-6 2 12 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 6 rows=15 {
+  C-2 1 38 | . .. ... | A-1 3 34 | A-2 4 30 | A-4 6 28 | A-2 7 36
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 14 | .        | .        | .        | .
+  .        | . .. ... | .        | E-2 4 26 | A-4 6 26 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 40 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 24 | .
+  .        | C-6 2 14 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+pattern 7 rows=15 {
+  C-2 1 34 | . .. ... | A-1 3 30 | A-2 4 26 | A-4 6 24 | A-2 7 32
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | E-2 4 22 | A-4 6 22 | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  C-2 1 32 | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | A-4 6 20 | .
+  .        | C-6 2 10 | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+  .        | . .. ... | .        | .        | .        | .
+}
+
+# ------------------------------------------------------------------ visuals
+uniform flicker humBreath rainAmt kickE
+
+frame {
+  # fluorescent tube flicker: 60 Hz hum plus occasional dip
+  f = 0.85 + 0.13 * sin(t * 377) + 0.05 * sin(t * 120)
+  f = f * (1 - step(0.97, hash(floor(t * 30))) * 0.35)
+  flicker = clamp(f, 0.45, 1.15)
+
+  humBreath = 0.9 + 0.1 * sin(t * 0.9)
+  rainAmt = 0.35 + 0.25 * sin(t * 0.07) + 0.15 * cenv(4)
+  kickE = exp(-trig(0) * 6)
+}
+
+pixel {
+  horizon = -0.08
+  isFloor = step(0, horizon - v)
+  isWall = 1 - isFloor
+
+  dz = max(0.001, horizon - v)
+  z = 0.28 / dz
+  wx = u * z
+  depthFade = exp(-z * 0.35)
+
+  wallZ = 3.5
+  wxWall = u * wallZ
+
+  toneWall = 0.22 + 0.08 * isWall + 0.05 * sin(wxWall * 0.4)
+  pal(night, toneWall)
+  cadd(0.10, 0.11, 0.13)
+
+  toneFloor = 0.20 + 0.05 * z + 0.04 * sin(wx * 0.5) + 0.10 * depthFade
+  pal(night, mix(toneWall, toneFloor, isFloor))
+  cadd(isFloor * 0.08, isFloor * 0.085, isFloor * 0.10)
+
+  # floor tiles
+  tileX = abs(fract(wx * 0.8 + 0.5) - 0.5)
+  tileZ = abs(fract(z * 0.6) - 0.5)
+  tile = exp(-tileX * tileX * 120 / (1 + z * 0.1)) * exp(-tileZ * tileZ * 80 / (1 + z * 0.1))
+  cadd(tile * 0.10 * isFloor, tile * 0.10 * isFloor, tile * 0.12 * isFloor)
+
+  # track edge line on the floor
+  trackD = abs(wx - 0.55) / (1 + z * 0.15)
+  track = exp(-trackD * trackD * 90)
+  cadd(track * 0.06 * isFloor, track * 0.06 * isFloor, track * 0.07 * isFloor)
+
+  # distant late-train headlight down the track
+  trainPhase = 0.5 + 0.5 * sin(t * 0.15)
+  trainX = 0.55
+  trainZ = 8.0 + 4.0 * sin(t * 0.08)
+  trainU = trainX / trainZ
+  trainV = horizon - 0.28 / trainZ
+  trainD = len(u - trainU, v - trainV)
+  trainGlow = exp(-trainD * trainD * 600 / trainZ) * trainPhase * isFloor
+  cadd(trainGlow * 0.35, trainGlow * 0.32, trainGlow * 0.22)
+
+  # atmospheric haze / fog on the floor
+  fog = fbm(wx * 0.5 + t * 0.02, z * 0.3, 3) * exp(-z * 0.4) * isFloor
+  cadd(fog * 0.04, fog * 0.045, fog * 0.055)
+
+  # receding pillars on the left
+  pillarX = fract(wx * 0.22 + 0.5) - 0.5
+  pillarZ = fract(z * 0.22) - 0.5
+  pillarD = sdBox(pillarX * 2.2, pillarZ * 0.18 + 0.25, 0, 0.35, 0.12, 0.08)
+  pillar = exp(-pillarD * pillarD * 110)
+  cadd(pillar * 0.22, pillar * 0.23, pillar * 0.28)
+
+  # ceiling fluorescent tubes
+  tubeY = 0.22 + 0.04 * sin(wxWall * 0.3)
+  tubeD = sdSegment(u, v, -0.8, tubeY, 0.8, tubeY)
+  tube = exp(-tubeD * tubeD * 2600) * flicker
+  cadd(tube * 1.2, tube * 1.25, tube * 1.3)
+
+  # vending machine on the right wall
+  vmZ = 3.2
+  vmX = 0.55
+  vmY = -0.06
+  vmScale = wallZ / vmZ
+  vmPx = (u - vmX) * vmScale
+  vmPy = (v - vmY) * vmScale
+  vmBody = sdBox(vmPx, vmPy, 0, 0, 0.18, 0.32)
+  vmFill = step(vmBody, 0) * isWall
+  vmGlow = exp(-vmBody * vmBody * 400) * vmFill
+
+  # replace wall colour with amber inside the vending machine
+  oldR = cget(0)
+  oldG = cget(1)
+  oldB = cget(2)
+  pal(amber, 0.45 + 0.25 * sin(t * 0.4) + 0.15 * hash(floor(t * 8) * 0.1))
+  cmul(humBreath)
+  newR = cget(0)
+  newG = cget(1)
+  newB = cget(2)
+  rgb(mix(oldR, newR, vmFill), mix(oldG, newG, vmFill), mix(oldB, newB, vmFill))
+  cadd(vmGlow * 0.70, vmGlow * 0.35, 0)
+
+  # internal vending lights
+  liteY = vmPy + 0.20
+  liteRow = abs(fract(liteY * 6) - 0.5)
+  lite = vmFill * exp(-liteRow * liteRow * 100) * (0.6 + 0.4 * sin(t * 2 + liteY * 10))
+  cadd(lite * 0.70, lite * 0.24, 0)
+
+  # lone figure silhouette on the floor, centre-left
+  figZ = 1.7
+  figScale = z / figZ
+  fx = (u + 0.12) * figScale
+  fy = (v - horizon) * figScale + 0.30
+  head = sdCircle(fx, fy - 0.50, 0, 0, 0.032)
+  torso = sdBox(fx, fy - 0.21, 0, 0, 0.035, 0.18)
+  leg1 = sdSegment(fx, fy, -0.018, 0.02, -0.025, -0.18)
+  leg2 = sdSegment(fx, fy, 0.018, 0.02, 0.03, -0.18)
+  figD = min(min(head, torso), min(leg1, leg2))
+  fig = step(figD, 0) * isFloor * step(0.25, figScale) * (1 - step(2.2, figScale))
+  cmul(1 - fig * 0.92)
+  cadd(fig * 0.02, fig * 0.02, fig * 0.03)
+
+  # rain on the glass: bright vertical streaks
+  rx = x * 50 + fbm(t * 0.07, x * 4, 2) * 1.2
+  ry = y * 80 - t * 6
+  streak = fbm(rx, ry, 3)
+  drop = pow(streak, 5) * rainAmt
+  # water refraction shift
+  refractU = u + drop * 0.02 * sin(ry * 4)
+  refractV = v + drop * 0.015 * cos(rx * 3)
+  refr = prev(refractU + 0.5, refractV + 0.5)
+  cmul(1 - drop * 0.20)
+  cadd(refr * 0.18 * drop, refr * 0.22 * drop, refr * 0.28 * drop)
+  # extra bright streak highlights
+  highlight = pow(streak, 18) * rainAmt
+  cadd(highlight * 0.25, highlight * 0.28, highlight * 0.32)
+
+  # wet floor reflection (only below horizon)
+  reflU = u
+  reflV = horizon + (horizon - v) * 0.65
+  refl = prev(reflU + 0.5, reflV + 0.5)
+  floorMask = step(0, horizon - v)
+  cadd(refl * 0.20 * floorMask * (1 - v * 1.2), refl * 0.14 * floorMask * (1 - v * 1.2), refl * 0.08 * floorMask * (1 - v * 1.2))
+
+  # subtle kick pulse in overall exposure
+  cmul(0.92 + 0.08 * kickE)
+
+  # vignette
+  d = len(u, v * 0.8)
+  cmul(1 - 0.25 * d * d)
+}

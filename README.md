@@ -62,6 +62,11 @@ envelopes and timeline events. Each chapter lasts four bars at 180 BPM.
 
 ## Build and run
 
+[![CI](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml/badge.svg)](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml)
+
+CI builds and runs `make test` on macOS and Linux, then does an ffmpeg MP4
+render smoke test on Linux.
+
 ```sh
 make                          # build dm on macOS or Linux
 ./dm play demos/showcase.dmt   # compile in memory and play; q quits
@@ -249,6 +254,46 @@ fiction and dreamlike carnival — and then taken wherever the model wanted.
 Provider outages during the run forced both Kimi K2.7 Code demos onto the same
 endpoint and moved one Kimi K3 demo to the managed provider, so the set covers
 six distinct models rather than the seven originally planned.
+
+### Same brief, six models
+
+A second experiment. Six models were given the identical paragraph — a nearly
+empty train platform at 4 a.m., one person waiting, a late train, buzzing
+fluorescent tubes, a glowing vending machine, rain on the glass — plus the same
+fixed spec: exactly 30 s at 120 BPM, 960x600, 30 fps. Everything else was
+theirs. The results isolate the model from the prompt.
+
+| file | model | reading |
+|------|-------|---------|
+| `platform.dmt` | DeepSeek V4.1 Flash | one-point perspective from inside the shelter: receding fluorescent battens, five analytic surfaces, a figure with a suitcase, vending machine and a headlight that grows down the tunnel but never arrives |
+| `layover.dmt` | DeepSeek V4 Pro | close, rain-beaded shelter glass: the LAYOVER sign, an 04:07 DELAYED board, large refracting rain drops, warm vending spill and a yellow safety line; deliberately abstract rather than architectural |
+| `lastcall.dmt` | GLM-5.3-Flash | a seated figure, drinks machine, sputtering tube and dot-matrix board that flips to NOW ARRIVING; the same hash drives the tube flicker and the buzz instrument, and the train body finally slides in |
+| `nighttrain.dmt` | Kimi K3 | the darkest reading: a hooded silhouette under a dying fluorescent, a split-flap board settling on DELAYED, a signal clicking red to green at 21 s, then a headlight and sub rumble |
+| `waitingroom.dmt` | Kimi K2.7 Code | the most abstract: striped wall, a single light bar, a glowing vending machine, a near-triangular silhouette and a wet-floor reflection; almost no conventional perspective |
+| `departure.dmt` | Kimi K3.1 Pro | a chunky pixel-art wide shot: hooded figure checking a phone, a dot-matrix board stuck on DELAYED, a cyan drinks machine, wet platform edge and rails; rain refraction and scripted brownouts |
+
+### Exquisite corpse: `chimaera`
+
+A third experiment: four models built one 48-second demo in sequence. Each got
+the file left by the previous model and added 12 seconds, with one hard rule —
+the section before its own had to render byte-identically afterwards. The
+handoff was checked by rendering the existing WAV and PNG frames before and
+after every edit and requiring a clean `cmp`.
+
+| section | model | what it added |
+|---------|-------|---------------|
+| 0:00–0:12 | DeepSeek V4.1 Flash | an eye assembles out of the dark: segmented armature rings converge on a slit, the lid opens on a gold-fibred iris, and the camera dives into the pupil |
+| 0:12–0:24 | GLM-5.3-Flash | the maw: a seven-fold log-polar throat of voronoi flesh, fbm veins, beat rings and a long-exposure tunnel, cooling green then heating to a white-hot core |
+| 0:24–0:36 | Kimi K3 | the breach: burst out through the eye into a night sky with a moon, stars and aurora; the creature swims the cloud deck as a dark serpent whose amber eye pulses on the kick |
+| 0:36–0:48 | Kimi K2.7 Code | the return: a smash cut back into the eye as a seven-fold fire tunnel, building through rings and streaks to a final whiteout |
+
+The construction was append-only: a new 24-row pattern, four order entries, one
+pixel program and one timeline scene switch per stage. The main technical
+surprise was that a 24-row pattern at 120 BPM is 3 seconds, not 12, so each
+section repeats its pattern four times in the order list. The other is tick
+quantization: a truncated render ends a few milliseconds into the next order
+entry, so every stage copies the previous pattern's row 0 verbatim to keep the
+gate clean.
 
 ## The text format (.dmt)
 
