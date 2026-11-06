@@ -64,8 +64,9 @@ envelopes and timeline events. Each chapter lasts four bars at 180 BPM.
 
 [![CI](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml/badge.svg)](https://github.com/HelgeSverre/dmscene/actions/workflows/ci.yml)
 
-CI builds and runs `make test` on macOS and Linux, then does an ffmpeg MP4
-render smoke test on Linux.
+CI builds and runs `make test` and `make test-sanitize` on macOS and Linux,
+then does an ffmpeg MP4 render smoke test on Linux. Sanitizer checks cover
+address errors, undefined behavior and float-to-integer overflow.
 
 ```sh
 make                          # build dm on macOS or Linux
@@ -75,6 +76,10 @@ make                          # build dm on macOS or Linux
 ./dm watch mydemo.dmt          # play and recompile on save
 make demos                    # compile demos/*.dmt into build/modules/*.dms
 make test                     # engine, compiler, audio and all demos
+make test-sanitize CC=clang    # state, numeric, reload and seek regression checks
+./dm --version                # engine generation and DMS format version
+./dm check mydemo.dmt          # compile/load and verify without writing a module
+./dm stats mydemo.dmt          # module summary and per-program resource usage
 ```
 
 Building needs a C99 compiler and make. Playback uses a truecolor terminal
@@ -88,9 +93,12 @@ mkdir -p build/video build/audio build/frames/pulse
 make videos SECONDS=30 SIZE=960x600    # build/video/*.mp4 + build/audio/*.wav
 ```
 
-`--mp4` pipes raw RGB frames into `ffmpeg` (libx264 crf 18, yuv420p, AAC 192k,
-faststart). Without ffmpeg on `PATH` it writes `FILE.frames/` and `FILE.wav` and
-prints the command that finishes the job. The pixel loop runs on all cores.
+`--mp4` pipes raw RGB frames into `ffmpeg` (libx264 medium preset, CRF 18,
+yuv420p, AAC 192k, faststart). Without ffmpeg on `PATH` it writes `FILE.frames/`
+and `FILE.wav` and prints the command that finishes the job; an explicit
+`--wav` sets the WAV path instead. Write/flush failures and unsuccessful encoder exits return a
+nonzero status. The pixel loop uses available CPU cores; `--threads N` sets
+the worker count for either playback or rendering.
 
 For a quick MP4 preview, `--render-scale N` overrides the demo's `song scale`:
 it renders at 1/N of the requested width and height, then enlarges the pixels
@@ -101,8 +109,9 @@ the pixel programs dominate complex demos.
 
 Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
 a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
-cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). `ffmpeg` is optional
-and only used by `--mp4`.
+cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). The `dm` binary
+only invokes `ffmpeg` for `--mp4`; PNG and WAV export use built-in writers.
+The README animation target also requires ffmpeg.
 
 Generated files stay grouped under `build/`: `obj/` for object files,
 `modules/` for compiled demos, `video/` for MP4s, `audio/` for WAVs,
@@ -137,26 +146,72 @@ the loader verifies their targets and stack joins before running a program.
 dm COMMAND file [options]
 
   compile IN [-o OUT.dms] [--disasm]   text -> byte-packed module (default OUT: IN with .dms)
-  check   IN                           compile and verify only, write nothing
+  check   IN [--json]                  compile/load and verify, write no module
+  stats   IN [--json]                  module and per-program resource usage
   disasm  IN                           print every program's bytecode
   play    IN [play options]            terminal + audio (IN may be .dmt or .dms)
   watch   IN [play options]            play, recompiling whenever the .dmt changes
-  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--start S] [--render-scale N]
+  render  IN [render options]          offline MP4, PNG sequence and/or WAV
   new     NAME                         write NAME.dmt, a minimal starting point
+
+  --version, -V                       engine generation and DMS format version
 
 play options:
   --fps N       target frame rate (default 30)      --size WxH   force framebuffer size
   --mute        no audio, wall-clock visuals         --start S    start S seconds in
   --solo C      hear only channel C                  --threads N  pixel worker threads
+
+render options (at least one output required; outputs can be combined):
+  --mp4 FILE    encode video with audio via ffmpeg
+  --png DIR     write numbered PNG frames to an existing directory
+  --wav FILE    write 44.1 kHz stereo, 16-bit PCM WAV
+  --seconds S   clip duration (default 8 seconds)
+  --start S     start S seconds into the demo (default 0)
+  --size WxH    output size (default 640x400; MP4 rounds down to even dimensions)
+  --fps N       frame rate (default 30; range 1..240)
+  --render-scale N  override song scale (1..64); smaller internal frame, same output size
+  --threads N   pixel worker threads
+  --solo C      hear only channel C (zero-based)
 ```
 
-`dm --help` (or `dm -h`) prints the banner and command reference. In the
-player, `q` quits; Left/Right seek five seconds; wheel or touchpad scroll/pan
-smoothly scrubs the timeline. Slow gestures make fine adjustments and faster
-swipes travel farther; scroll bursts retain their full reported motion.
-Up/Down change speed and Space pauses. Playback speed resamples audio together with the
-visual clock, so it changes pitch. `1`..`8` toggle channel mutes, `0` unmutes
-all, `r` forces a reload in watch mode, and Ctrl-Z cleanly restores the terminal
+`dm --help` (or `dm -h`) prints the banner and command reference.
+`dm --version` reports `dmscene v4 (DMS format 4)`; this is the engine/module
+generation, not a Git revision. Commands accept source `.dmt` or compiled
+`.dms` input; use `.dmt` with `watch` to recompile edits.
+
+Inspect a demo without starting playback or rendering:
+
+```sh
+./dm stats demos/threshold.dmt
+./dm stats demos/threshold.dmt --json
+./dm check demos/threshold.dmt --json
+```
+
+`stats` reports initial song settings, resource counts, sample/texture payload
+bytes, and each program's bytecode size, locals, state slots, delays and reverbs.
+These are storage/resource measurements, not render-time estimates. With
+`--json`, `stats` and `check` emit one JSON object on stdout, including failures,
+without a banner. Exit codes are 0 for success, 1 for a load/compile/verification
+or output failure, and 2 for invalid arguments. See
+[CLI reporting](docs/cli-reporting.md) for the schema and examples.
+
+For a preview starting partway through a demo:
+
+```sh
+mkdir -p build/video
+./dm render demos/threshold.dmt --mp4 build/video/threshold-preview.mp4 --start 12 --seconds 4 --size 960x600 --fps 30 --render-scale 6
+```
+
+`--start` advances audio and the tracker from the beginning, so a late start can
+take time to prepare. It starts visual history at the chosen position; feedback
+and other effects that depend on earlier frames are not reconstructed.
+
+In the player, `q` or Ctrl-C quits; Left/Right seek five seconds; wheel or
+touchpad scroll/pan smoothly scrubs the timeline. Slow gestures make fine
+adjustments and faster swipes travel farther; scroll bursts retain their full
+reported motion. Up/Down change speed and Space pauses. Playback speed resamples
+audio together with the visual clock, so it changes pitch. `1`..`8` toggle
+channel mutes, `0` unmutes all, `r` forces a reload in watch mode, and Ctrl-Z cleanly restores the terminal
 before suspension and reinstates playback on `fg`. Mouse clicks, bracketed
 paste, and unknown escape sequences are ignored rather than treated as quit
 keys.
@@ -167,7 +222,9 @@ chosen sample; a first jump into uncached audio can take longer. Seeking does
 not replay prior video frames: feedback and other frame-history effects restart
 when a seek or scrub gesture begins. The status line shows time, beat, fps,
 speed, channel flags, and reload status. `watch` swaps the new module in at the
-same sample position; uniforms and feedback buffers restart. See
+same sample position; uniforms and feedback buffers restart. If compilation or
+module verification fails, the current demo keeps playing and the status line
+shows the error; save again or press `r` to retry. See
 [scroll input and performance](docs/scrubbing.md) for the Ghostty behavior and
 implementation details.
 
@@ -191,12 +248,17 @@ src/dm_scene.c      frame, selected pixel program, post pass; worker threads; pr
 src/dm_io.c         PNG (stored deflate, own CRC/Adler), PPM, WAV writers
 src/dm_term.c       terminal blitter with nearest-neighbour scaling, raw keys, timing
 src/dm_audio.c      AudioQueue backend / pipe backend
+src/dm_seek.c       cancellable audio seek worker and synth checkpoint cache
 tools/dm.c          the CLI
 demos/*.dmt         the demos (table below); demos/assets holds WAV samples and PPM textures
 tests/run.sh        compile, round-trip, determinism, audio, errors, features and every demo
 tests/synth-voices.c voice ownership, held notes, NNA tails, slot reuse and PCM isolation
 tests/showcase-gates.c bass/lead gate durations across breaks and song loops
 tests/branch-texture.c branch execution and verification, PPM sampling and module round trip
+tests/cli-inspect.sh version, human/JSON reports, diagnostics and escaping
+docs/cli-reporting.md module inspection commands and JSON schema
+docs/scrubbing.md   terminal input, seek architecture and responsiveness measurements
+docs/state-machines.md states, invariants, transitions, confirmed bugs and regression evidence
 art/               README artwork and animated demo highlights
 ```
 
@@ -314,7 +376,7 @@ gate clean.
 Top level is line oriented. `#` (at line start or after whitespace, so `D#4`
 is a note) and `//` start comments. Blocks open with `{` at the end of the
 header line and close with a line containing only `}`; nested `{`/`}` lines
-(from `repeat`) are tracked.
+(from `repeat` and `if`/`else`) are tracked.
 
 ```
 title PULSE
@@ -356,7 +418,7 @@ frame { program }   pixel [NAME] { program }   post { program }   master { progr
 | `uniform a b ...` | names shared between `frame` (writer) and every pixel/post program (readers); persist across frames |
 | `palette NAME { pos r g b }` | up to 16 keys, linear LUT of 256 entries; equal positions make hard steps |
 | `text NAME "..."` | string resource for `glyph`/`str`/`strlen`, up to 1024 chars |
-| `sample NAME "f.wav" [rate=N]` | loads and optionally resamples a WAV to 8-bit mono; path relative to the `.dmt` |
+| `sample NAME "f.wav" [rate=N]` | loads a WAV as 8-bit mono, keeping its sample rate unless `rate=N` requests resampling (stored rate max 65535 Hz); path relative to the `.dmt` |
 | `texture NAME "f.ppm"` | embeds a P6 RGB texture (max 1024×1024); path relative to the `.dmt` |
 | `venv NAME [sustain=K] { t v }` | drawn volume envelope; `sustain` is the point index held while the key is down |
 | `timeline { O:R name=v }` | events at song positions; names become `evt()`/`evtl()` inputs. Positions are order:row, so the timeline loops with the song |
@@ -402,13 +464,17 @@ else {
 * Uniforms persist across frames, so `frame` can read last frame's value before
   overwriting it (lightwall uses this to re-project the wall buffer).
 * Expressions: `+ - * / %`, `^` (power, right associative), `< <= > >= == !=`,
-  `&& || !` (non short-circuit, 1/0 values), `c ? a : b`, parentheses, constants
-  `pi tau`. Precedence low to high: `?:`, `||`, `&&`, `== !=`, `< <= > >=`, `+ -`,
-  `* / %`, unary `- !`, `^`. Division by zero yields 0, `sqrt`/`log`/`pow` clamp
-  their domain (`x ^ n` accepts negative x for integer n), every op is NaN-safe.
+  `&& || !` (non short-circuit, 1/0 values), `c ? a : b` (both arms evaluated),
+  parentheses, constants `pi tau`. Precedence low to high: `?:`, `||`, `&&`,
+  `== !=`, `< <= > >=`, `+ -`, `* / %`, unary `- !`, `^`. Division by zero yields
+  0, `sqrt`/`log`/`pow` clamp their domain (`x ^ n` accepts negative x for integer n).
+  Arithmetic can still
+  produce nonfinite values; resource lookups guard their indices before conversion.
 * `r1 r2 r3` hold secondary results of the last multi-result intrinsic.
 * Loops run in the VM (`loop`/`endl`); the verifier checks the stack depth is
-  unchanged across the body. There is no `break`: mask with `step()`.
+  unchanged across the body. An active loop counter is read-only and cannot be
+  reused by a nested loop; it may be reused after the loop ends. There is no
+  `break` or `continue`; use `if` to conditionally skip work inside an iteration.
 * `if`/`else` may nest inside loops and each other. The verifier checks both
   paths meet at the same stack depth and cannot jump across loop boundaries.
 * `fn name(a, b) { ... return expr }` defines a function. Calls are inlined at
@@ -553,10 +619,12 @@ followed by only the present fields; `0x80|n` skips n+1 empty cells. Note 1..96
 Bytecode is one byte per opcode in `dm_ops.h` table order plus immediates:
 `pushk` f32, `pushb` i8, `ldl/stl/ldi/ldu/stu/lds/sts` u8 slot, `lp/hp/svf/usaw`
 u8 state slot, `dly` u8 line, `verb` u8 instance, `pal/mixpal` u8 palette,
-`str/strlen/smp/smplen/wave/venv/evt/evtl/scene` u8 resource id, `loop` u8 slot
-u16 count u16 skip, `endl` u8 slot u16 back. Integer constants in -128..127
+`str/strlen/smp/smplen/wave/tex/venv/evt/evtl/scene` u8 resource id, `loop` u8 slot
+u16 count u16 skip, `endl` u8 slot u16 back, `ifz/else` u16 forward skip,
+`endif` with no immediate. Integer constants in -128..127
 compile to the 2-byte `pushb`. Every program is verified on load: opcode range,
-immediates against the declared resources, loop structure, exact stack depth.
+immediates against the declared resources, loop-counter ownership, structured
+branch/loop targets and exact stack depth at joins.
 A module from an older version is rejected with a message telling you to
 recompile; opcode numbers are table order, so append new ops to keep old
 modules working.
@@ -572,7 +640,8 @@ modules working.
   real output level of channel c read from the audio thread, after chan fx.
 * The timeline is addressed in song position (order:row), so it loops with the
   song. `evt` holds the last value, `evtl` ramps linearly to the next event of
-  the same name.
+  the same name. Before the first event for a name, both return that first
+  event's value; add an event at `0:00` when you need a different initial value.
 * `mp0..mp3` are the one piece of state the patterns, the instruments and the
   visuals all share; `vowels.dmt` drives its vowel morph that way.
 
@@ -589,11 +658,15 @@ previous final output.
 
 ## Determinism and threads
 
-Offline output is bit-identical between runs at the same thread count. Rows are
+Offline output is bit-identical between runs with the same build, platform,
+settings and thread count. Cross-platform bit identity is not guaranteed. Rows are
 dealt to worker threads round-robin; pixel and post `$state` and `noise()` are
 per worker, so a program that depends on them is only reproducible at a fixed
 `--threads`. Audio is single-threaded and always deterministic. Offline renders
 replay a second player to obtain `cenv` levels for the visuals.
+
+The [state-machine audit](docs/state-machines.md) documents lifecycle invariants,
+retry/concurrency behavior, confirmed fixes and the tests that exercise them.
 
 ## Extending
 
