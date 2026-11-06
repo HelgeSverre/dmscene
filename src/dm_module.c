@@ -177,7 +177,7 @@ int dm_module_write(const dm_module *m, const char *path) {
   }
   FILE *f = fopen(path, "wb");
   int rc = -1;
-  if (f) { rc = fwrite(out.d, 1, out.n, f) == out.n ? 0 : -1; fclose(f); }
+  if (f) { rc = fwrite(out.d, 1, out.n, f) == out.n ? 0 : -1; if (fclose(f)) rc = -1; }
   if (rc) dm_set_error("cannot write %s", path);
   free(out.d); free(c.d);
   return rc;

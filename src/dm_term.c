@@ -15,20 +15,30 @@ struct dm_term {
   struct termios saved;
   int raw, eof;
   char *buf; size_t cap;
-  struct sigaction handlers[5]; unsigned installed;
+  struct sigaction handlers[6]; unsigned installed;
   unsigned char input[256]; size_t input_pos, input_n;
   int state, invalid, private, param_i, digits, x10_left, x10_button, paste_match, string_bel;
   unsigned params[4], sequence_len;
 };
 
 static volatile sig_atomic_t g_quit, g_suspend;
-static const int handled_signals[] = {SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP};
+static const int handled_signals[] = {SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP, SIGPIPE};
 static void on_sig(int s) { if (s == SIGTSTP) g_suspend = 1; else g_quit = 1; }
 enum { INPUT_TEXT, INPUT_ESC, INPUT_CSI, INPUT_SS3, INPUT_X10, INPUT_STRING,
        INPUT_STRING_ESC, INPUT_PASTE, INPUT_ESC_INTERMEDIATE };
 
 static void wr(const char *s, size_t n) {
-  while (n) { ssize_t k = write(1, s, n); if (k <= 0) { if (k < 0 && (errno == EINTR || errno == EAGAIN)) continue; return; } s += k; n -= (size_t)k; }
+  while (n) {
+    ssize_t k = write(1, s, n);
+    if (k <= 0) {
+      if (k < 0 && errno == EINTR && !g_quit) continue;
+      if (k < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && !g_quit) {
+        struct pollfd fd = {1, POLLOUT, 0}; poll(&fd, 1, 20); continue;
+      }
+      g_quit = 1; return;
+    }
+    s += k; n -= (size_t)k;
+  }
 }
 
 dm_term *dm_term_open(void) {

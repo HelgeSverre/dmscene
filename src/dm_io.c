@@ -2,10 +2,12 @@
 #include "dm.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#include <pthread.h>
 
 static uint32_t crc_tab[256];
+static pthread_once_t crc_once = PTHREAD_ONCE_INIT;
 static void crc_init(void) {
-  if (crc_tab[1]) return;
   for (uint32_t n = 0; n < 256; n++) {
     uint32_t c = n;
     for (int k = 0; k < 8; k++) c = c & 1 ? 0xedb88320u ^ (c >> 1) : c >> 1;
@@ -27,7 +29,7 @@ static void chunk(FILE *f, const char *type, const uint8_t *data, uint32_t n) {
 }
 
 int dm_png_write(const dm_fb *fb, const char *path) {
-  crc_init();
+  pthread_once(&crc_once, crc_init);
   FILE *f = fopen(path, "wb");
   if (!f) return -1;
   static const uint8_t sig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
@@ -36,9 +38,11 @@ int dm_png_write(const dm_fb *fb, const char *path) {
   chunk(f, "IHDR", ihdr, 13);
   size_t stride = (size_t)fb->w * 3 + 1, raw_n = stride * fb->h;
   uint8_t *raw = malloc(raw_n);
+  if (!raw) { fclose(f); return -1; }
   for (int y = 0; y < fb->h; y++) { raw[y * stride] = 0; memcpy(raw + y * stride + 1, fb->rgb + (size_t)y * fb->w * 3, (size_t)fb->w * 3); }
   size_t nblk = (raw_n + 65534) / 65535, zn = 2 + raw_n + nblk * 5 + 4;
-  uint8_t *z = malloc(zn), *p = z;
+  uint8_t *z = zn <= UINT32_MAX ? malloc(zn) : NULL, *p = z;
+  if (!z) { free(raw); fclose(f); return -1; }
   *p++ = 0x78; *p++ = 0x01;
   uint32_t a = 1, b = 0;
   for (size_t i = 0; i < raw_n; i++) { a = (a + raw[i]) % 65521; b = (b + a) % 65521; }
@@ -51,8 +55,10 @@ int dm_png_write(const dm_fb *fb, const char *path) {
   be32(p, (b << 16) | a); p += 4;
   chunk(f, "IDAT", z, (uint32_t)(p - z));
   chunk(f, "IEND", NULL, 0);
-  fclose(f); free(raw); free(z);
-  return 0;
+  int failed = ferror(f);
+  if (fclose(f)) failed = 1;
+  free(raw); free(z);
+  return failed ? -1 : 0;
 }
 
 int dm_ppm_write(const dm_fb *fb, const char *path) {
@@ -60,38 +66,52 @@ int dm_ppm_write(const dm_fb *fb, const char *path) {
   if (!f) return -1;
   fprintf(f, "P6\n%d %d\n255\n", fb->w, fb->h);
   fwrite(fb->rgb, 1, (size_t)fb->w * fb->h * 3, f);
-  fclose(f);
-  return 0;
+  int failed = ferror(f);
+  if (fclose(f)) failed = 1;
+  return failed ? -1 : 0;
 }
 
 static void le32(FILE *f, uint32_t v) { uint8_t b[4] = {v, v >> 8, v >> 16, v >> 24}; fwrite(b, 1, 4, f); }
 static void le16(FILE *f, uint32_t v) { uint8_t b[2] = {v, v >> 8}; fwrite(b, 1, 2, f); }
 static void wav_header(dm_wav *w) {
   uint32_t data = w->frames * 4;
-  fseek(w->f, 0, SEEK_SET);
+  if (fseek(w->f, 0, SEEK_SET)) { w->failed = 1; return; }
   fwrite("RIFF", 1, 4, w->f); le32(w->f, 36 + data); fwrite("WAVEfmt ", 1, 8, w->f);
   le32(w->f, 16); le16(w->f, 1); le16(w->f, 2); le32(w->f, w->sr); le32(w->f, w->sr * 4); le16(w->f, 4); le16(w->f, 16);
   fwrite("data", 1, 4, w->f); le32(w->f, data);
+  if (ferror(w->f)) w->failed = 1;
 }
 int dm_wav_open(dm_wav *w, const char *path, int sr) {
-  w->f = fopen(path, "wb"); w->frames = 0; w->sr = sr;
+  w->f = fopen(path, "wb"); w->frames = 0; w->sr = sr; w->failed = 0;
   if (!w->f) return -1;
   wav_header(w);
+  if (fflush(w->f)) w->failed = 1;
+  if (w->failed) { fclose(w->f); w->f = NULL; return -1; }
   return 0;
 }
-void dm_wav_write(dm_wav *w, const float *lr, uint32_t frames) {
+int dm_wav_write(dm_wav *w, const float *lr, uint32_t frames) {
+  if (!w->f || w->failed) return -1;
+  if (frames > (UINT32_MAX - 36) / 4 - w->frames) { w->failed = 1; return -1; }
   uint8_t pcm[8192];
   while (frames) {
     uint32_t n = frames > 2048 ? 2048 : frames;
     for (uint32_t i = 0; i < n * 2; i++) {
-      float x = lr[i]; if (x > 1) x = 1; if (x < -1) x = -1;
+      float x = lr[i]; if (!isfinite(x)) x = 0; if (x > 1) x = 1; if (x < -1) x = -1;
       int v = (int)(x * 32767.0f);
       pcm[2 * i] = (uint8_t)v; pcm[2 * i + 1] = (uint8_t)(v >> 8);
     }
-    fwrite(pcm, 1, (size_t)n * 4, w->f);
+    if (fwrite(pcm, 4, n, w->f) != n) { w->failed = 1; return -1; }
     lr += (size_t)n * 2;
     frames -= n;
     w->frames += n;
   }
+  return 0;
 }
-void dm_wav_close(dm_wav *w) { if (!w->f) return; wav_header(w); fclose(w->f); w->f = NULL; }
+int dm_wav_close(dm_wav *w) {
+  if (w->f) {
+    if (!w->failed) wav_header(w);
+    if (fclose(w->f)) w->failed = 1;
+    w->f = NULL;
+  }
+  return w->failed ? -1 : 0;
+}

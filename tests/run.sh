@@ -8,11 +8,19 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$T/a" "$T/b"
 fail() { echo "FAIL: $1"; exit 1; }
 
+./build/tests/state-safety || fail "VM control flow"
+./build/tests/vm-numeric || fail "VM numeric lookup boundary"
+./build/tests/output-errors || fail "output failure propagation"
+./build/tests/compile-retry || fail "compiler retry ownership"
+./build/tests/watch-state || fail "watch reload state"
+./build/tests/audio-pipe || fail "pipe audio lifecycle"
+
 ./build/tests/term-input || fail "terminal input"
 ./build/tests/play-transport || fail "play transport"
 ./build/tests/seek || fail "background seek"
 ./build/tests/scrub-live || fail "live scrubbing"
 ./build/tests/scrub-live ./build/tests/dm-audio-clock audio || fail "scrubbing with audio output"
+DM_AUDIO_CMD='exit 7' ./build/tests/scrub-live ./build/tests/dm-pipe audio || fail "playback recovery after audio failure"
 ./build/tests/scrub-live ./dm low-fps || fail "scrubbing with slow playback timer"
 
 ./dm compile demos/pulse.dmt -o "$T/pulse.dms" 2>/dev/null || fail "compile"
@@ -56,12 +64,16 @@ EOF
 chmod +x "$T/bin/ffmpeg"
 PATH="$T/bin" ./dm render "$T/pulse.dms" --mp4 "$T/failed.mp4" --seconds 0.5 --fps 4 --size 16x16 >/dev/null 2>&1 && fail "encoder failure reported success"
 [ ! -e "$T/failed.mp4.tmp.wav" ] || fail "temporary WAV left after encoder failure"
+for artifact in "$T/failed.mp4".tmp.*; do
+  [ ! -e "$artifact" ] || fail "temporary audio left after encoder failure"
+done
 
 if command -v ffmpeg >/dev/null 2>&1; then
   sh -c "$(tail -n 1 "$T/fallback.log")" >/dev/null 2>&1 || fail "fallback command quoting"
   [ -s "$T/no'encoder.mp4" ] || fail "fallback MP4 missing"
   ./dm render "$T/pulse.dms" --mp4 "$T/it's video.mp4" --seconds 0.5 --fps 4 --size 16x16 >/dev/null 2>&1 || fail "quoted MP4 path"
   [ -s "$T/it's video.mp4" ] || fail "MP4 missing"
+  ./dm render "$T/pulse.dms" --mp4 "$T/no-stdin.mp4" --seconds 0.1 --fps 10 --size 16x16 0<&- >/dev/null 2>&1 || fail "MP4 with closed stdin"
 fi
 
 # audio is neither silent nor DC: count distinct sample values in the first 2 s

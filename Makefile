@@ -84,10 +84,49 @@ build/tests/scrub-live: tests/scrub-live.c build/obj/dm_term.o | build/tests
 build/tests/dm-audio-clock: tools/dm.c tests/audio-clock.c $(OBJ) build/obj/dm_term.o build/obj/dm_seek.o | build/tests
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport build/tests/seek build/tests/scrub-live build/tests/dm-audio-clock
+build/tests/state-safety build/tests/output-errors build/tests/vm-numeric: build/tests/%: tests/%.c $(OBJ) | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/compile-retry: tests/compile-retry.c src/dm_compile.c src/dm_module.c $(filter-out build/obj/dm_compile.o build/obj/dm_module.o,$(OBJ)) | build/tests
+	$(CC) $(CFLAGS) tests/compile-retry.c $(filter-out build/obj/dm_compile.o build/obj/dm_module.o,$(OBJ)) -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/watch-state: tests/watch-state.c tools/dm.c $(OBJ) $(POBJ) | build/tests
+	$(CC) $(CFLAGS) tests/watch-state.c $(OBJ) $(POBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/audio-pipe: tests/audio-pipe.c src/dm_audio.c src/dm_term.c include/dm.h | build/tests
+	$(CC) $(CFLAGS) -DDM_AUDIO_PIPE tests/audio-pipe.c src/dm_audio.c src/dm_term.c -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/dm-pipe: tools/dm.c src/dm_audio.c $(OBJ) build/obj/dm_term.o build/obj/dm_seek.o | build/tests
+	$(CC) $(CFLAGS) -DDM_AUDIO_PIPE $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport build/tests/seek build/tests/scrub-live build/tests/dm-audio-clock build/tests/state-safety build/tests/output-errors build/tests/compile-retry build/tests/watch-state build/tests/audio-pipe build/tests/vm-numeric build/tests/dm-pipe
 	./tests/run.sh
+
+# Separate objects keep sanitizer flags out of the normal dm binary.
+SANFLAGS := $(CFLAGS) -O1 -g -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all
+SANOBJ := $(ENGINE:src/%.c=build/sanitize/%.o)
+SANPOBJ := $(PLAT:src/%.c=build/sanitize/%.o)
+SAN_TESTS := state-safety vm-numeric compile-retry watch-state seek
+
+build/sanitize build/sanitize/tests:
+	mkdir -p $@
+
+build/sanitize/%.o: src/%.c include/dm.h include/dm_ops.h include/dm_seek.h | build/sanitize
+	$(CC) $(SANFLAGS) -c $< -o $@
+
+build/sanitize/tests/state-safety build/sanitize/tests/vm-numeric build/sanitize/tests/seek: build/sanitize/tests/%: tests/%.c $(SANOBJ) $(SANPOBJ) | build/sanitize/tests
+	$(CC) $(SANFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/sanitize/tests/watch-state: tests/watch-state.c tools/dm.c $(SANOBJ) $(SANPOBJ) | build/sanitize/tests
+	$(CC) $(SANFLAGS) tests/watch-state.c $(SANOBJ) $(SANPOBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/sanitize/tests/compile-retry: tests/compile-retry.c src/dm_compile.c src/dm_module.c $(filter-out build/sanitize/dm_compile.o build/sanitize/dm_module.o,$(SANOBJ)) | build/sanitize/tests
+	$(CC) $(SANFLAGS) tests/compile-retry.c $(filter-out build/sanitize/dm_compile.o build/sanitize/dm_module.o,$(SANOBJ)) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test-sanitize: $(addprefix build/sanitize/tests/,$(SAN_TESTS))
+	@set -e; for t in $(SAN_TESTS); do ./build/sanitize/tests/$$t; done
 
 clean:
 	rm -rf build dm
 
-.PHONY: all demo demos videos showcase showcase-preview run test clean
+.PHONY: all demo demos videos showcase showcase-preview run test test-sanitize clean

@@ -76,6 +76,8 @@ typedef struct {
   char uni[DM_MAX_UNIFORMS][DM_NAME_LEN];
   cfn fns[DM_MAX_FNS]; int nfns;
   int ncalls;
+  char *block; /* current read_block allocation, owned until transferred */
+  char *path; /* asset name while loading a sample/texture */
 } cc;
 
 static void fail(cc *c, int line, const char *fmt, ...) {
@@ -642,7 +644,8 @@ static void set_name(cc *c, int line, char *dst, const char *src) {
  * body ends at a line that is exactly '}'.  Returns malloc'd text. */
 static char *read_block(cc *c, int *first_line) {
   size_t cap = 1024, n = 0;
-  char *body = malloc(cap), line[1024];
+  char *body = c->block = malloc(cap), line[1024];
+  if (!body) fail(c, c->line, "out of memory reading block");
   *first_line = c->line + 1;
   int start = c->line, depth = 0;
   for (;;) {
@@ -653,7 +656,12 @@ static char *read_block(cc *c, int *first_line) {
     else if (argc == 1 && !strcmp(argv[0], "}")) { if (depth == 0) break; depth--; }
     else if (argc >= 1 && !strcmp(argv[argc - 1], "{")) depth++;
     size_t l = strlen(line);
-    if (n + l + 2 > cap) { cap = (cap + l) * 2; body = realloc(body, cap); }
+    if (n + l + 2 > cap) {
+      cap = (cap + l) * 2;
+      char *next = realloc(body, cap);
+      if (!next) fail(c, c->line, "out of memory reading block");
+      body = c->block = next;
+    }
     memcpy(body + n, line, l); n += l; body[n++] = '\n';
   }
   body[n] = 0;
@@ -690,6 +698,8 @@ static void parse_pattern(cc *c, int id, int rows, int header_line) {
   if (m->pat[id].cells) fail(c, header_line, "pattern %d defined twice", id);
   int chn = m->channels ? m->channels : DM_MAX_CHANNELS;
   dm_cell *cells = calloc((size_t)rows * chn, sizeof(dm_cell));
+  if (!cells) fail(c, header_line, "out of memory reading pattern");
+  m->pat[id].cells = cells; /* cleanup owns it even if parsing fails */
   char line[1024];
   int row = 0, start = c->line;
   for (;;) {
@@ -869,43 +879,51 @@ static char *quoted(cc *c, int line, const char *raw) {
   const char *e = strrchr(raw, '"');
   if (e == q) fail(c, line, "unterminated string");
   size_t n = (size_t)(e - q - 1);
-  char *s = malloc(n + 1); memcpy(s, q + 1, n); s[n] = 0;
+  char *s = malloc(n + 1);
+  if (!s) fail(c, line, "out of memory reading string");
+  memcpy(s, q + 1, n); s[n] = 0;
   return s;
 }
 
 int dm_compile(const char *src, const char *srcname, dm_module *m) {
-  cc c; memset(&c, 0, sizeof c);
-  c.m = m; c.srcname = srcname; c.src = src;
-  { const char *sl = strrchr(srcname, '/'); if (sl) { size_t n = (size_t)(sl - srcname); if (n >= sizeof c.srcdir) n = sizeof c.srcdir - 1; memcpy(c.srcdir, srcname, n); c.srcdir[n] = 0; } }
+  cc *c = malloc(sizeof *c);
+  if (!c) { dm_set_error("out of memory compiling"); return -1; }
+  memset(c, 0, sizeof *c);
+  c->m = m; c->srcname = srcname; c->src = src;
+  { const char *sl = strrchr(srcname, '/'); if (sl) { size_t n = (size_t)(sl - srcname); if (n >= sizeof c->srcdir) n = sizeof c->srcdir - 1; memcpy(c->srcdir, srcname, n); c->srcdir[n] = 0; } }
   memset(m, 0, sizeof *m);
   m->bpm = 125; m->speed = 6; m->rpb = 4; m->channels = 4; m->volume = 0.8f; m->scale = 1;
   for (int i = 0; i < DM_MAX_CHANNELS; i++) m->pan[i] = 0.5f;
-  if (setjmp(c.jb)) { dm_module_free(m); return -1; }
+  if (setjmp(c->jb)) {
+    free(c->block); free(c->path);
+    for (int i = 0; i < c->nfns; i++) free(c->fns[i].body);
+    free(c); dm_module_free(m); return -1;
+  }
 
   char line[1024];
   /* pre-scan: pixel program names and timeline event names may be referenced before they are defined */
   {
-    cc pre = c; int in_tl = 0;
+    cc pre = *c; int in_tl = 0;
     while (get_line(&pre, line, sizeof line)) {
       strip_comment(line);
       char *argv[64]; int argc = split(line, argv, 64);
       if (!argc) continue;
-      if (in_tl) { if (!strcmp(argv[0], "}")) in_tl = 0; else for (int i = 1; i < argc; i++) { char *eq = strchr(argv[i], '='); if (eq) { *eq = 0; if (find_evname(&c, argv[i]) < 0 && m->nevname < DM_MAX_EVNAMES) set_name(&c, pre.line, m->evname[m->nevname++], argv[i]); } } continue; }
+      if (in_tl) { if (!strcmp(argv[0], "}")) in_tl = 0; else for (int i = 1; i < argc; i++) { char *eq = strchr(argv[i], '='); if (eq) { *eq = 0; if (find_evname(c, argv[i]) < 0 && m->nevname < DM_MAX_EVNAMES) set_name(c, pre.line, m->evname[m->nevname++], argv[i]); } } continue; }
       if (!strcmp(argv[0], "timeline") && argc == 2 && !strcmp(argv[1], "{")) in_tl = 1;
       else if (!strcmp(argv[0], "pixel") && argc >= 2 && !strcmp(argv[argc - 1], "{")) {
         const char *nm = argc == 3 ? argv[1] : "main";
-        if (find_pixel(&c, nm) < 0 && m->npixel < DM_MAX_PIXEL) set_name(&c, pre.line, m->pixelname[m->npixel++], nm);
+        if (find_pixel(c, nm) < 0 && m->npixel < DM_MAX_PIXEL) set_name(c, pre.line, m->pixelname[m->npixel++], nm);
       }
     }
   }
   int npixel_names = m->npixel;
-  while (get_line(&c, line, sizeof line)) {
+  while (get_line(c, line, sizeof line)) {
     char raw[1024]; strcpy(raw, line);
     strip_comment(line);
     char *argv[64]; int argc = split(line, argv, 64);
     if (!argc) continue;
     const char *k = argv[0], *v;
-    int ln = c.line;
+    int ln = c->line;
     if (!strcmp(k, "title")) {
       char *p = strstr(raw, "title") + 5; while (isspace((unsigned char)*p)) p++;
       char *end = p + strlen(p); while (end > p && (isspace((unsigned char)end[-1]) || end[-1] == '#')) end--;
@@ -921,98 +939,98 @@ int dm_compile(const char *src, const char *srcname, dm_module *m) {
         else if (kv(argv[i], "volume", &v)) m->volume = strtof(v, NULL);
         else if (kv(argv[i], "scale", &v)) m->scale = (uint8_t)atoi(v);
         else if (kv(argv[i], "dither", &v)) m->dither = (uint8_t)atoi(v);
-        else fail(&c, ln, "unknown song option '%s'", argv[i]);
+        else fail(c, ln, "unknown song option '%s'", argv[i]);
       }
-      if (m->bpm < 32) fail(&c, ln, "bpm must be >= 32 (and <= 255)");
-      if (m->channels < 1 || m->channels > DM_MAX_CHANNELS) fail(&c, ln, "channels must be 1..%d", DM_MAX_CHANNELS);
-      if (m->speed < 1 || m->speed > 31) fail(&c, ln, "speed must be 1..31");
+      if (m->bpm < 32) fail(c, ln, "bpm must be >= 32 (and <= 255)");
+      if (m->channels < 1 || m->channels > DM_MAX_CHANNELS) fail(c, ln, "channels must be 1..%d", DM_MAX_CHANNELS);
+      if (m->speed < 1 || m->speed > 31) fail(c, ln, "speed must be 1..31");
     } else if (!strcmp(k, "order")) {
       for (int i = 1; i < argc; i++) {
-        if (m->norder >= DM_MAX_ORDER) fail(&c, ln, "order list too long");
+        if (m->norder >= DM_MAX_ORDER) fail(c, ln, "order list too long");
         m->order[m->norder++] = (uint8_t)atoi(argv[i]);
       }
     } else if (!strcmp(k, "uniform")) {
       for (int i = 1; i < argc; i++) {
-        if (m->nuniform >= DM_MAX_UNIFORMS) fail(&c, ln, "too many uniforms");
-        if (find_uniform(&c, argv[i]) >= 0) fail(&c, ln, "uniform '%s' declared twice", argv[i]);
-        set_name(&c, ln, c.uni[m->nuniform++], argv[i]);
+        if (m->nuniform >= DM_MAX_UNIFORMS) fail(c, ln, "too many uniforms");
+        if (find_uniform(c, argv[i]) >= 0) fail(c, ln, "uniform '%s' declared twice", argv[i]);
+        set_name(c, ln, c->uni[m->nuniform++], argv[i]);
       }
     } else if (!strcmp(k, "palette")) {
-      if (argc != 3 || strcmp(argv[2], "{")) fail(&c, ln, "usage: palette NAME {");
-      parse_palette(&c, argv[1], ln);
+      if (argc != 3 || strcmp(argv[2], "{")) fail(c, ln, "usage: palette NAME {");
+      parse_palette(c, argv[1], ln);
     } else if (!strcmp(k, "pan")) {
       for (int i = 1; i < argc && i <= DM_MAX_CHANNELS; i++) m->pan[i - 1] = strtof(argv[i], NULL);
     } else if (!strcmp(k, "text")) {
-      if (argc < 3) fail(&c, ln, "usage: text NAME \"string\"");
-      if (m->ntext >= DM_MAX_TEXTS) fail(&c, ln, "too many texts");
+      if (argc < 3) fail(c, ln, "usage: text NAME \"string\"");
+      if (m->ntext >= DM_MAX_TEXTS) fail(c, ln, "too many texts");
       dm_text *t = &m->text[m->ntext];
-      set_name(&c, ln, t->name, argv[1]);
-      t->s = quoted(&c, ln, raw); size_t n = strlen(t->s); if (n > DM_MAX_TEXT_LEN) fail(&c, ln, "text too long"); t->len = (uint16_t)n;
+      set_name(c, ln, t->name, argv[1]);
+      t->s = quoted(c, ln, raw); size_t n = strlen(t->s); if (n > DM_MAX_TEXT_LEN) fail(c, ln, "text too long"); t->len = (uint16_t)n;
       m->ntext++;
     } else if (!strcmp(k, "sample")) {
-      if (argc < 3) fail(&c, ln, "usage: sample NAME \"file.wav\" [rate=N]");
-      if (m->nsmp >= DM_MAX_SAMPLES) fail(&c, ln, "too many samples");
+      if (argc < 3) fail(c, ln, "usage: sample NAME \"file.wav\" [rate=N]");
+      if (m->nsmp >= DM_MAX_SAMPLES) fail(c, ln, "too many samples");
       dm_sample *sm = &m->smp[m->nsmp];
-      set_name(&c, ln, sm->name, argv[1]);
+      set_name(c, ln, sm->name, argv[1]);
       int rate = 0;
       for (int i = 2; i < argc; i++) if (kv(argv[i], "rate", &v)) rate = atoi(v);
-      char *path = quoted(&c, ln, raw);
-      load_wav(&c, ln, path, rate, sm);
-      free(path);
+      char *path = c->path = quoted(c, ln, raw);
+      load_wav(c, ln, path, rate, sm);
+      free(path); c->path = NULL;
       m->nsmp++;
     } else if (!strcmp(k, "texture")) {
-      if (argc < 3) fail(&c, ln, "usage: texture NAME \"file.ppm\"");
-      if (m->ntex >= DM_MAX_TEXTURES) fail(&c, ln, "too many textures");
+      if (argc < 3) fail(c, ln, "usage: texture NAME \"file.ppm\"");
+      if (m->ntex >= DM_MAX_TEXTURES) fail(c, ln, "too many textures");
       dm_texture *tx = &m->tex[m->ntex];
-      set_name(&c, ln, tx->name, argv[1]);
-      if (find_texture(&c, tx->name) >= 0) fail(&c, ln, "texture '%s' defined twice", tx->name);
-      char *path = quoted(&c, ln, raw);
-      load_ppm(&c, ln, path, tx);
-      free(path);
+      set_name(c, ln, tx->name, argv[1]);
+      if (find_texture(c, tx->name) >= 0) fail(c, ln, "texture '%s' defined twice", tx->name);
+      char *path = c->path = quoted(c, ln, raw);
+      load_ppm(c, ln, path, tx);
+      free(path); c->path = NULL;
       m->ntex++;
     } else if (!strcmp(k, "venv")) {
-      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: venv NAME [sustain=K] {");
-      if (m->nvenv >= DM_MAX_VENVS) fail(&c, ln, "too many envelopes");
+      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(c, ln, "usage: venv NAME [sustain=K] {");
+      if (m->nvenv >= DM_MAX_VENVS) fail(c, ln, "too many envelopes");
       dm_venv *ve = &m->venv[m->nvenv];
-      set_name(&c, ln, ve->name, argv[1]);
+      set_name(c, ln, ve->name, argv[1]);
       ve->sustain = 255;
-      for (int i = 2; i < argc - 1; i++) { if (kv(argv[i], "sustain", &v)) ve->sustain = (uint8_t)atoi(v); else fail(&c, ln, "unknown venv option '%s'", argv[i]); }
-      int start = c.line;
+      for (int i = 2; i < argc - 1; i++) { if (kv(argv[i], "sustain", &v)) ve->sustain = (uint8_t)atoi(v); else fail(c, ln, "unknown venv option '%s'", argv[i]); }
+      int start = c->line;
       for (;;) {
-        if (!get_line(&c, line, sizeof line)) fail(&c, start, "unterminated venv");
+        if (!get_line(c, line, sizeof line)) fail(c, start, "unterminated venv");
         strip_comment(line);
         char *f[4]; int nf = split(line, f, 4);
         if (!nf) continue;
         if (nf == 1 && !strcmp(f[0], "}")) break;
-        if (nf != 2) fail(&c, c.line, "venv point: time level");
-        if (ve->npts >= DM_MAX_VENV_PTS) fail(&c, c.line, "too many envelope points");
+        if (nf != 2) fail(c, c->line, "venv point: time level");
+        if (ve->npts >= DM_MAX_VENV_PTS) fail(c, c->line, "too many envelope points");
         ve->t[ve->npts] = strtof(f[0], NULL); ve->v[ve->npts] = strtof(f[1], NULL);
-        if (ve->npts && ve->t[ve->npts] < ve->t[ve->npts - 1]) fail(&c, c.line, "venv points must be in time order");
+        if (ve->npts && ve->t[ve->npts] < ve->t[ve->npts - 1]) fail(c, c->line, "venv points must be in time order");
         ve->npts++;
       }
-      if (!ve->npts) fail(&c, ln, "empty venv");
+      if (!ve->npts) fail(c, ln, "empty venv");
       m->nvenv++;
     } else if (!strcmp(k, "timeline")) {
-      if (argc != 2 || strcmp(argv[1], "{")) fail(&c, ln, "usage: timeline {");
-      int start = c.line;
+      if (argc != 2 || strcmp(argv[1], "{")) fail(c, ln, "usage: timeline {");
+      int start = c->line;
       for (;;) {
-        if (!get_line(&c, line, sizeof line)) fail(&c, start, "unterminated timeline");
+        if (!get_line(c, line, sizeof line)) fail(c, start, "unterminated timeline");
         strip_comment(line);
         char *f[64]; int nf = split(line, f, 64);
         if (!nf) continue;
         if (nf == 1 && !strcmp(f[0], "}")) break;
         char *colon = strchr(f[0], ':');
-        if (!colon) fail(&c, c.line, "timeline entry: ORDER:ROW name=value ...");
+        if (!colon) fail(c, c->line, "timeline entry: ORDER:ROW name=value ...");
         *colon = 0;
         int ord = atoi(f[0]), row = atoi(colon + 1);
-        if (ord < 0 || ord >= DM_MAX_ORDER || row < 0 || row > 255) fail(&c, c.line, "timeline position out of range");
+        if (ord < 0 || ord >= DM_MAX_ORDER || row < 0 || row > 255) fail(c, c->line, "timeline position out of range");
         for (int i = 1; i < nf; i++) {
           char *eq = strchr(f[i], '=');
-          if (!eq) fail(&c, c.line, "timeline entry: name=value");
+          if (!eq) fail(c, c->line, "timeline entry: name=value");
           *eq = 0;
-          int id = find_evname(&c, f[i]);
-          if (id < 0) fail(&c, c.line, "internal: event name '%s' not pre-registered", f[i]);
-          if (m->nev >= DM_MAX_EVENTS) fail(&c, c.line, "too many timeline events");
+          int id = find_evname(c, f[i]);
+          if (id < 0) fail(c, c->line, "internal: event name '%s' not pre-registered", f[i]);
+          if (m->nev >= DM_MAX_EVENTS) fail(c, c->line, "too many timeline events");
           dm_event *ev = &m->ev[m->nev++];
           ev->order = (uint8_t)ord; ev->row = (uint8_t)row; ev->id = (uint8_t)id; ev->value = strtof(eq + 1, NULL);
         }
@@ -1022,91 +1040,92 @@ int dm_compile(const char *src, const char *srcname, dm_module *m) {
         while (j >= 0 && (m->ev[j].order > x.order || (m->ev[j].order == x.order && m->ev[j].row > x.row))) { m->ev[j + 1] = m->ev[j]; j--; }
         m->ev[j + 1] = x; }
     } else if (!strcmp(k, "chan")) {
-      if (argc != 3 || strcmp(argv[2], "{")) fail(&c, ln, "usage: chan N {");
+      if (argc != 3 || strcmp(argv[2], "{")) fail(c, ln, "usage: chan N {");
       int ch = atoi(argv[1]);
-      if (ch < 0 || ch >= m->channels) fail(&c, ln, "chan %d: song has %d channels", ch, m->channels);
-      if ((m->has_chanfx >> ch) & 1) fail(&c, ln, "chan %d defined twice", ch);
-      int first; char *body = read_block(&c, &first);
+      if (ch < 0 || ch >= m->channels) fail(c, ln, "chan %d: song has %d channels", ch, m->channels);
+      if ((m->has_chanfx >> ch) & 1) fail(c, ln, "chan %d defined twice", ch);
+      int first; char *body = read_block(c, &first);
       char nm[16]; snprintf(nm, sizeof nm, "chan %d", ch);
-      compile_program(&c, body, first, DM_PK_CHAN, &m->chanfx[ch], nm);
-      free(body);
+      compile_program(c, body, first, DM_PK_CHAN, &m->chanfx[ch], nm);
+      free(body); c->block = NULL;
       m->has_chanfx |= (uint8_t)(1 << ch);
     } else if (!strcmp(k, "pixel")) {
-      if (argc < 2 || argc > 3 || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: pixel [NAME] {");
+      if (argc < 2 || argc > 3 || strcmp(argv[argc - 1], "{")) fail(c, ln, "usage: pixel [NAME] {");
       const char *nm = argc == 3 ? argv[1] : "main";
       int idx = -1;
       for (int i = 0; i < npixel_names; i++) if (!strcmp(m->pixelname[i], nm)) idx = i;
-      if (idx < 0) fail(&c, ln, "internal: pixel name '%s' not pre-registered", nm);
-      if (m->pixel[idx].len) fail(&c, ln, "pixel '%s' defined twice", nm);
-      int first; char *body = read_block(&c, &first);
+      if (idx < 0) fail(c, ln, "internal: pixel name '%s' not pre-registered", nm);
+      if (m->pixel[idx].len) fail(c, ln, "pixel '%s' defined twice", nm);
+      int first; char *body = read_block(c, &first);
       m->npixel = npixel_names;                    /* all names visible to scene() */
-      compile_program(&c, body, first, DM_PK_PIXEL, &m->pixel[idx], nm);
-      free(body);
+      compile_program(c, body, first, DM_PK_PIXEL, &m->pixel[idx], nm);
+      free(body); c->block = NULL;
     } else if (!strcmp(k, "post")) {
-      if (argc != 2 || strcmp(argv[1], "{")) fail(&c, ln, "usage: post {");
-      if (m->has_post) fail(&c, ln, "post defined twice");
-      int first; char *body = read_block(&c, &first);
-      compile_program(&c, body, first, DM_PK_POST, &m->post, "post");
-      free(body);
+      if (argc != 2 || strcmp(argv[1], "{")) fail(c, ln, "usage: post {");
+      if (m->has_post) fail(c, ln, "post defined twice");
+      int first; char *body = read_block(c, &first);
+      compile_program(c, body, first, DM_PK_POST, &m->post, "post");
+      free(body); c->block = NULL;
       m->has_post = 1;
     } else if (!strcmp(k, "inst")) {
-      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: inst NAME [nna=continue] {");
-      if (m->ninst >= DM_MAX_INST) fail(&c, ln, "too many instruments");
+      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(c, ln, "usage: inst NAME [nna=continue] {");
+      if (m->ninst >= DM_MAX_INST) fail(c, ln, "too many instruments");
       dm_inst *in = &m->inst[m->ninst];
-      set_name(&c, ln, in->name, argv[1]);
+      set_name(c, ln, in->name, argv[1]);
       for (int i = 2; i < argc - 1; i++) {
-        if (kv(argv[i], "nna", &v)) { if (!strcmp(v, "continue")) in->flags |= DM_INST_NNA; else if (strcmp(v, "cut")) fail(&c, ln, "nna must be cut or continue"); }
-        else fail(&c, ln, "unknown inst option '%s'", argv[i]);
+        if (kv(argv[i], "nna", &v)) { if (!strcmp(v, "continue")) in->flags |= DM_INST_NNA; else if (strcmp(v, "cut")) fail(c, ln, "nna must be cut or continue"); }
+        else fail(c, ln, "unknown inst option '%s'", argv[i]);
       }
-      int first; char *body = read_block(&c, &first);
-      compile_program(&c, body, first, DM_PK_INST, &in->prog, in->name);
-      free(body);
+      int first; char *body = read_block(c, &first);
+      compile_program(c, body, first, DM_PK_INST, &in->prog, in->name);
+      free(body); c->block = NULL;
       m->ninst++;
     } else if (!strcmp(k, "pattern")) {
-      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: pattern ID rows=N {");
+      if (argc < 3 || strcmp(argv[argc - 1], "{")) fail(c, ln, "usage: pattern ID rows=N {");
       int rows = 16;
-      for (int i = 2; i < argc - 1; i++) { if (kv(argv[i], "rows", &v)) rows = atoi(v); else fail(&c, ln, "unknown pattern option '%s'", argv[i]); }
-      if (rows < 1 || rows > 256) fail(&c, ln, "rows must be 1..256");
-      parse_pattern(&c, atoi(argv[1]), rows, ln);
+      for (int i = 2; i < argc - 1; i++) { if (kv(argv[i], "rows", &v)) rows = atoi(v); else fail(c, ln, "unknown pattern option '%s'", argv[i]); }
+      if (rows < 1 || rows > 256) fail(c, ln, "rows must be 1..256");
+      parse_pattern(c, atoi(argv[1]), rows, ln);
     } else if (!strcmp(k, "fn")) {
       /* fn name(a, b) {   -- re-split the raw line on the parens */
       char hdr[1024]; strcpy(hdr, raw); strip_comment(hdr);
       char *lp = strchr(hdr, '('), *rp = lp ? strchr(lp, ')') : NULL;
-      if (!lp || !rp || strcmp(argv[argc - 1], "{")) fail(&c, ln, "usage: fn NAME(a, b) {");
-      if (c.nfns >= DM_MAX_FNS) fail(&c, ln, "too many fns");
-      cfn *fn = &c.fns[c.nfns];
+      if (!lp || !rp || strcmp(argv[argc - 1], "{")) fail(c, ln, "usage: fn NAME(a, b) {");
+      if (c->nfns >= DM_MAX_FNS) fail(c, ln, "too many fns");
+      cfn *fn = &c->fns[c->nfns];
       *lp = 0; char *nm = hdr + 2; while (isspace((unsigned char)*nm)) nm++;
       char *ne = nm + strlen(nm); while (ne > nm && isspace((unsigned char)ne[-1])) *--ne = 0;
-      set_name(&c, ln, fn->name, nm);
-      if (find_op(fn->name) >= 0) fail(&c, ln, "fn '%s' shadows a built-in", fn->name);
+      set_name(c, ln, fn->name, nm);
+      if (find_op(fn->name) >= 0) fail(c, ln, "fn '%s' shadows a built-in", fn->name);
       *rp = 0;
       char *pv[DM_MAX_FNARGS + 1]; int np = 0;
-      for (char *tk = strtok(lp + 1, ", \t"); tk; tk = strtok(NULL, ", \t")) { if (np > DM_MAX_FNARGS) fail(&c, ln, "too many fn params"); pv[np++] = tk; }
-      if (np > DM_MAX_FNARGS) fail(&c, ln, "too many fn params");
-      for (int i = 0; i < np; i++) set_name(&c, ln, fn->params[i], pv[i]);
+      for (char *tk = strtok(lp + 1, ", \t"); tk; tk = strtok(NULL, ", \t")) { if (np > DM_MAX_FNARGS) fail(c, ln, "too many fn params"); pv[np++] = tk; }
+      if (np > DM_MAX_FNARGS) fail(c, ln, "too many fn params");
+      for (int i = 0; i < np; i++) set_name(c, ln, fn->params[i], pv[i]);
       fn->nparams = np;
-      int first; fn->body = read_block(&c, &first); fn->line = first;
-      c.nfns++;
+      int first; fn->body = read_block(c, &first); fn->line = first;
+      c->block = NULL; c->nfns++;
     } else if (!strcmp(k, "frame") || !strcmp(k, "master")) {
-      if (argc != 2 || strcmp(argv[1], "{")) fail(&c, ln, "usage: %s {", k);
+      if (argc != 2 || strcmp(argv[1], "{")) fail(c, ln, "usage: %s {", k);
       int kind = k[0] == 'f' ? DM_PK_FRAME : DM_PK_MASTER;
       dm_prog *dst = kind == DM_PK_FRAME ? &m->frame : &m->master;
       int *flag = kind == DM_PK_FRAME ? &m->has_frame : &m->has_master;
       m->npixel = npixel_names;
-      if (*flag) fail(&c, ln, "%s defined twice", k);
-      int first; char *body = read_block(&c, &first);
-      compile_program(&c, body, first, kind, dst, k);
-      free(body);
+      if (*flag) fail(c, ln, "%s defined twice", k);
+      int first; char *body = read_block(c, &first);
+      compile_program(c, body, first, kind, dst, k);
+      free(body); c->block = NULL;
       *flag = 1;
-    } else fail(&c, ln, "unknown directive '%s'", k);
+    } else fail(c, ln, "unknown directive '%s'", k);
   }
   if (!m->norder) {
     for (int i = 0; i < DM_MAX_PATTERNS && m->norder < DM_MAX_ORDER; i++) if (m->pat[i].cells) m->order[m->norder++] = (uint8_t)i;
   }
-  if (!m->norder) fail(&c, c.line, "no patterns");
+  if (!m->norder) fail(c, c->line, "no patterns");
   for (int i = 0; i < npixel_names; i++) if (!m->pixel[i].len && !m->pixel[i].off) { /* declared by pre-scan but never compiled: impossible */ }
   m->npixel = npixel_names;
-  for (int i = 0; i < c.nfns; i++) free(c.fns[i].body);
+  for (int i = 0; i < c->nfns; i++) free(c->fns[i].body);
+  free(c);
   if (dm_module_verify(m)) { dm_module_free(m); return -1; }
   return 0;
 }

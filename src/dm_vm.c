@@ -1,6 +1,7 @@
 /* dm_vm.c - float stack machine + intrinsics + structured-control verifier. */
 #include "dm.h"
 #include <math.h>
+#include <limits.h>
 #include <string.h>
 
 const dm_opinfo dm_ops[DM_OP_COUNT] = {
@@ -37,7 +38,14 @@ int dm_op_stack_effect(int op) {
 
 /* ------------------------------------------------------------ intrinsics */
 static inline float fractf(float x) { return x - floorf(x); }
-static inline float clampf(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
+static inline float clampf(float x, float a, float b) { return isnan(x) || x < a ? a : (x > b ? b : x); }
+/* Float arithmetic may overflow even in verified source. Convert only after
+ * bounding the value; NaN uses an invalid index so lookup callers fall back. */
+static int indexf(float x) {
+  if (!(x > (float)INT_MIN)) return INT_MIN;
+  if (x >= (float)INT_MAX) return INT_MAX;
+  return (int)x;
+}
 
 static float frac_escape(dm_vm *vm, float zx, float zy, float cx, float cy, int maxit, int kind) {
   float x = zx, y = zy, x2 = x * x, y2 = y * y;
@@ -81,6 +89,7 @@ static float frac_kali(dm_vm *vm, float px, float py, float kx, float ky, int n)
 }
 
 static void hsv_to_rgb(float h, float s, float v, float *o) {
+  if (!isfinite(h)) h = 0;
   h = fractf(h) * 6.0f;
   int i = (int)h; float f = h - (float)i;
   float p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
@@ -95,6 +104,7 @@ static void hsv_to_rgb(float h, float s, float v, float *o) {
 }
 
 static void pal_lookup(const dm_palette *p, float t, float *o) {
+  if (!isfinite(t)) t = 0;
   float f = fractf(t) * 255.0f;
   int i = (int)f; float k = f - (float)i;
   int j = i + 1 > 255 ? 255 : i + 1;
@@ -183,7 +193,7 @@ static void sample_prev(const dm_vm *vm, float x, float y, float *o) {
 static float sample_read(const dm_module *m, int id, double pos_samples) {
   if (!m || id < 0 || id >= m->nsmp || !m->smp[id].pcm) return 0.0f;
   const dm_sample *sm = &m->smp[id];
-  if (pos_samples < 0 || pos_samples >= (double)(sm->len - 1)) return 0.0f;
+  if (!isfinite(pos_samples) || pos_samples < 0 || pos_samples >= (double)(sm->len - 1)) return 0.0f;
   uint32_t i = (uint32_t)pos_samples; float f = (float)(pos_samples - i);
   return (sm->pcm[i] + (sm->pcm[i + 1] - sm->pcm[i]) * f) * (1.0f / 127.0f);
 }
@@ -425,7 +435,7 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
         break;
       }
       case DM_OP_TAP: { float col[3]; b = POP(); a = TOP;
-        sample_buf(vm->cur, vm->pw, vm->ph, (int)(in[DM_IN_X] * vm->pw + a), (int)(in[DM_IN_Y] * vm->ph + b), col);
+        sample_buf(vm->cur, vm->pw, vm->ph, indexf(in[DM_IN_X] * vm->pw + a), indexf(in[DM_IN_Y] * vm->ph + b), col);
         TOP = col[0]; vm->r[1] = col[1]; vm->r[2] = col[2]; break; }
       case DM_OP_CPREVZ: {                    /* pivot px,py (0..1), zoom, angle, k: sample prev around the pivot */
         float col[3]; float k = POP(), ang = POP(), zm = POP(), py = POP(), px = TOP; sp--;
@@ -437,11 +447,11 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
         sample_prev(vm, px + rx / asp, py + ry, col);
         vm->out[0] += (col[0] - vm->out[0]) * k; vm->out[1] += (col[1] - vm->out[1]) * k; vm->out[2] += (col[2] - vm->out[2]) * k;
         break; }
-      case DM_OP_GLYPH: { float gy = POP(), gx = POP(); int code = (int)TOP;
-        int cx = (int)floorf(gx * 6.0f), cy = (int)floorf(gy * 8.0f);
+      case DM_OP_GLYPH: { float gy = POP(), gx = POP(); int code = indexf(TOP);
+        int cx = indexf(floorf(gx * 6.0f)), cy = indexf(floorf(gy * 8.0f));
         if (code < 32 || code > 126 || cx < 0 || cx > 4 || cy < 0 || cy > 7 || gx < 0 || gy < 0) { TOP = 0.0f; break; }
         TOP = (dm_font5x7[code - 32][cx] >> cy) & 1 ? 1.0f : 0.0f; break; }
-      case DM_OP_STR: { uint8_t id = IMM8(); int i = (int)floorf(TOP);
+      case DM_OP_STR: { uint8_t id = IMM8(); int i = indexf(floorf(TOP));
         const dm_text *tx = vm->m && id < vm->m->ntext ? &vm->m->text[id] : NULL;
         TOP = (tx && i >= 0 && i < tx->len) ? (float)(unsigned char)tx->s[i] : 32.0f; break; }
       case DM_OP_STRLEN: { uint8_t id = IMM8(); PUSH(vm->m && id < vm->m->ntext ? (float)vm->m->text[id].len : 0.0f); break; }
@@ -462,7 +472,7 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
       case DM_OP_EVT: { uint8_t id = IMM8(); PUSH(vm->evhold && id < DM_MAX_EVNAMES ? vm->evhold[id] : 0.0f); break; }
       case DM_OP_EVTL: { uint8_t id = IMM8(); PUSH(vm->evlerp && id < DM_MAX_EVNAMES ? vm->evlerp[id] : 0.0f); break; }
       case DM_OP_SCENE: { uint8_t id = IMM8(); PUSH((float)id); break; }
-      case DM_OP_SELECT: { int i = (int)POP(); if (i < 0) i = 0; vm->scene = i; break; }
+      case DM_OP_SELECT: { int i = indexf(POP()); if (i < 0) i = 0; vm->scene = i; break; }
 
       case DM_OP_OUT1: vm->out[0] = POP(); break;
       case DM_OP_OUT2: vm->out[1] = POP(); vm->out[0] = POP(); break;
@@ -476,7 +486,7 @@ void dm_vm_run(dm_vm *vm, const uint8_t *code, uint32_t len) {
       case DM_OP_HSV: c = POP(); b = POP(); a = POP(); hsv_to_rgb(a, b, c, vm->out); break;
       case DM_OP_CMUL: a = POP(); vm->out[0] *= a; vm->out[1] *= a; vm->out[2] *= a; break;
       case DM_OP_CADD: c = POP(); b = POP(); a = POP(); vm->out[0] += a; vm->out[1] += b; vm->out[2] += c; break;
-      case DM_OP_CGET: { int i = (int)TOP; TOP = (i >= 0 && i < 4) ? vm->out[i] : 0.0f; break; }
+      case DM_OP_CGET: { int i = indexf(TOP); TOP = (i >= 0 && i < 4) ? vm->out[i] : 0.0f; break; }
       default: return;   /* unreachable after verification */
     }
   }
@@ -509,7 +519,7 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
   const uint8_t *pc = m->code + p->off, *end = pc + p->len;
   int depth = 0, maxd = 0;
   const uint8_t *lstart[DM_MAX_LOOP_DEPTH], *lend[DM_MAX_LOOP_DEPTH];
-  int ldepth[DM_MAX_LOOP_DEPTH], lifsp[DM_MAX_LOOP_DEPTH], lsp = 0;
+  int ldepth[DM_MAX_LOOP_DEPTH], lifsp[DM_MAX_LOOP_DEPTH], lslot[DM_MAX_LOOP_DEPTH], lsp = 0;
   struct { const uint8_t *target, *end; int depth, loop, has_else; } branch[32];
   int bsp = 0;
   while (pc < end) {
@@ -518,6 +528,11 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
     const dm_opinfo *o = &dm_ops[op];
     if ((size_t)(end - pc) < o->imm) { dm_set_error("%s: truncated immediate", what); return -1; }
     uint32_t imm = o->imm == 1 ? pc[0] : 0;
+    if (op == DM_OP_STL || op == DM_OP_LOOP) {
+      for (int i = 0; i < lsp; i++) if (pc[0] == lslot[i]) {
+        dm_set_error("%s: active repeat counter is read-only", what); return -1;
+      }
+    }
     switch (op) {
       case DM_OP_LDL: case DM_OP_STL: if (imm >= p->nlocals) { dm_set_error("%s: local %u out of range", what, imm); return -1; } break;
       case DM_OP_USAW: if (imm + DM_USAW_VOICES > p->nstate) { dm_set_error("%s: state %u out of range", what, imm); return -1; } break;
@@ -540,13 +555,14 @@ int dm_prog_verify(const dm_module *m, const dm_prog *p, const char *what) {
         if (lsp >= DM_MAX_LOOP_DEPTH) { dm_set_error("%s: loops nested too deep", what); return -1; }
         int skip = pc[3] | (pc[4] << 8);
         if ((size_t)(end - (pc + 5)) < (size_t)skip) { dm_set_error("%s: loop skip out of range", what); return -1; }
-        lstart[lsp] = pc + 5; lend[lsp] = pc + 5 + skip; ldepth[lsp] = depth; lifsp[lsp] = bsp; lsp++;
+        lstart[lsp] = pc + 5; lend[lsp] = pc + 5 + skip; ldepth[lsp] = depth; lifsp[lsp] = bsp; lslot[lsp] = pc[0]; lsp++;
         break;
       }
       case DM_OP_ENDL: {
         if (lsp == 0) { dm_set_error("%s: endl without loop", what); return -1; }
         int back = pc[1] | (pc[2] << 8);
         lsp--;
+        if (pc[0] != lslot[lsp]) { dm_set_error("%s: endl counter does not match loop", what); return -1; }
         if (bsp != lifsp[lsp] || pc + 3 != lend[lsp]) { dm_set_error("%s: loop crosses a branch or skip offset mismatch", what); return -1; }
         if ((size_t)back > (size_t)(pc + 3 - (m->code + p->off)) || pc + 3 - back != lstart[lsp]) { dm_set_error("%s: loop back offset mismatch", what); return -1; }
         if (depth != ldepth[lsp]) { dm_set_error("%s: stack depth changes across loop body", what); return -1; }

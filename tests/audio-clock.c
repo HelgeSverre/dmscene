@@ -1,6 +1,7 @@
 /* Test-only audio device: clocked callbacks without opening speakers. Scrubbing
  * must keep one device alive instead of repeatedly closing and reopening it. */
 #include "dm.h"
+int dm_audio_failed(dm_audio *a) { (void)a; return 0; }
 #include <pthread.h>
 #include <stdlib.h>
 

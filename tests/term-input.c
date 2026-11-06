@@ -18,6 +18,21 @@ static int sequence(dm_term *t, int fd, const char *s, int expected) {
 }
 #define CHECK(expr, label) do { if (!(expr)) { fprintf(stderr, "FAIL: %s\n", label); return 1; } } while(0)
 int main(void) {
+  /* Losing the output reader must enter orderly quit, not terminate via
+   * SIGPIPE before raw terminal settings can be restored. */
+  pid_t broken = fork(); CHECK(broken >= 0, "broken-output fork");
+  if (!broken) {
+    int out[2]; if (pipe(out)) _exit(2);
+    close(out[0]); if (dup2(out[1], 1) < 0) _exit(2); close(out[1]);
+    signal(SIGPIPE, SIG_DFL);
+    dm_term *term = dm_term_open();
+    int quit = term && dm_term_key(term) == 'q';
+    dm_term_close(term);
+    struct sigaction restored_pipe; sigaction(SIGPIPE, NULL, &restored_pipe);
+    _exit(quit && restored_pipe.sa_handler == SIG_DFL ? 0 : 1);
+  }
+  int broken_status; waitpid(broken, &broken_status, 0);
+  CHECK(WIFEXITED(broken_status) && !WEXITSTATUS(broken_status), "broken output did not quit and restore handlers");
   int p[2], oldin = dup(0), oldout = dup(1); FILE *null = fopen("/dev/null", "w");
   CHECK(!pipe(p) && oldin >= 0 && oldout >= 0 && null, "pipe setup");
   CHECK(dup2(p[0], 0) >= 0 && dup2(fileno(null), 1) >= 0, "fd setup");

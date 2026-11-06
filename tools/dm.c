@@ -17,22 +17,50 @@
 static char *slurp(const char *path) {
   FILE *f = fopen(path, "rb");
   if (!f) return NULL;
-  fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
+  if (fseek(f, 0, SEEK_END)) { fclose(f); return NULL; }
+  long n = ftell(f);
+  if (n < 0 || fseek(f, 0, SEEK_SET)) { fclose(f); return NULL; }
   char *s = malloc((size_t)n + 1);
-  size_t got = fread(s, 1, (size_t)n, f); fclose(f);
+  if (!s) { fclose(f); return NULL; }
+  size_t got = fread(s, 1, (size_t)n, f);
+  int failed = ferror(f); fclose(f);
+  if (failed || got != (size_t)n) { free(s); return NULL; }
   s[got] = 0;
   return s;
 }
 static int ends_with(const char *s, const char *suf) { size_t a = strlen(s), b = strlen(suf); return a >= b && !strcmp(s + a - b, suf); }
-static double mtime(const char *path) { struct stat st; return stat(path, &st) == 0 ? (double)st.st_mtime : 0; }
+typedef struct { int exists; dev_t dev; ino_t ino; off_t size; struct timespec time; } file_stamp;
+static file_stamp mtime(const char *path) {
+  struct stat st; file_stamp v = {0};
+  if (stat(path, &st)) return v;
+  v.exists = 1; v.dev = st.st_dev; v.ino = st.st_ino; v.size = st.st_size;
+#ifdef __APPLE__
+  v.time = st.st_mtimespec;
+#else
+  v.time = st.st_mtim;
+#endif
+  return v;
+}
+static int same_stamp(file_stamp a, file_stamp b) {
+  return a.exists == b.exists && a.dev == b.dev && a.ino == b.ino && a.size == b.size &&
+    a.time.tv_sec == b.time.tv_sec && a.time.tv_nsec == b.time.tv_nsec;
+}
 
 /* load a .dmt or .dms into m; returns 0 on success */
 static int load_any(const char *path, dm_module *m) {
-  if (ends_with(path, ".dms")) return dm_module_read(m, path);
-  char *src = slurp(path);
-  if (!src) { dm_set_error("cannot read %s", path); return -1; }
-  int rc = dm_compile(src, path, m);
-  free(src);
+  dm_module *next = calloc(1, sizeof *next);
+  if (!next) { dm_set_error("out of memory loading %s", path); return -1; }
+  int rc;
+  if (ends_with(path, ".dms")) rc = dm_module_read(next, path);
+  else {
+    char *src = slurp(path);
+    if (!src) { dm_set_error("cannot read %s", path); free(next); return -1; }
+    rc = dm_compile(src, path, next);
+    free(src);
+  }
+  if (rc) dm_module_free(next);
+  else { dm_module_free(m); *m = *next; }
+  free(next);
   return rc;
 }
 
@@ -264,14 +292,18 @@ static FILE *start_ffmpeg(int w, int h, int fps, const char *wav, const char *mp
   if (*pid == 0) {
     close(fds[1]);
     if (dup2(fds[0], STDIN_FILENO) < 0) _exit(127);
-    close(fds[0]);
+    if (fds[0] != STDIN_FILENO) close(fds[0]);
     execvp("ffmpeg", args);
     _exit(127);
   }
   close(fds[0]);
   if (*pid < 0) { close(fds[1]); return NULL; }
   FILE *out = fdopen(fds[1], "wb");
-  if (!out) { close(fds[1]); kill(*pid, SIGTERM); waitpid(*pid, NULL, 0); }
+  if (!out) {
+    close(fds[1]); kill(*pid, SIGTERM);
+    while (waitpid(*pid, NULL, 0) < 0 && errno == EINTR) {}
+    *pid = -1;
+  }
   return out;
 }
 
@@ -286,10 +318,16 @@ static void print_shell_arg(FILE *f, const char *s) {
 
 static int render_offline(dm_module *m, opts *o) {
   static audio_ctx ac;
-  if (dm_player_init(&ac.p, m, DM_SR)) { fprintf(stderr, "dm: out of memory\n"); return 1; }
+  dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
+  dm_fb fb = {0}, big = {0};
+  char tmpwav[1100] = {0};
+  FILE *vpipe = NULL;
+  pid_t encoder = -1;
+  int rc = 1, saved_pipe = 0, tmp_owned = 0;
+  struct sigaction old_pipe;
+  if (dm_player_init(&ac.p, m, DM_SR)) { fprintf(stderr, "dm: out of memory\n"); goto done; }
   if (o->solo >= 0) dm_player_solo(&ac.p, o->solo);
   dm_seq clk; dm_seq_init(&clk, m, DM_SR);
-  dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   uint64_t start_sample = (uint64_t)(o->start * DM_SR);
   if (start_sample) { float tmp[2 * 1024]; uint64_t left = start_sample; while (left) { uint32_t k = left > 1024 ? 1024 : (uint32_t)left; dm_player_render(&ac.p, tmp, k); left -= k; } }
   double seconds = o->seconds > 0 ? o->seconds : 8;
@@ -297,36 +335,46 @@ static int render_offline(dm_module *m, opts *o) {
   const char *png = o->png, *wav = o->wav, *mp4 = o->mp4;
   if (mp4) { W &= ~1; H &= ~1; }
   int sc = o->render_scale ? o->render_scale : (m->scale > 1 ? m->scale : 1);
-  dm_fb fb = {0}, big = {0};
-  if (dm_fb_alloc(&fb, W / sc > 1 ? W / sc : 1, H / sc > 1 ? H / sc : 1) || dm_fb_alloc(&big, W, H)) return 1;
-  char tmpwav[1100]; tmpwav[0] = 0;
+  if (dm_fb_alloc(&fb, W / sc > 1 ? W / sc : 1, H / sc > 1 ? H / sc : 1) || dm_fb_alloc(&big, W, H)) goto done;
   static char fbwav[1100], dir[1100];
-  FILE *vpipe = NULL;
-  pid_t encoder = -1;
   int have_ffmpeg = 0;
   if (mp4) {
     have_ffmpeg = ffmpeg_available();
     if (!have_ffmpeg) {
       if (snprintf(dir, sizeof dir, "%s.frames", mp4) >= (int)sizeof dir || mkdir_p(dir)) {
-        fprintf(stderr, "dm: cannot create %s.frames\n", mp4); return 1;
+        fprintf(stderr, "dm: cannot create %s.frames\n", mp4); goto done;
       }
       png = dir;
-      if (!wav) { if (snprintf(fbwav, sizeof fbwav, "%s.wav", mp4) >= (int)sizeof fbwav) return 1; wav = fbwav; }
+      if (!wav) { if (snprintf(fbwav, sizeof fbwav, "%s.wav", mp4) >= (int)sizeof fbwav) goto done; wav = fbwav; }
       fprintf(stderr, "dm: ffmpeg not found; writing %s/ and %s instead\n", dir, wav);
-    } else if (!wav) { if (snprintf(tmpwav, sizeof tmpwav, "%s.tmp.wav", mp4) >= (int)sizeof tmpwav) return 1; wav = tmpwav; }
+    } else if (!wav) {
+      if (snprintf(tmpwav, sizeof tmpwav, "%s.tmp.XXXXXX", mp4) >= (int)sizeof tmpwav) goto done;
+      int fd = mkstemp(tmpwav);
+      if (fd < 0) { fprintf(stderr, "dm: cannot create temporary audio for %s\n", mp4); goto done; }
+      close(fd); tmp_owned = 1; wav = tmpwav;
+    }
   }
   uint64_t total = (uint64_t)(seconds * DM_SR);
   if (wav) {
+    if (total > (UINT32_MAX - 36) / 4) { fprintf(stderr, "dm: audio exceeds WAV size limit\n"); goto done; }
     dm_wav wv = {0};
-    if (dm_wav_open(&wv, wav, DM_SR)) { fprintf(stderr, "dm: cannot write %s\n", wav); return 1; }
+    if (dm_wav_open(&wv, wav, DM_SR)) { fprintf(stderr, "dm: cannot write %s\n", wav); goto done; }
     float *buf = malloc(sizeof(float) * 2 * 4096);
-    for (uint64_t done = 0; done < total;) { uint32_t n = total - done > 4096 ? 4096 : (uint32_t)(total - done); dm_player_render(&ac.p, buf, n); dm_wav_write(&wv, buf, n); done += n; }
-    dm_wav_close(&wv); free(buf);
+    int failed = !buf;
+    for (uint64_t done = 0; !failed && done < total;) {
+      uint32_t n = total - done > 4096 ? 4096 : (uint32_t)(total - done);
+      dm_player_render(&ac.p, buf, n); failed = dm_wav_write(&wv, buf, n); done += n;
+    }
+    if (dm_wav_close(&wv)) failed = 1;
+    free(buf);
+    if (failed) { fprintf(stderr, "dm: cannot finish %s\n", wav); goto done; }
   }
   if (mp4 && have_ffmpeg) {
-    signal(SIGPIPE, SIG_IGN);
+    struct sigaction ignore = {0}; ignore.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &ignore, &old_pipe)) goto done;
+    saved_pipe = 1;
     vpipe = start_ffmpeg(W, H, fps, wav, mp4, &encoder);
-    if (!vpipe) { fprintf(stderr, "dm: cannot start ffmpeg\n"); return 1; }
+    if (!vpipe) { fprintf(stderr, "dm: cannot start ffmpeg\n"); goto done; }
   }
   int frame = 0, nframes = (int)(seconds * fps + 0.5), render_error = 0;
   if (png || vpipe) {
@@ -354,19 +402,20 @@ static int render_offline(dm_module *m, opts *o) {
     free(scratch); if (vis_ready) dm_player_free(&vis.p);
   }
   if (vpipe) {
-    int write_error = fclose(vpipe);
+    int write_error = fclose(vpipe); vpipe = NULL;
     int status = 0;
-    int waited = waitpid(encoder, &status, 0);
-    if (tmpwav[0]) remove(tmpwav);
+    pid_t waited;
+    do { waited = waitpid(encoder, &status, 0); } while (waited < 0 && errno == EINTR);
+    encoder = -1;
     if (render_error || write_error || waited < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-      fprintf(stderr, "\ndm: ffmpeg failed or stopped before all frames were written\n"); return 1;
+      fprintf(stderr, "\ndm: ffmpeg failed or stopped before all frames were written\n"); goto done;
     }
     fprintf(stderr, "\rwrote %s: %d frames, %dx%d @ %d fps, %.1fs            \n", mp4, frame, W, H, fps, seconds);
-  } else if (render_error) return 1;
+  } else if (render_error) goto done;
   else if (mp4) {
     size_t len = strlen(png) + sizeof "/frame_%04d.png";
     char *pattern = malloc(len);
-    if (!pattern) return 1;
+    if (!pattern) goto done;
     snprintf(pattern, len, "%s/frame_%%04d.png", png);
     fprintf(stderr, "to finish:\n  ffmpeg -framerate %d -i ", fps);
     print_shell_arg(stderr, pattern);
@@ -375,8 +424,14 @@ static int render_offline(dm_module *m, opts *o) {
     print_shell_arg(stderr, mp4); fputc('\n', stderr);
     free(pattern);
   } else fprintf(stderr, "rendered %.2fs: %d frame(s)%s%s\n", seconds, frame, wav ? ", wav " : "", wav ? wav : "");
+  rc = 0;
+ done:
+  if (vpipe) fclose(vpipe);
+  if (encoder > 0) { kill(encoder, SIGTERM); while (waitpid(encoder, NULL, 0) < 0 && errno == EINTR) {} }
+  if (tmp_owned) remove(tmpwav);
+  if (saved_pipe) sigaction(SIGPIPE, &old_pipe, NULL);
   dm_player_free(&ac.p); dm_scene_free(&scene); dm_fb_free(&fb); dm_fb_free(&big);
-  return 0;
+  return rc;
 }
 
 static void hold_audio(audio_ctx *ac, int paused) {
@@ -447,7 +502,8 @@ static int play_realtime(dm_module *mods, opts *o) {
   dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   dm_term *term = dm_term_open();
   dm_fb fb = {0}; dm_scrub scrub = {0};
-  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, srcm = mtime(o->file), last_draw = 0;
+  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, last_draw = 0;
+  file_stamp srcm = mtime(o->file);
   char note[160] = ""; double note_until = 0;
   int frames = 0, frame_dirty = 1, restore_tstp = 0;
   struct sigaction saved_tstp;
@@ -463,6 +519,12 @@ static int play_realtime(dm_module *mods, opts *o) {
       uint64_t heard = au ? dm_audio_played(au) : 0;
       double elapsed = au ? (double)(heard > audio_origin ? heard - audio_origin : 0) : (now - epoch) * DM_SR;
       pos = advance_samples(base, elapsed * speeds[speed_i]);
+    }
+    if (au && dm_audio_failed(au)) {
+      hold_audio(&ac, 1); dm_audio_close(au); au = NULL;
+      base = pos; waiting = 0; epoch = dm_now();
+      snprintf(note, sizeof note, "audio stopped; wall-clock playback");
+      note_until = epoch + 3; frame_dirty = 1;
     }
 
     /* Consume the whole scroll burst before drawing. Keep ordinary keys queued
@@ -582,8 +644,8 @@ static int play_realtime(dm_module *mods, opts *o) {
     int reload = k == 'r';
     if (o->watch && now - lastcheck > .5) {
       lastcheck = now;
-      double mt = mtime(o->file);
-      if (mt != srcm) { srcm = mt; reload = 1; }
+      file_stamp mt = mtime(o->file);
+      if (!same_stamp(mt, srcm)) { srcm = mt; reload = 1; }
     }
     if (reload && o->watch) {
       dm_module *nm = &mods[which ^ 1];

@@ -312,16 +312,17 @@ void dm_scene_render(dm_scene *s, const dm_seq *clk, const float *cenv, dm_fb *f
 int dm_png_write(const dm_fb *fb, const char *path);
 int dm_ppm_write(const dm_fb *fb, const char *path);
 
-typedef struct { FILE *f; uint32_t frames; int sr; } dm_wav;
+typedef struct { FILE *f; uint32_t frames; int sr, failed; } dm_wav;
 int  dm_wav_open(dm_wav *w, const char *path, int sr);
-void dm_wav_write(dm_wav *w, const float *lr, uint32_t frames);
-void dm_wav_close(dm_wav *w);
+int  dm_wav_write(dm_wav *w, const float *lr, uint32_t frames);
+int  dm_wav_close(dm_wav *w);
 
 /* ---------------------------------------------------------------- platform: audio */
 typedef void (*dm_audio_cb)(void *user, float *lr, uint32_t frames);
 typedef struct dm_audio dm_audio;
 dm_audio *dm_audio_open(int sr, dm_audio_cb cb, void *user);
 uint64_t  dm_audio_played(dm_audio *a);     /* frames heard so far (best estimate) */
+int       dm_audio_failed(dm_audio *a);     /* pipe worker stopped after output failure */
 void      dm_audio_close(dm_audio *a);
 const char *dm_audio_backend(dm_audio *a);
 
