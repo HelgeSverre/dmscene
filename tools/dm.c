@@ -3,9 +3,15 @@
 #include "dm.h"
 #include "dm_banner.h"
 #include <pthread.h>
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 static char *slurp(const char *path) {
   FILE *f = fopen(path, "rb");
@@ -37,7 +43,7 @@ static void usage(int code) {
     "  disasm  IN                           print every program's bytecode\n"
     "  play    IN [play options]            terminal + audio (IN may be .dmt or .dms)\n"
     "  watch   IN [play options]            play, recompiling whenever the .dmt changes\n"
-    "  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N]\n"
+    "  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--render-scale N]\n"
     "  new     NAME                         write NAME.dmt, a minimal starting point\n\n"
     "play options:\n"
     "  --fps N       target frame rate (default 30)      --size WxH   force framebuffer size\n"
@@ -130,27 +136,121 @@ static void audio_cb(void *user, float *lr, uint32_t frames) {
 
 typedef struct {
   const char *file, *png, *wav, *mp4;
-  int fps, W, H, mute, threads, solo, watch;
+  int fps, W, H, mute, threads, solo, watch, render_scale;
   double seconds, start;
 } opts;
 
+static int parse_int(const char *s) {
+  char *end;
+  errno = 0;
+  long value = strtol(s, &end, 10);
+  if (errno || end == s || *end || value < INT_MIN || value > INT_MAX) usage(2);
+  return (int)value;
+}
+
+static double parse_double(const char *s) {
+  char *end;
+  errno = 0;
+  double value = strtod(s, &end);
+  if (errno || end == s || *end || !isfinite(value)) usage(2);
+  return value;
+}
+
 static void parse_play_opts(int argc, char **argv, opts *o) {
   for (int i = 0; i < argc; i++) {
-    if (!strcmp(argv[i], "--fps") && i + 1 < argc) o->fps = atoi(argv[++i]);
-    else if (!strcmp(argv[i], "--size") && i + 1 < argc) { if (sscanf(argv[++i], "%dx%d", &o->W, &o->H) != 2) usage(2); }
+    if (!strcmp(argv[i], "--fps") && i + 1 < argc) o->fps = parse_int(argv[++i]);
+    else if (!strcmp(argv[i], "--size") && i + 1 < argc) {
+      int end = 0;
+      const char *size = argv[++i];
+      if (sscanf(size, "%dx%d%n", &o->W, &o->H, &end) != 2 || !end || size[end] || o->W < 2 || o->H < 2) usage(2);
+    }
     else if (!strcmp(argv[i], "--mute")) o->mute = 1;
-    else if (!strcmp(argv[i], "--seconds") && i + 1 < argc) o->seconds = atof(argv[++i]);
+    else if (!strcmp(argv[i], "--seconds") && i + 1 < argc) o->seconds = parse_double(argv[++i]);
     else if (!strcmp(argv[i], "--png") && i + 1 < argc) o->png = argv[++i];
     else if (!strcmp(argv[i], "--wav") && i + 1 < argc) o->wav = argv[++i];
     else if (!strcmp(argv[i], "--mp4") && i + 1 < argc) o->mp4 = argv[++i];
-    else if (!strcmp(argv[i], "--threads") && i + 1 < argc) o->threads = atoi(argv[++i]);
-    else if (!strcmp(argv[i], "--start") && i + 1 < argc) o->start = atof(argv[++i]);
-    else if (!strcmp(argv[i], "--solo") && i + 1 < argc) o->solo = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--threads") && i + 1 < argc) o->threads = parse_int(argv[++i]);
+    else if (!strcmp(argv[i], "--render-scale") && i + 1 < argc) { o->render_scale = parse_int(argv[++i]); if (o->render_scale < 1) usage(2); }
+    else if (!strcmp(argv[i], "--start") && i + 1 < argc) o->start = parse_double(argv[++i]);
+    else if (!strcmp(argv[i], "--solo") && i + 1 < argc) o->solo = parse_int(argv[++i]);
     else if (!strcmp(argv[i], "--watch")) o->watch = 1;
     else if (argv[i][0] == '-') usage(2);
     else o->file = argv[i];
   }
-  if (!o->file || o->fps < 1) usage(2);
+  if (!o->file || o->fps < 1 || o->fps > 240 || o->W < 0 || o->H < 0 ||
+      (o->W && (o->W < 2 || o->W > 16384)) || (o->H && (o->H < 2 || o->H > 16384)) ||
+      !isfinite(o->seconds) || o->seconds < 0 || !isfinite(o->start) || o->start < 0 ||
+      o->start > (double)UINT64_MAX / DM_SR || o->seconds > (double)(INT_MAX - 1) / o->fps ||
+      o->render_scale < 0 || o->render_scale > 64) usage(2);
+}
+
+static int mkdir_p(const char *path) {
+  char *copy = strdup(path);
+  if (!copy) return -1;
+  for (char *p = copy + (copy[0] == '/'); ; p++) {
+    if (*p != '/' && *p != 0) continue;
+    char c = *p; *p = 0;
+    if (*copy && mkdir(copy, 0777) && errno != EEXIST) { free(copy); return -1; }
+    if (*copy) { struct stat st; if (stat(copy, &st) || !S_ISDIR(st.st_mode)) { free(copy); return -1; } }
+    *p = c;
+    if (!c) break;
+  }
+  free(copy);
+  return 0;
+}
+
+static int ffmpeg_available(void) {
+  const char *path = getenv("PATH");
+  if (!path) path = "/bin:/usr/bin";
+  const char *p = path;
+  do {
+    const char *end = strchr(p, ':');
+    size_t len = end ? (size_t)(end - p) : strlen(p);
+    char *name = malloc(len + sizeof "/ffmpeg");
+    if (!name) return 0;
+    if (len) memcpy(name, p, len);
+    else { name[0] = '.'; len = 1; }
+    memcpy(name + len, "/ffmpeg", sizeof "/ffmpeg");
+    int found = access(name, X_OK) == 0;
+    free(name);
+    if (found) return 1;
+    p = end ? end + 1 : NULL;
+  } while (p);
+  return 0;
+}
+
+static FILE *start_ffmpeg(int w, int h, int fps, const char *wav, const char *mp4, pid_t *pid) {
+  int fds[2];
+  if (pipe(fds)) return NULL;
+  char size[64], rate[32];
+  snprintf(size, sizeof size, "%dx%d", w, h);
+  snprintf(rate, sizeof rate, "%d", fps);
+  char *const args[] = {"ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "rawvideo",
+    "-pix_fmt", "rgb24", "-s", size, "-r", rate, "-i", "-", "-i", (char *)wav,
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", (char *)mp4, NULL};
+  *pid = fork();
+  if (*pid == 0) {
+    close(fds[1]);
+    if (dup2(fds[0], STDIN_FILENO) < 0) _exit(127);
+    close(fds[0]);
+    execvp("ffmpeg", args);
+    _exit(127);
+  }
+  close(fds[0]);
+  if (*pid < 0) { close(fds[1]); return NULL; }
+  FILE *out = fdopen(fds[1], "wb");
+  if (!out) { close(fds[1]); kill(*pid, SIGTERM); waitpid(*pid, NULL, 0); }
+  return out;
+}
+
+static void print_shell_arg(FILE *f, const char *s) {
+  fputc('\'', f);
+  for (; *s; s++) {
+    if (*s == '\'') fputs("'\\''", f);
+    else fputc(*s, f);
+  }
+  fputc('\'', f);
 }
 
 static int render_offline(dm_module *m, opts *o) {
@@ -165,23 +265,24 @@ static int render_offline(dm_module *m, opts *o) {
   int W = o->W ? o->W : 640, H = o->H ? o->H : 400, fps = o->fps;
   const char *png = o->png, *wav = o->wav, *mp4 = o->mp4;
   if (mp4) { W &= ~1; H &= ~1; }
-  int sc = m->scale > 1 ? m->scale : 1;
+  int sc = o->render_scale ? o->render_scale : (m->scale > 1 ? m->scale : 1);
   dm_fb fb = {0}, big = {0};
   if (dm_fb_alloc(&fb, W / sc > 1 ? W / sc : 1, H / sc > 1 ? H / sc : 1) || dm_fb_alloc(&big, W, H)) return 1;
   char tmpwav[1100]; tmpwav[0] = 0;
   static char fbwav[1100], dir[1100];
   FILE *vpipe = NULL;
+  pid_t encoder = -1;
   int have_ffmpeg = 0;
   if (mp4) {
-    have_ffmpeg = system("ffmpeg -version >/dev/null 2>&1") == 0;
+    have_ffmpeg = ffmpeg_available();
     if (!have_ffmpeg) {
-      snprintf(dir, sizeof dir, "%s.frames", mp4);
-      char cmd[1200]; snprintf(cmd, sizeof cmd, "mkdir -p '%s'", dir);
-      if (system(cmd) != 0) { fprintf(stderr, "dm: cannot create %s\n", dir); return 1; }
+      if (snprintf(dir, sizeof dir, "%s.frames", mp4) >= (int)sizeof dir || mkdir_p(dir)) {
+        fprintf(stderr, "dm: cannot create %s.frames\n", mp4); return 1;
+      }
       png = dir;
-      if (!wav) { snprintf(fbwav, sizeof fbwav, "%s.wav", mp4); wav = fbwav; }
+      if (!wav) { if (snprintf(fbwav, sizeof fbwav, "%s.wav", mp4) >= (int)sizeof fbwav) return 1; wav = fbwav; }
       fprintf(stderr, "dm: ffmpeg not found; writing %s/ and %s instead\n", dir, wav);
-    } else if (!wav) { snprintf(tmpwav, sizeof tmpwav, "%s.tmp.wav", mp4); wav = tmpwav; }
+    } else if (!wav) { if (snprintf(tmpwav, sizeof tmpwav, "%s.tmp.wav", mp4) >= (int)sizeof tmpwav) return 1; wav = tmpwav; }
   }
   uint64_t total = (uint64_t)(seconds * DM_SR);
   if (wav) {
@@ -192,20 +293,19 @@ static int render_offline(dm_module *m, opts *o) {
     dm_wav_close(&wv); free(buf);
   }
   if (mp4 && have_ffmpeg) {
-    char cmd[2400];
-    snprintf(cmd, sizeof cmd,
-      "ffmpeg -y -hide_banner -loglevel error -f rawvideo -pix_fmt rgb24 -s %dx%d -r %d -i - -i '%s' "
-      "-c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart '%s'", W, H, fps, wav, mp4);
-    vpipe = popen(cmd, "w");
+    signal(SIGPIPE, SIG_IGN);
+    vpipe = start_ffmpeg(W, H, fps, wav, mp4, &encoder);
     if (!vpipe) { fprintf(stderr, "dm: cannot start ffmpeg\n"); return 1; }
   }
-  int frame = 0, nframes = (int)(seconds * fps + 0.5);
+  int frame = 0, nframes = (int)(seconds * fps + 0.5), render_error = 0;
   if (png || vpipe) {
     /* offline the audio was rendered first, so level followers are replayed from a second player for the visuals */
-    static audio_ctx vis; dm_player_init(&vis.p, m, DM_SR);
-    float *scratch = malloc(sizeof(float) * 2 * 8192);
+    static audio_ctx vis;
+    int vis_ready = dm_player_init(&vis.p, m, DM_SR) == 0;
+    float *scratch = vis_ready ? malloc(sizeof(float) * 2 * 8192) : NULL;
+    if (!scratch) { fprintf(stderr, "dm: out of memory\n"); render_error = 1; }
     uint64_t vdone = 0;
-    for (frame = 0; frame < nframes; frame++) {
+    for (frame = 0; !render_error && frame < nframes; frame++) {
       uint64_t target = start_sample + (uint64_t)((double)frame * DM_SR / fps);
       while (vdone < target) { uint32_t k = target - vdone > 8192 ? 8192 : (uint32_t)(target - vdone); dm_player_render(&vis.p, scratch, k); vdone += k; }
       dm_seq_seek(&clk, target);
@@ -213,21 +313,36 @@ static int render_offline(dm_module *m, opts *o) {
       dm_fb *outfb = &fb;
       if (sc > 1) { dm_fb_upscale(&fb, &big); outfb = &big; }
       if (png) {
-        char path[1200]; snprintf(path, sizeof path, "%s/frame_%04d.png", png, frame);
-        if (dm_png_write(outfb, path)) { fprintf(stderr, "dm: cannot write %s\n", path); return 1; }
+        char path[1200];
+        if (snprintf(path, sizeof path, "%s/frame_%04d.png", png, frame) >= (int)sizeof path ||
+            dm_png_write(outfb, path)) { fprintf(stderr, "dm: cannot write frame %d in %s\n", frame, png); render_error = 1; break; }
       }
-      if (vpipe && fwrite(outfb->rgb, 1, (size_t)outfb->w * outfb->h * 3, vpipe) != (size_t)outfb->w * outfb->h * 3) { fprintf(stderr, "dm: ffmpeg pipe broke\n"); break; }
+      if (vpipe && fwrite(outfb->rgb, 1, (size_t)outfb->w * outfb->h * 3, vpipe) != (size_t)outfb->w * outfb->h * 3) { render_error = 1; break; }
       if (vpipe && (frame % fps) == 0) { fprintf(stderr, "\r%s: %d/%d frames", mp4, frame, nframes); fflush(stderr); }
     }
-    free(scratch); dm_player_free(&vis.p);
+    free(scratch); if (vis_ready) dm_player_free(&vis.p);
   }
   if (vpipe) {
-    int rc = pclose(vpipe);
+    int write_error = fclose(vpipe);
+    int status = 0;
+    int waited = waitpid(encoder, &status, 0);
     if (tmpwav[0]) remove(tmpwav);
-    if (rc != 0) { fprintf(stderr, "\ndm: ffmpeg failed (%d)\n", rc); return 1; }
+    if (render_error || write_error || waited < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      fprintf(stderr, "\ndm: ffmpeg failed or stopped before all frames were written\n"); return 1;
+    }
     fprintf(stderr, "\rwrote %s: %d frames, %dx%d @ %d fps, %.1fs            \n", mp4, frame, W, H, fps, seconds);
-  } else if (mp4) {
-    fprintf(stderr, "to finish:\n  ffmpeg -framerate %d -i '%s/frame_%%04d.png' -i '%s' -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest '%s'\n", fps, png, wav, mp4);
+  } else if (render_error) return 1;
+  else if (mp4) {
+    size_t len = strlen(png) + sizeof "/frame_%04d.png";
+    char *pattern = malloc(len);
+    if (!pattern) return 1;
+    snprintf(pattern, len, "%s/frame_%%04d.png", png);
+    fprintf(stderr, "to finish:\n  ffmpeg -framerate %d -i ", fps);
+    print_shell_arg(stderr, pattern);
+    fputs(" -i ", stderr); print_shell_arg(stderr, wav);
+    fputs(" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest ", stderr);
+    print_shell_arg(stderr, mp4); fputc('\n', stderr);
+    free(pattern);
   } else fprintf(stderr, "rendered %.2fs: %d frame(s)%s%s\n", seconds, frame, wav ? ", wav " : "", wav ? wav : "");
   dm_player_free(&ac.p); dm_scene_free(&scene); dm_fb_free(&fb); dm_fb_free(&big);
   return 0;

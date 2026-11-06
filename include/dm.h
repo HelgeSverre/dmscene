@@ -293,6 +293,7 @@ typedef struct {
   float in[DM_IN_COUNT];
   float uni[DM_MAX_UNIFORMS];
   float fstate[DM_MAX_STATE], pstate[DM_MAX_STATE], ostate[DM_MAX_STATE];
+  float worker_state[2][64][DM_MAX_STATE]; /* pixel and post state for workers 1..63 */
   float evhold[DM_MAX_EVNAMES], evlerp[DM_MAX_EVNAMES];
   uint32_t rng;
   int frame;

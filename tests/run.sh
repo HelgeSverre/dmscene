@@ -21,6 +21,42 @@ cmp -s "$T/a.wav" "$T/b.wav" || fail "audio not deterministic"
 cmp -s "$T/a/frame_0003.png" "$T/b/frame_0003.png" || fail "video not deterministic"
 [ "$(ls "$T/a" | wc -l | tr -d ' ')" = "8" ] || fail "expected 8 frames"
 
+# Render-scale override keeps the requested output dimensions and preserves
+# the original pixels when it matches the module's effective scale.
+./dm render "$T/pulse.dms" --seconds 2 --fps 4 --png "$T/b" --size 64x40 --render-scale 1 >/dev/null 2>&1
+cmp -s "$T/a/frame_0003.png" "$T/b/frame_0003.png" || fail "render-scale 1 changed pixels"
+./dm render "$T/pulse.dms" --seconds 0.5 --fps 4 --png "$T/b" --size 64x40 --render-scale 4 >/dev/null 2>&1 || fail "render-scale 4"
+
+# Invalid times and dimensions must fail before they can wrap to huge seeks
+# or zero-sized MP4 framebuffers.
+for args in '--start -1' '--seconds -1' '--seconds nan' '--seconds abc' '--size 0x0' '--size 16x16junk' '--render-scale 0'; do
+  # Intentional splitting of fixed test arguments.
+  ./dm render "$T/pulse.dms" --wav "$T/invalid.wav" $args >/dev/null 2>&1 && fail "accepted invalid $args"
+done
+
+# A missing encoder falls back to PNG/WAV even when the path contains quotes.
+mkdir -p "$T/empty" "$T/bin"
+PATH="$T/empty" ./dm render "$T/pulse.dms" --mp4 "$T/no'encoder.mp4" --seconds 0.5 --fps 4 --size 16x16 >/dev/null 2>"$T/fallback.log" || fail "encoder fallback"
+[ -s "$T/no'encoder.mp4.frames/frame_0000.png" ] || fail "fallback PNG missing"
+[ -s "$T/no'encoder.mp4.wav" ] || fail "fallback WAV missing"
+
+# A child that exits early must not terminate dm via SIGPIPE or report success.
+cat > "$T/bin/ffmpeg" <<'EOF'
+#!/bin/sh
+if [ "$1" = -version ]; then exit 0; fi
+exit 7
+EOF
+chmod +x "$T/bin/ffmpeg"
+PATH="$T/bin" ./dm render "$T/pulse.dms" --mp4 "$T/failed.mp4" --seconds 0.5 --fps 4 --size 16x16 >/dev/null 2>&1 && fail "encoder failure reported success"
+[ ! -e "$T/failed.mp4.tmp.wav" ] || fail "temporary WAV left after encoder failure"
+
+if command -v ffmpeg >/dev/null 2>&1; then
+  sh -c "$(tail -n 1 "$T/fallback.log")" >/dev/null 2>&1 || fail "fallback command quoting"
+  [ -s "$T/no'encoder.mp4" ] || fail "fallback MP4 missing"
+  ./dm render "$T/pulse.dms" --mp4 "$T/it's video.mp4" --seconds 0.5 --fps 4 --size 16x16 >/dev/null 2>&1 || fail "quoted MP4 path"
+  [ -s "$T/it's video.mp4" ] || fail "MP4 missing"
+fi
+
 # audio is neither silent nor DC: count distinct sample values in the first 2 s
 n=$(od -An -t d2 -j 44 "$T/a.wav" | tr -s ' ' '\n' | grep -v '^$' | sort -u | wc -l | tr -d ' ')
 [ "$n" -gt 1000 ] || fail "audio looks silent ($n distinct values)"
@@ -61,6 +97,7 @@ rm -f "$T/scaffold.dmt"; ./dm new "$T/scaffold" >/dev/null 2>&1 || fail "dm new"
 ./build/tests/showcase-gates || fail "showcase held notes"
 ./build/tests/synth-voices || fail "synth voice ownership"
 ./build/tests/branch-texture || fail "branches and textures"
+./build/tests/scene-workers || fail "scene worker state"
 
 for f in demos/*.dmt; do
   n=$(basename "$f" .dmt)

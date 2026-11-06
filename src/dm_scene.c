@@ -7,18 +7,25 @@
 #include <unistd.h>
 
 int dm_fb_alloc(dm_fb *fb, int w, int h) {
+  if (!fb || w < 1 || h < 1 || (size_t)w > SIZE_MAX / 3 / (size_t)h) return -1;
   if (fb->rgb && fb->w == w && fb->h == h) return 0;
+  uint8_t *rgb = calloc((size_t)w * h * 3, 1);
+  if (!rgb) return -1;
   free(fb->rgb);
-  fb->w = w; fb->h = h; fb->rgb = calloc((size_t)w * h * 3, 1);
-  return fb->rgb ? 0 : -1;
+  fb->w = w; fb->h = h; fb->rgb = rgb;
+  return 0;
 }
 void dm_fb_free(dm_fb *fb) { free(fb->rgb); fb->rgb = NULL; fb->w = fb->h = 0; }
 
 void dm_fb_upscale(const dm_fb *src, dm_fb *dst) {
+  int last_sy = -1;
   for (int y = 0; y < dst->h; y++) {
-    const uint8_t *row = src->rgb + (size_t)(y * src->h / dst->h) * src->w * 3;
+    int sy = (int)((size_t)y * src->h / dst->h);
     uint8_t *o = dst->rgb + (size_t)y * dst->w * 3;
-    for (int x = 0; x < dst->w; x++) { const uint8_t *p = row + (size_t)(x * src->w / dst->w) * 3; o[0] = p[0]; o[1] = p[1]; o[2] = p[2]; o += 3; }
+    if (sy == last_sy) { memcpy(o, o - (size_t)dst->w * 3, (size_t)dst->w * 3); continue; }
+    const uint8_t *row = src->rgb + (size_t)sy * src->w * 3;
+    for (int x = 0; x < dst->w; x++) { const uint8_t *p = row + ((size_t)x * src->w / dst->w) * 3; o[0] = p[0]; o[1] = p[1]; o[2] = p[2]; o += 3; }
+    last_sy = sy;
   }
 }
 
@@ -40,7 +47,7 @@ static inline uint8_t to8(float v, float dth) {
 typedef struct {
   dm_scene *s; dm_fb *fb; int y0, step;
   const uint8_t *code; uint32_t len; int post;
-  dm_vm vm; float in[DM_IN_COUNT]; float state[DM_MAX_STATE]; uint32_t rng;
+  dm_vm vm; float in[DM_IN_COUNT]; uint32_t rng;
 } job;
 
 static void *run_rows(void *arg) {
@@ -73,20 +80,24 @@ static void run_pass(dm_scene *s, dm_fb *fb, const dm_prog *p, int post, float *
   int nt = s->nthreads;
   if (nt <= 0) { const char *env = getenv("DM_THREADS"); nt = env ? atoi(env) : (int)sysconf(_SC_NPROCESSORS_ONLN); }
   if (nt < 1) nt = 1; if (nt > 64) nt = 64; if (nt > fb->h) nt = fb->h;
-  static job jobs[64]; static pthread_t th[64];
+  job jobs[64]; pthread_t th[64]; int started[64] = {0};
   for (int i = 0; i < nt; i++) {
     job *j = &jobs[i];
     j->s = s; j->fb = fb; j->y0 = i; j->step = nt; j->post = post;
     j->code = s->m->code + p->off; j->len = p->len;
     memcpy(j->in, s->in, sizeof j->in);
-    if (s->frame == 0) memset(j->state, 0, sizeof j->state);
+    float *worker_state = s->worker_state[post][i];
+    if (s->frame == 0) memset(worker_state, 0, sizeof s->worker_state[post][i]);
     j->rng = s->rng ^ (uint32_t)(i * 0x9E3779B9u) ^ (uint32_t)(post * 0x51ED27u);
-    j->vm = s->vm; j->vm.in = j->in; j->vm.state = i == 0 ? state : j->state; j->vm.rng = &j->rng;
+    j->vm = s->vm; j->vm.in = j->in; j->vm.state = i == 0 ? state : worker_state; j->vm.rng = &j->rng;
     j->vm.prev = s->prev; j->vm.pw = s->pw; j->vm.ph = s->ph; j->vm.cur = s->cur;
   }
-  for (int i = 1; i < nt; i++) pthread_create(&th[i], NULL, run_rows, &jobs[i]);
+  for (int i = 1; i < nt; i++) {
+    if (pthread_create(&th[i], NULL, run_rows, &jobs[i]) == 0) started[i] = 1;
+    else run_rows(&jobs[i]);
+  }
   run_rows(&jobs[0]);
-  for (int i = 1; i < nt; i++) pthread_join(th[i], NULL);
+  for (int i = 1; i < nt; i++) if (started[i]) pthread_join(th[i], NULL);
 }
 
 void dm_scene_render(dm_scene *s, const dm_seq *clk, const float *cenv, dm_fb *fb) {

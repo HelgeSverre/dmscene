@@ -1,0 +1,494 @@
+# lastcall.dmt - LASTCALL: 4 a.m., one person waiting on the last platform, the
+# train late.  One continuous wide shot: buzzing fluorescent tubes overhead, a
+# humming drinks machine, rain running down the glass, a departure board, and
+# near the end the headlight glare of the late train flooding in.  Music: mains
+# drones, sparse music-box bells, and a rumble that arrives with the train.
+title LASTCALL
+song bpm=120 speed=6 rpb=4 channels=7 loop=0 volume=0.70 scale=2 dither=1
+order 0 1 2 1 3 2 1 4 4 5 5 5 6 6 7
+pan 0.50 0.62 0.38 0.30 0.50 0.55 0.50
+
+text BOARD1 "LAST TRAIN  00:47  "
+text BOARD2 "NOW ARRIVING       "
+text TITLE "LASTCALL"
+
+timeline {
+  0:00  rain=0.50 sput=0.90 glare=0.01 board=0 lean=0
+  2:00  sput=0.45
+  4:00  rain=0.95
+  6:00  sput=0.75
+  8:00  rain=0.40
+  9:00  glare=0.04
+  10:00 rain=0.85 sput=0.55
+  10:00 board=0
+  11:00 board=1 glare=0.22
+  12:00 lean=0
+  13:00 glare=0.60
+  14:00 glare=1.40 lean=1 sput=0.10
+}
+
+# ------------------------------------------------------------------ instruments
+# channels: 0 kick  1 tick  2 buzz  3 vend  4 rain  5 bell  6 train (rumble+horn)
+
+inst kick {
+  f = 54 + 80 * exp(-t * 20)
+  $p = $p + f / sr
+  body = sin($p * tau) * exp(-t * 5.5)
+  tap = lp(noise(), 800) * exp(-t * 95) * 0.3
+  out(dist(body * 1.7 + tap, 1.2) * 0.46)
+}
+
+inst tick {
+  e = exp(-t * 55)
+  n = hp(noise(), 3200) * exp(-t * 150)
+  m = sin(tau * 2100 * t) * exp(-t * 110) * 0.5
+  out((n * 0.6 + m) * e * (0.30 + 0.35 * vel))
+}
+
+inst buzz {
+  # the fluorescent tubes; the sputter hash sequence is shared with the picture
+  sp = evtl(sput)
+  fw = 0.62 + 0.38 * hash(floor(time * 47.0) + 2.0)
+  dw = 1 - (1 - step(hash(floor(time * 7.3) + 5.0), 0.90 + 0.08 * (1 - sp))) * (0.35 + 0.65 * sp)
+  th = step(hash(floor(time * 1.1) + 9.0), 0.985)
+  $p = $p + 118 / sr
+  s = bsqr($p, 0.45, 118) * 0.9 + saw($p * 0.5) * 0.5 + sin($p * tau * 2.003) * 0.3
+  s = lp(s, 2400)
+  crt = noise() * step(0.75, hash(floor(time * 90.0) + 3.0)) * 0.5 * dw
+  e = env(0.06, 0.15, 0.95, 0.5)
+  out(dist((s * fw * dw * th + crt) * 0.5, 1.3) * e * 0.30)
+}
+
+inst vend {
+  # drinks machine: constant hum, occasional compressor clunk on loud hits
+  cl = step(0.30, vel)
+  $h = $h + 61 / sr
+  hum = sin($h * tau) * 0.55 + sin($h * tau * 2.02) * 0.28 + sin($h * tau * 3.01) * 0.12
+  wob = 0.80 + 0.12 * sin(t * 1.9) + 0.08 * sin(t * 0.63)
+  clunk = sin(tau * 63 * t) * exp(-t * 16) + lp(noise(), 320) * exp(-t * 26) * 0.9
+  e = env(0.04, 0.20, 0.80, 1.6)
+  out((cl * clunk * 0.85 + (1 - cl) * hum * 0.5 * wob) * e * 0.34)
+}
+
+inst rain {
+  e = env(0.25, 0.80, 0.88, 2.5)
+  n = noise()
+  hi = hp(n, 2300) * 0.55
+  m0 = svf(n, 1150, 0.25)
+  mid = m0 * 0.5 + r2 * 0.5
+  pat = lp(n, 700) * step(0.80, hash(floor(time * 26.0) + 2.0)) * 1.4
+  gust = 0.66 + 0.22 * sin(t * 0.19 + 1.1) + 0.12 * sin(t * 0.047)
+  out((hi + mid + pat) * e * gust * (0.30 + 0.70 * vel) * 0.40)
+}
+
+inst bell nna=continue {
+  e = env(0.002, 1.0, 0.0, 0.9)
+  m = sin(ph * tau * 3.005) * (1.3 * exp(-t * 4.5) + 0.10)
+  s = sin(ph * tau + m) + sin(ph * tau * 4.02) * 0.13 * exp(-t * 3) + sin(ph * tau * 7.94) * 0.06 * exp(-t * 9)
+  out(s * e * (0.45 + 0.55 * vel) * 0.30)
+}
+
+inst rumble nna=continue {
+  e = env(0.8, 2.4, 0.95, 2.5)
+  n = lp(noise(), 130 + 70 * sin(t * 0.4) + 260 * vel)
+  $r = $r + 31 / sr
+  sub = sin($r * tau + 0.5 * sin(t * 2.3)) * 0.75
+  out(dist((n * 1.15 + sub + sin(ph * tau) * 0.10) * (0.45 + 0.9 * vel), 1.3) * e * 0.52)
+}
+
+inst horn nna=continue {
+  e = env(0.14, 0.60, 0.86, 1.6)
+  vib = 1 + 0.005 * sin(t * 5.3)
+  s = sin(ph * tau * vib) * 0.62 + sin(ph * tau * vib * 0.5 + 0.2) * 0.35
+  air = lp(noise(), 800 + 700 * e) * 0.10
+  out(dist((s + air) * e * (0.35 + 0.65 * vel), 1.2) * 0.40)
+}
+
+# ------------------------------------------------------------------ channel fx
+chan 5 {
+  d = dly(x, 0.375, 0.40)
+  v = verb(x, 0.82, 0.50)
+  out(x * 0.9 + d * 0.32 + v * 0.42)
+}
+
+chan 6 {
+  v = verb(x, 0.88, 0.45)
+  out(x + v * 0.30)
+}
+
+master {
+  d1 = dly(l, 0.375, 0.28)
+  d2 = dly(r, 0.375, 0.28)
+  vl = verb(l + d2 * 0.08, 0.85, 0.50)
+  vr = verb(r + d1 * 0.08, 0.85, 0.50)
+  hiss = lp(noise(), 2600) * 0.006
+  ol = hp(l + d1 * 0.10 + vl * 0.14 + hiss, 30)
+  or = hp(r + d2 * 0.10 + vr * 0.14 + hiss, 30)
+  out(dist(ol * 1.08, 1.25), dist(or * 1.08, 1.25))
+}
+
+# ------------------------------------------------------------------ patterns
+# channels: 0 kick | 1 tick | 2 buzz | 3 vend | 4 rain | 5 bell | 6 train
+# key: D dorian.  rumble=inst 7, horn=inst 8.
+
+pattern 0 rows=16 {
+  00: . | . | C-0 3 08 | D-1 4 0A | D-1 5 0C | D-5 6 10 | .
+  08: . | . | .        | .        | .        | A-4 6 0C | .
+  12: . | . | .        | .        | .        | F-4 6 0A | .
+}
+
+pattern 1 rows=16 {
+  00: C-2 1 18 | .        | C-0 3 08 | D-1 4 0A | D-1 5 14 | D-5 6 12 | .
+  04: .        | D-5 2 0A | .        | .        | .        | A-4 6 0C | .
+  08: C-2 1 16 | .        | .        | .        | .        | F-5 6 0E | .
+  12: .        | D-5 2 0A | .        | .        | .        | E-5 6 0A | .
+}
+
+pattern 2 rows=16 {
+  00: C-2 1 18 | .        | C-0 3 08 | D-1 4 0A | D-1 5 14 | F-5 6 12 | .
+  04: .        | D-5 2 0A | .        | .        | .        | A-5 6 0C | .
+  08: C-2 1 16 | .        | .        | .        | .        | C-6 6 0E | .
+  12: .        | D-5 2 0A | .        | .        | .        | B-4 6 0A | .
+}
+
+pattern 3 rows=16 {
+  00: .        | .        | C-0 3 0A | D-1 4 0A | D-1 5 14 | D-5 6 12 | .
+  03: .        | .        | .        | .        | .        | F-5 6 0C | .
+  06: .        | D-5 2 0C | .        | D-1 4 3C | .        | A-5 6 0C | .
+  09: .        | .        | .        | .        | .        | C-6 6 0E | .
+  12: .        | D-5 2 0A | .        | .        | .        | A-5 6 0A | .
+  14: .        | D-5 2 08 | .        | .        | .        | E-5 6 0A | .
+}
+
+pattern 4 rows=16 {
+  00: C-2 1 12 | .        | C-0 3 08 | D-1 4 0A | D-1 5 1A | D-4 6 0A | D-0 7 1E
+  04: .        | D-5 2 0A | .        | .        | .        | .        | .
+  08: C-2 1 10 | .        | .        | .        | .        | .        | .
+  12: .        | D-5 2 0A | .        | .        | .        | .        | .
+}
+
+pattern 5 rows=16 {
+  00: C-2 1 1E | .        | C-0 3 08 | D-1 4 0A | D-1 5 1E | D-5 6 0E | D-0 7 2A
+  04: .        | D-5 2 0A | .        | .        | .        | .        | .
+  08: C-2 1 1A | .        | .        | .        | .        | F-5 6 0C | D-0 7 26
+  0A: .        | D-5 2 0C | .        | .        | .        | .        | .
+  12: .        | .        | .        | D-1 4 3A | .        | .        | .
+}
+
+pattern 6 rows=16 {
+  00: C-2 1 22 | .        | C-0 3 08 | D-1 4 0A | D-1 5 20 | A-5 6 12 | D-0 7 30
+  02: .        | .        | .        | D-1 4 3C | .        | .        | .
+  04: .        | D-5 2 0A | .        | .        | .        | .        | F-4 8 30
+  08: C-2 1 1E | .        | .        | .        | .        | F-5 6 0C | .
+  0C: .        | D-5 2 0A | .        | .        | .        | .        | .
+  10: .        | .        | .        | D-1 4 38 | .        | .        | .
+}
+
+pattern 7 rows=16 {
+  00: . | . | C-0 3 0A | D-1 4 0A | D-1 5 20 | D-4 6 14 | D-0 7 2C
+  02: . | . | .        | .        | .        | .        | F-4 8 2A
+  04: . | . | .        | .        | .        | A-4 6 12 | A#4 8 28
+  08: . | . | .        | .        | .        | D-5 6 14 | .
+  0C: . | . | .        | .        | .        | F-5 6 12 | .
+}
+
+# ------------------------------------------------------------------ visuals
+# One wide shot of the waiting hall.  Glass wall with the dark outside, the
+# drinks machine and the seated figure in front of it, wet tiled floor below,
+# a departure board and one flickering fluorescent tube above.
+
+uniform boot tubeF glA rainA boardV leanV kickE tickE bellE clE vendI
+
+fn sdbox(px, py, bx, by) {
+  dx = abs(px) - bx
+  dy = abs(py) - by
+  return len(max(dx, 0), max(dy, 0)) + min(max(dx, dy), 0)
+}
+
+fn ellip(px, py, rx, ry) {
+  return (len(px / rx, py / ry) - 1) * min(rx, ry)
+}
+
+fn smin(a, b, k) {
+  hh = clamp(0.5 + 0.5 * (b - a) / k, 0, 1)
+  return mix(b, a, hh) - k * hh * (1 - hh)
+}
+
+fn sdseg(px, py, ax, ay, bx, by) {
+  pax = px - ax
+  pay = py - ay
+  bax = bx - ax
+  bay = by - ay
+  kk = clamp((pax * bax + pay * bay) / (bax * bax + bay * bay + 0.000001), 0, 1)
+  return len(pax - bax * kk, pay - bay * kk)
+}
+
+frame {
+  tt = time
+  boot = smooth(0.4, 2.3, tt)
+  sp = evtl(sput)
+  fw = hash(floor(tt * 47.0) + 2.0)
+  dw = 1 - (1 - step(hash(floor(tt * 7.3) + 5.0), 0.90 + 0.08 * (1 - sp))) * (0.35 + 0.65 * sp)
+  th = step(hash(floor(tt * 1.1) + 9.0), 0.985)
+  tubeF = boot * (0.62 + 0.38 * fw) * dw * th * (0.82 + 0.18 * sin(tt * 0.7))
+  glA = evtl(glare)
+  rainA = evtl(rain)
+  boardV = evtl(board)
+  leanV = evtl(lean)
+  kickE = exp(-trig(0) * 9)
+  tickE = exp(-trig(1) * 16)
+  bellE = exp(-trig(5) * 3)
+  clE = exp(-trig(3) * 10) * step(0.30, vel(3))
+  vendI = (0.72 + 0.16 * sin(tt * 1.9) + 0.10 * sin(tt * 0.61)) * (1 - 0.55 * clE) * boot
+}
+
+pixel {
+  # ---- camera shake (arrival rumble) and tube flicker aux
+  shx = (hash(floor(time * 57.0) + 21.0) - 0.5) * 0.007 * (glA + 0.3 * kickE)
+  shy = (hash(floor(time * 61.0) + 33.0) - 0.5) * 0.006 * glA
+  su = u + shx
+  sv = v + shy
+  tw = tubeF
+
+  FH = -0.14
+  GT = 0.66
+
+  # ================= dark outside through the glass =================
+  dsky = clamp(clamp(0.66 - sv, 0, 2) * 0.4, 0, 1)
+  orr = 0.007 + 0.026 * (1 - dsky)
+  og  = 0.010 + 0.022 * (1 - dsky)
+  ob  = 0.024 + 0.042 * (1 - dsky)
+
+  # city bokeh, two layers
+  bx1 = su * 2.6 + 3.0
+  by1 = sv * 2.6 + 1.0
+  id1 = floor(bx1) * 17.0 + floor(by1) * 41.0
+  dc1 = len(fract(bx1) - (0.25 + 0.5 * hash(id1 + 1.0)), fract(by1) - (0.2 + 0.6 * hash(id1 + 2.0)) * 1.4)
+  bg1 = exp(-dc1 * dc1 * 90.0) * step(0.62, hash(id1)) * (0.10 + 0.25 * hash(id1 + 3.0))
+  warm = step(0.5, hash(id1 + 4.0))
+  orr = orr + bg1 * (1.0 * warm + 0.45 * (1 - warm))
+  og  = og + bg1 * (0.70 * warm + 0.72 * (1 - warm))
+  ob  = ob + bg1 * (0.40 * warm + 1.00 * (1 - warm))
+
+  bx2 = su * 9.0 + 7.0
+  by2 = sv * 9.0 + 4.0
+  id2 = floor(bx2) * 13.0 + floor(by2) * 57.0
+  dc2 = len(fract(bx2) - 0.5, fract(by2) - 0.5)
+  bg2 = exp(-dc2 * dc2 * 380.0) * step(0.80, hash(id2)) * 0.22 * (0.5 + 0.5 * sin(time * 2.0 + hash(id2 + 6.0) * 20.0))
+  orr = orr + bg2 * 0.9
+  og  = og + bg2 * 0.9
+  ob  = ob + bg2 * 1.1
+
+  # blinking red signal far right
+  sigd = len(su - 1.02, (sv - 0.30) * 1.3)
+  blink = step(0.55, fract(time * 0.5)) * step(0.35, hash(floor(time * 0.5) + 7.0))
+  sig = exp(-sigd * sigd * 700.0) * blink * 1.1 + exp(-sigd * 7.0) * blink * 0.10
+  orr = orr + sig * 1.6
+  og  = og + sig * 0.18
+  ob  = ob + sig * 0.12
+
+  # the late train: headlight glare far right (grows 18 s -> 26 s, then holds)
+  gd = len(su - 1.18, (sv - 0.16) * 1.15)
+  gl = exp(-gd * 2.3) * glA * 1.05 + exp(-gd * gd * 32.0) * glA * 1.00
+  gl = gl + exp(-abs(sv - 0.16) * 26.0) * exp(-max(0, 1.18 - su) * 2.6) * glA * 0.55
+  orr = orr + gl * 1.05
+  og  = og + gl * 1.00
+  ob  = ob + gl * 0.92
+
+  # train body sliding in over the last two seconds
+  tsm = smooth(28.1, 29.9, time)
+  txe = 1.62 - tsm * 1.30
+  tfac = step(txe, su) * step(-0.05, sv - 0.06) * (1 - smooth(0.52, 0.55, sv)) * tsm
+  tcolU = (su - txe) * 4.4
+  trow = fract(tcolU)
+  wband = smooth(0.155, 0.175, sv) * (1 - smooth(0.315, 0.33, sv))
+  wlit = step(0.24, trow) * (1 - step(0.76, trow)) * step(0.25, hash(floor(tcolU) * 3.0 + 5.0)) * wband
+  orr = orr + tfac * 0.020 + wlit * tfac * 1.45
+  og  = og + tfac * 0.019 + wlit * tfac * 1.25
+  ob  = ob + tfac * 0.020 + wlit * tfac * 0.85
+
+  # ================= rain on the glass =================
+  rc = su * 34.0 + sin(sv * 3.0 + time * 0.4) * 0.12
+  colid = floor(rc)
+  on = step(0.60, hash(colid * 1.7 + 3.0)) * (0.4 + 0.6 * rainA)
+  yy = sv * (2.2 + hash(colid + 7.0)) - time * (1.6 + hash(colid + 11.0) * 1.8)
+  yf = fract(yy)
+  streak = exp(-yf * 26.0) * exp(-abs(fract(rc) - 0.55) * 26.0) * on * (0.10 + 0.18 * rainA)
+  bxr = su * 26.0
+  byr = sv * 34.0 - time * 0.25
+  cell = hash(floor(bxr) * 3.1 + floor(byr) * 7.3)
+  bd = exp(-(abs(fract(bxr) - 0.5) + abs(fract(byr) - 0.5)) * 30.0) * step(0.86, cell) * (0.4 + 0.6 * rainA)
+  grime = fbm(su * 3.2 + 9.0, sv * 3.2, 2)
+  rainmix = streak * 3.0 + bd * 1.4
+  orr = orr * (0.90 + 0.10 * grime) + rainmix
+  og  = og * (0.90 + 0.10 * grime) + rainmix * 1.02
+  ob  = ob * (0.90 + 0.10 * grime) + rainmix * 1.10
+
+  # ================= drinks machine =================
+  vmx = sdbox(su + 0.80, sv - 0.085, 0.17, 0.215)
+  vin = 1 - smooth(-0.002, 0.002, vmx)
+  igx = (su + 0.93) / 0.052
+  igy = (sv + 0.115) / 0.078
+  ingrid = step(-0.1, igx) * (1 - step(5.7, igx)) * step(-0.3, igy) * (1 - step(4.1, igy))
+  hitem = hash(floor(igx) * 3.3 + floor(igy) * 7.7)
+  ncx = fract(igx) - 0.5
+  ncy = fract(igy) - 0.5
+  canm = (1 - smooth(0.30, 0.34, len(ncx, ncy * 1.35) * 1.35)) * step(0.20, hitem) * ingrid
+  qc = hitem
+  q1 = step(0.30, qc) * (1 - step(0.62, qc))
+  q2 = step(0.62, qc) * (1 - step(0.90, qc))
+  qs = (1 - q1) * (1 - q2)
+  ib = canm * 1.25 * (vendI * (0.45 + 0.55 * hash(floor(igx) + floor(igy) * 2.2)) + bellE * 0.25)
+  vmc1 = vin * ib * (q1 * 1.30 + q2 * 0.25 + qs * 0.10)
+  vmc2 = vin * ib * (q1 * 0.55 + q2 * 0.70 + qs * 0.85)
+  vmc3 = vin * ib * (q1 * 0.20 + q2 * 1.45 + qs * 1.05)
+  orr = orr + vmc1
+  og  = og + vmc2
+  ob  = ob + vmc3
+  brand = vin * (1 - smooth(0.195, 0.215, sv)) * smooth(0.12, 0.14, sv) * vendI
+  orr = orr + brand * 1.35
+  og  = og + brand * 1.30
+  ob  = ob + brand * 2.40
+  vmfr = 1 - smooth(-0.020, -0.014, vmx)
+  flim = mix(1.0, 0.30, vmfr)
+  orr = orr * flim
+  og  = og * flim
+  ob  = ob * flim
+  sheen = exp(-abs((su + 0.80) * 2.0 + (sv - 0.0) * 0.9 - 0.10) * 30.0) * vin * 0.045
+  orr = orr + sheen
+  og  = og + sheen
+  ob  = ob + sheen
+
+  # ================= structure band + fluorescent tube =================
+  strb = smooth(0.654, 0.660, sv)
+  stgr = 1 - smooth(0.735, 0.742, sv) * (1 - smooth(0.796, 0.803, sv))
+  tubeZ = exp(-abs(sv - 0.769) * 42.0)
+  tinner = smooth(-1.62, -1.50, su) * (1 - smooth(1.50, 1.62, su))
+  tubeC = tubeZ * tinner * tw * 2.2
+  tglow = exp(-abs(sv - 0.769) * 11.0) * tw * 0.16
+  srr = 0.020 + 0.016 * fbm(su * 2.4 + 5.0, sv * 3.6 + 2.0, 2) + tglow * 0.6 + tubeC * 1.05
+  srg = 0.024 + 0.016 * fbm(su * 2.4 + 5.0, sv * 3.6 + 2.0, 2) + tglow * 1.0 + tubeC * 1.30
+  srb = 0.026 + 0.015 * fbm(su * 2.4 + 5.0, sv * 3.6 + 2.0, 2) + tglow * 0.9 + tubeC * 1.05
+  orr = orr * (1 - strb) + srr * strb * stgr
+  og  = og * (1 - strb) + srg * strb * stgr
+  ob  = ob * (1 - strb) + srb * strb * stgr
+
+  # tube light falling onto the wall below
+  wlight = tw * (0.10 + 0.30 * exp(-max(0, 0.66 - sv) * 1.6))
+  orr = orr + wlight * 0.62
+  og  = og + wlight * 0.68
+  ob  = ob + wlight * 0.55
+
+  # ================= departure board (LED dots) =================
+  badv = su - 0.20
+  bidx = floor(badv / 0.063)
+  bgx = fract(badv / 0.063)
+  bgy = clamp((sv - 0.665) / 0.060, -0.2, 1.2)
+  ingb = step(-0.5, bidx) * (1 - step(16.5, bidx)) * step(0, sv - 0.665) * (1 - step(0.074, sv - 0.665))
+  c1 = str(BOARD1, bidx)
+  c2 = str(BOARD2, bidx)
+  a1 = glyph(c1, bgx, bgy)
+  a2 = glyph(c2, bgx, bgy)
+  dots = step(0.30, fract(bgx * 6.0)) * step(0.30, fract(bgy * 8.0))
+  bval = ((1 - boardV) * a1 + boardV * a2) * dots * ingb
+  bflk = 0.85 + 0.15 * hash(floor(time * 13.0) + bidx * 0.2)
+  orr = orr + bval * 1.05 * bflk
+  og  = og + bval * 0.68 * bflk
+  ob  = ob + bval * 0.22 * bflk
+  bpanel = (1 - smooth(-0.003, 0.003, sdbox(su - 0.72, sv - 0.702, 0.56, 0.042))) * (1 - ingb)
+  orr = orr * mix(1, 0.28, bpanel)
+  og  = og * mix(1, 0.30, bpanel)
+  ob  = ob * mix(1, 0.36, bpanel)
+
+  # ================= wet tiled floor =================
+  fdn = max(FH - sv, 0.015)
+  zz = 0.50 / fdn
+  fxz = su * zz * 1.05
+  fz2 = 0.42 / fdn
+  tnf = fbm(fxz * 2.2, fz2 * 2.2, 2)
+  tileU = fract(fxz * 0.5)
+  tileV = fract(fz2 * 0.5)
+  gfade = clamp(fdn * 5.0, 0, 1)
+  grout = 1 - gfade * (0.24 * exp(-abs(tileU - 0.5) * 24.0) + 0.24 * exp(-abs(tileV - 0.5) * 24.0))
+  sn = 0.60 + 0.40 * fbm(fxz * 1.7 + 4.0, 3.7, 2)
+  pools = exp(-abs(tileV - 0.5) * 9.0) * tw * 0.40 * exp(-fdn * 0.35)
+  vmrefl = exp(-abs(fxz + 1.05) * 5.0) * vendI * 0.14 * (0.6 + 0.4 * sn)
+  glsp = glA * smooth(0.2, 1.0, fxz) * 0.16
+  frr = (0.014 + 0.030 * tnf) * grout + tw * sn * 0.28 * exp(-fdn * 0.7) * 0.85 + pools + vmrefl * 0.5 + glsp + kickE * sn * 0.03
+  frg = (0.017 + 0.028 * tnf) * grout + tw * sn * 0.32 * exp(-fdn * 0.7) * 0.85 + pools * 1.05 + vmrefl + glsp
+  frb = (0.019 + 0.026 * tnf) * grout + tw * sn * 0.28 * exp(-fdn * 0.7) * 0.85 + pools * 1.15 + vmrefl * 1.3 + glsp * 0.9
+  fshd = 1 - 0.75 * exp(-len(su + 0.30, sv + 0.24) * 3.6)
+  frr = max(frr * fshd, 0.002)
+  frg = max(frg * fshd, 0.002)
+  frb = max(frb * fshd, 0.002)
+  fshade = exp(-len(su + 0.30, sv + 0.20) * 4.5)
+
+  fl = 1 - smooth(-0.142, -0.136, sv)
+  orr = orr * (1 - fl) + frr * fl
+  og  = og * (1 - fl) + frg * fl
+  ob  = ob * (1 - fl) + frb * fl
+
+  # ================= bench + the waiting figure =================
+  bseat = sdbox(su + 0.28, sv + 0.02, 0.24, 0.014)
+  bl1 = sdbox(su + 0.46, sv + 0.075, 0.012, 0.068)
+  bl2 = sdbox(su + 0.10, sv + 0.075, 0.012, 0.068)
+  bd = min(bseat, min(bl1, bl2))
+  bmask = 1 - smooth(-0.004, 0.005, bd)
+  blit = tw * exp(-abs(sv + 0.006) * 70.0)
+  orr = mix(orr, 0.014 + blit * 0.10, bmask)
+  og  = mix(og, 0.012 + blit * 0.09, bmask)
+  ob  = mix(ob, 0.010 + blit * 0.05, bmask)
+
+  figx = -0.30 + 0.010 * sin(time * 0.5)
+  fsh = clamp((sv + 0.14) * 1.4, 0, 1) * leanV * 0.030
+  fx = su - figx - fsh
+  fy = sv
+  head = len(fx, fy - 0.30) - 0.034
+  tb = sdbox(fx, fy - 0.115, 0.062, 0.130)
+  legT = ellip(fx, (fy - 0.02) * 1.65, 0.105, 0.062)
+  shinL = sdbox(fx - 0.043, fy + 0.07, 0.016, 0.068)
+  shinR = sdbox(fx + 0.050, fy + 0.07, 0.016, 0.068)
+  shoeL = ellip(fx - 0.046, (fy + 0.155) * 1.8, 0.030, 0.016)
+  shoeR = ellip(fx + 0.047, (fy + 0.155) * 1.8, 0.030, 0.016)
+  armL = sdseg(fx, fy, -0.052, 0.145, -0.022, 0.045) - 0.014
+  armR = sdseg(fx, fy, 0.055, 0.145, 0.028, 0.045) - 0.014
+  dfg = smin(head, tb, 0.020)
+  dfg = min(dfg, legT)
+  dfg = smin(dfg, shinL, 0.014)
+  dfg = smin(dfg, shinR, 0.014)
+  dfg = min(dfg, shoeL)
+  dfg = min(dfg, shoeR)
+  dfg = smin(dfg, armL, 0.018)
+  dfg = smin(dfg, armR, 0.018)
+  figm = 1 - smooth(-0.004, 0.006, dfg)
+  rimE = exp(-abs(dfg) * 95.0)
+  rimT = rimE * tw * clamp((fy - 0.02) * 2.5, 0, 1)
+  rimV = rimE * vendI * clamp((figx - su) * 6.0, 0, 1)
+  pgh = step(0.55, hash(floor(time * 1.7) + 4.0)) * (0.7 + 0.3 * sin(time * 3.1))
+  phx = figx + 0.005 + leanV * 0.02
+  phy = 0.045
+  pl = pgh * exp(-len(su - phx, sv - phy) * 7.0)
+  fr1 = 0.013 + rimT * 0.80 + rimV * 0.25 + figm * pl * 0.10
+  fg1 = 0.013 + rimT * 0.88 + rimV * 0.38 + figm * pl * 0.22
+  fb1 = 0.014 + rimT * 0.66 + rimV * 0.45 + figm * pl * 0.60
+  orr = mix(orr, fr1, figm)
+  og  = mix(og, fg1, figm)
+  ob  = mix(ob, fb1, figm)
+  phone = exp(-abs(fx - 0.0) * 260.0) * exp(-abs(fy - 0.045) * 260.0) * pgh * 1.2
+  orr = orr + phone
+  og  = og + phone
+  ob  = ob + phone * 1.25
+  orr = orr + pl * 0.05
+  og  = og + pl * 0.06
+  ob  = ob + pl * 0.12
+
+  # ================= grade =================
+  gwash = glA * boot
+  orr = orr + gwash * 0.05
+  og  = og + gwash * 0.055
+  ob  = ob + gwash * 0.065
+  rgb(max(orr, 0), max(og, 0), max(ob, 0))
+  vgn = len(u * 0.88, v * 0.95)
+  cmul(1 - 0.38 * vgn * vgn)
+  cprev(u, v, 0.10)
+}
