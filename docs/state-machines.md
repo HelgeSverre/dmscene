@@ -408,9 +408,9 @@ Validation on macOS: `make test` passes all 42 tracked demos and the new
 regressions. `make test-sanitize` passes AddressSanitizer, UndefinedBehaviorSanitizer
 and float-cast-overflow checks for loop safety, numeric lookup, compile retry,
 reload ownership and asynchronous seeking. Separate ThreadSanitizer builds of
-`tests/audio-pipe.c` and `tests/seek.c` pass. The sanitizer target is also wired
-into the macOS/Linux CI matrix; these local results do not imply Linux CI has
-already run. Existing live subprocess tests continue to cover scroll, reverse
+`tests/audio-pipe.c` and `tests/seek.c` pass. Both macOS and Linux also passed
+the engine/demo suite and sanitizer steps in [CI for `511dbf4`](https://github.com/HelgeSverre/dmscene/actions/runs/42303161332).
+The sanitizer target remains wired into that CI matrix. Existing live subprocess tests cover scroll, reverse
 seek, pause and slow-frame-rate input wakeup. They also run with a real pipe
 backend whose player immediately exits, checking continued wall-clock playback.
 The first remote macOS run exposed a fixed-400-ms assumption in the existing
