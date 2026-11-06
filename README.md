@@ -13,27 +13,26 @@
 A composable demoscene engine in pure C99 with no third-party libraries.
 Write the instruments, tracker score, visuals and effects in one text file.
 
-[Demo](#one-vm--no-sleep) · [Build and run](#build-and-run) · [How it works](#how-it-works) · [CLI](#cli) · [Demos](#demos) · [Text format](#the-text-format-dmt)
+[Demo](#demo) · [Build and run](#build-and-run) · [How it works](#how-it-works) · [CLI](#cli) · [Demos](#demos) · [Text format](#the-text-format-dmt)
 
 ```
 .dmt text  --dm compile-->  .dms module  --dm play-->    truecolor terminal + audio
                                        --dm render-->  MP4 / PNG / WAV
 ```
 
-## ONE VM / NO SLEEP
+## Demo
 
-**FULL SEND.** A demo of dmscene, made in dmscene: **42.6 seconds of original
-180 BPM chip/rave**, eight visual chapters, and a tour of all seven CLI commands.
-Recursive word zooms, individually twisting and flipping letters, a live audio
-rotor, deep fractal zooms, a torus fly-through and spiralling feedback all run
-inside the same VM that plays the music. Command captions type themselves on
-while a sine scroller carries the CLI through the foreground.
-[The score and every scene](demos/showcase.dmt) are editable source; the synth
-and visual programs produce the soundtrack and frames at runtime.
+A 43-second demo with synth music, fractals and animated text, generated from
+[one .dmt file](demos/showcase.dmt).
 
-![Silent highlights: recursive logo zooms, flipping letters, live audio rotor, Mandelbrot zoom, torus fly-through, feedback text trails, hyperspace and kaleidoscopic finale.](art/showcase.gif)
+<p align="center">
+  <a href="demos/showcase.dmt">
+    <img src="art/showcase.gif" alt="dmscene demo preview — click to view the source" width="960">
+  </a>
+</p>
 
-*Silent chapter highlights. Play the demo or render the full MP4 to hear the themesong.*
+The preview is silent. Run `make run` to hear the music, or
+[open the demo source](demos/showcase.dmt).
 
 ```sh
 make
@@ -58,18 +57,8 @@ Use `make run DEMO=demos/pulse.dmt` to launch another demo.
 | 0:32.0 | Export the damage | accelerating hyperspace rails, tiled walls, streaks and warped type |
 | 0:37.3 | One VM. Full send. | zooming kaleidoscopic field and independently flipping finale letters |
 
-The 180 BPM score starts with a four-on-the-floor kick, pushes the bass onto
-the offbeats, and adds rolling hats, fast bell replies, snare fills and a brighter
-pulse/FM hook. The final drop lifts the lead an octave. Delays follow the song
-tempo, and explicit note-offs control the short bass and lead phrases.
-The moving command deck covers all seven commands and the core engine
-features. [Research and engine notes](docs/research/music-findings.md) document
-the earlier composition work and the playback bug found along the way.
-
-The source uses all six program kinds, all eight pixel slots, `fn`, `repeat`,
-`sample`, `venv`, `nna`, `timeline`, `scale` and `dither`. Each chapter is
-four bars. The tracker quantises 180 BPM ticks to whole audio samples, giving
-a complete loop of approximately 42.632 seconds.
+The demo uses all six VM program kinds, eight pixel programs, samples,
+envelopes and timeline events. Each chapter lasts four bars at 180 BPM.
 
 ## Build and run
 

@@ -6,7 +6,7 @@ Version note: this report records the earlier 150 BPM composition experiment
 and the subsequent synth fix. The current FULL SEND revision, requested after
 that experiment, runs at 180 BPM (42.632 seconds) with a faster rave score,
 recursive zoom scenes and kinetic typography. Current timings and preview
-are in the [README](../../README.md#one-vm--no-sleep).
+are in the [README](../../README.md#demo).
 
 ## Decision
 
