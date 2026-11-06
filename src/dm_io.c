@@ -80,12 +80,18 @@ int dm_wav_open(dm_wav *w, const char *path, int sr) {
   return 0;
 }
 void dm_wav_write(dm_wav *w, const float *lr, uint32_t frames) {
-  for (uint32_t i = 0; i < frames * 2; i++) {
-    float x = lr[i]; if (x > 1) x = 1; if (x < -1) x = -1;
-    int v = (int)(x * 32767.0f);
-    uint8_t b[2] = {(uint8_t)v, (uint8_t)(v >> 8)};
-    fwrite(b, 1, 2, w->f);
+  uint8_t pcm[8192];
+  while (frames) {
+    uint32_t n = frames > 2048 ? 2048 : frames;
+    for (uint32_t i = 0; i < n * 2; i++) {
+      float x = lr[i]; if (x > 1) x = 1; if (x < -1) x = -1;
+      int v = (int)(x * 32767.0f);
+      pcm[2 * i] = (uint8_t)v; pcm[2 * i + 1] = (uint8_t)(v >> 8);
+    }
+    fwrite(pcm, 1, (size_t)n * 4, w->f);
+    lr += (size_t)n * 2;
+    frames -= n;
+    w->frames += n;
   }
-  w->frames += frames;
 }
 void dm_wav_close(dm_wav *w) { if (!w->f) return; wav_header(w); fclose(w->f); w->f = NULL; }

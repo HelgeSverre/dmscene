@@ -87,6 +87,13 @@ make videos SECONDS=30 SIZE=960x600    # build/video/*.mp4 + build/audio/*.wav
 faststart). Without ffmpeg on `PATH` it writes `FILE.frames/` and `FILE.wav` and
 prints the command that finishes the job. The pixel loop runs on all cores.
 
+For a quick MP4 preview, `--render-scale N` overrides the demo's `song scale`:
+it renders at 1/N of the requested width and height, then enlarges the pixels
+to the requested output size. For example, `--render-scale 6` is faster than a
+demo's usual `scale=2`, with visibly coarser detail. Omit it for the intended
+render quality. Encoding is usually a small fraction of the total render time;
+the pixel programs dominate complex demos.
+
 Dependencies: libc, libm, pthreads. Audio is AudioToolbox (a C API) on macOS and
 a pipe to `aplay` elsewhere. Video is ANSI truecolor using `▀` for two pixels per
 cell; use a fast terminal (Ghostty, iTerm2, kitty, WezTerm). `ffmpeg` is optional
@@ -129,7 +136,7 @@ dm COMMAND file [options]
   disasm  IN                           print every program's bytecode
   play    IN [play options]            terminal + audio (IN may be .dmt or .dms)
   watch   IN [play options]            play, recompiling whenever the .dmt changes
-  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--start S]
+  render  IN --mp4 F | --png DIR | --wav F [--seconds S] [--size WxH] [--fps N] [--start S] [--render-scale N]
   new     NAME                         write NAME.dmt, a minimal starting point
 
 play options:

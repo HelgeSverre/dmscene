@@ -66,7 +66,10 @@ build/tests/synth-voices: tests/synth-voices.c $(OBJ) | build/tests
 build/tests/branch-texture: tests/branch-texture.c $(OBJ) | build/tests
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture
+build/tests/scene-workers: tests/scene-workers.c $(OBJ) | build/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers
 	./tests/run.sh
 
 clean:
