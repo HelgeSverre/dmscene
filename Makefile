@@ -69,7 +69,13 @@ build/tests/branch-texture: tests/branch-texture.c $(OBJ) | build/tests
 build/tests/scene-workers: tests/scene-workers.c $(OBJ) | build/tests
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers
+build/tests/term-input: tests/term-input.c src/dm_term.c include/dm.h | build/tests
+	$(CC) $(CFLAGS) tests/term-input.c src/dm_term.c -o $@ $(LDFLAGS) $(LDLIBS)
+
+build/tests/play-transport: tests/play-transport.c tools/dm.c $(OBJ) $(POBJ) | build/tests
+	$(CC) $(CFLAGS) tests/play-transport.c $(OBJ) $(POBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test: all demos build/tests/showcase-gates build/tests/synth-voices build/tests/branch-texture build/tests/scene-workers build/tests/term-input build/tests/play-transport
 	./tests/run.sh
 
 clean:

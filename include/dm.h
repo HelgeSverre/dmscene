@@ -327,6 +327,8 @@ const char *dm_audio_backend(dm_audio *a);
 
 /* ---------------------------------------------------------------- platform: terminal */
 typedef struct dm_term dm_term;
+enum { DM_KEY_UP = 0x101, DM_KEY_DOWN, DM_KEY_LEFT, DM_KEY_RIGHT, DM_KEY_SUSPEND, DM_KEY_SCRUB_BACK, DM_KEY_SCRUB_FORWARD };
+
 dm_term *dm_term_open(void);
 void     dm_term_size(dm_term *t, int *cols, int *rows);
 void     dm_term_blit(dm_term *t, const dm_fb *fb, int cols, int rows, const char *status);
