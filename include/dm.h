@@ -333,6 +333,7 @@ dm_term *dm_term_open(void);
 void     dm_term_size(dm_term *t, int *cols, int *rows);
 void     dm_term_blit(dm_term *t, const dm_fb *fb, int cols, int rows, const char *status);
 int      dm_term_key(dm_term *t);           /* -1 if none */
+void     dm_term_wait(dm_term *t, double seconds); /* wait for input or frame deadline */
 void     dm_term_close(dm_term *t);
 double   dm_now(void);                      /* monotonic seconds */
 void     dm_sleep(double sec);

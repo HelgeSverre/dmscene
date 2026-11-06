@@ -1,7 +1,8 @@
 # Terminal scrubbing
 
 Touchpad scrolling uses the count and arrival time of terminal wheel reports.
-The timeline follows a continuous target with a 25 ms smoothing time constant.
+The timeline immediately follows 25% of new movement and interpolates the rest
+toward a continuous target with a 25 ms smoothing time constant.
 Slow gestures make fine adjustments; dense reports increase sensitivity. All
 reported movement contributes to the target, including large bursts. Reversing
 direction cancels the remaining interpolation in the old direction. Ghostty
@@ -29,8 +30,11 @@ open throughout scrubbing; its callback emits silence until the gesture settles
 and the requested state is ready. A cold seek can delay sound, but it cannot
 block input or rendering. Older checkpoints may be evicted during long playback.
 
+Input wakes the frame timer immediately, including at low playback frame rates.
 While scrubbing, drawing targets at least 60 fps (subject to shader cost and
-terminal throughput). Feedback history restarts once at the start of a gesture,
+terminal throughput). Incoming events can trigger additional redraws, coalesced
+to 120 fps unless a higher playback frame rate was explicitly requested.
+Feedback history restarts once at the start of a gesture,
 then follows the preview. Historical video frames are not reconstructed.
 
 ## Checks
@@ -46,3 +50,10 @@ plus 0.6 seconds settling produced one frame before the change and 112 afterward
 The new 95th-percentile frame gap was 21.3 ms, with a 26.3 ms maximum. These are
 synthetic terminal-input measurements, not a measurement of physical touchpad
 or display latency.
+
+A second test measures the delay from sending a single wheel report to observing
+changed timeline text. At the default 30 fps, the first asynchronous version
+measured 31.4 ms median / 58.1 ms p95. Input-aware waiting reduced that to
+22.0 / 23.1 ms; immediate partial movement reduced it to 3.2 / 12.0 ms. The
+regression suite also exercises scrubbing at a deliberately slow 2 fps playback
+rate, buffered input, signal wakeups, and closed input without busy-waiting.

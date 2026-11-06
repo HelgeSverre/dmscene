@@ -53,9 +53,10 @@ int main(int argc, char **argv) {
     dup2(in[0], 0); dup2(out[1], 1); dup2(out[1], 2);
     close(in[0]); close(in[1]); close(out[0]); close(out[1]);
     const char *bin = argc > 1 ? argv[1] : "./dm";
-    if (argc > 2)
+    int low_fps = argc > 2 && !strcmp(argv[2], "low-fps");
+    if (argc > 2 && !low_fps)
       execl(bin, bin, "play", "demos/showcase.dmt", "--start", "30", "--size", "120x40", "--fps", "60", (char *)NULL);
-    execl(bin, bin, "play", "demos/showcase.dmt", "--mute", "--start", "30", "--size", "120x40", "--fps", "60", (char *)NULL);
+    execl(bin, bin, "play", "demos/showcase.dmt", "--mute", "--start", "30", "--size", "120x40", "--fps", low_fps ? "2" : "60", (char *)NULL);
     _exit(127);
   }
   atexit(cleanup); close(in[0]); close(out[1]); child_in = in[1]; child_out = out[0];
@@ -64,6 +65,7 @@ int main(int argc, char **argv) {
   for (int i = 0; i < 20; i++) { send_keys("\033[<65;10;10M"); read_for(.025); }
   read_for(.4);
   CHECK(frames - start_frames >= 20 && max_gap < .250, "scrubbing blocks the rendering loop");
+  double scrub_gap = max_gap;
   double forward = seconds, forward_beat = beat;
   for (int i = 0; i < 20; i++) { send_keys("\033[<64;10;10M"); read_for(.025); }
   read_for(.4);
@@ -84,6 +86,6 @@ int main(int argc, char **argv) {
   }
   CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0, "quit after scrub");
   child = 0; close(child_in); close(child_out);
-  printf("ok: live scrub response, reverse clock, pause (max frame gap %.1fms)\n", max_gap * 1000);
+  printf("ok: live scrub response, reverse clock, pause (max scrub frame gap %.1fms)\n", scrub_gap * 1000);
   return 0;
 }

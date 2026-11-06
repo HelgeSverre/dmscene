@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static volatile sig_atomic_t restored;
@@ -47,12 +48,25 @@ int main(void) {
   CHECK(!sequence(t,p[1],"\033[201~",-1), "end long paste");
   CHECK(!feed(p[1],"\033[A\033[Bq",7), "queued keys");
   CHECK(dm_term_key(t)==DM_KEY_UP && dm_term_key(t)==DM_KEY_DOWN && dm_term_key(t)=='q', "queued events preserved");
+  CHECK(!feed(p[1],"rq",2) && dm_term_key(t)=='r', "buffered wait setup");
+  double start = dm_now(); dm_term_wait(t, .5);
+  CHECK(dm_now()-start < .2 && dm_term_key(t)=='q', "wait ignored buffered input");
+  pid_t child = fork(); CHECK(child >= 0, "wake test fork");
+  if (!child) { dm_sleep(.020); _exit(feed(p[1],"q",1)); }
+  start = dm_now(); dm_term_wait(t, 1);
+  CHECK(dm_now()-start < .3 && dm_term_key(t)=='q', "input failed to wake frame wait");
+  int child_status;
+  CHECK(waitpid(child,&child_status,0)==child && WIFEXITED(child_status) && !WEXITSTATUS(child_status), "wake test child");
   raise(SIGTSTP); CHECK(dm_term_key(t)==DM_KEY_SUSPEND, "suspend signal event");
   raise(SIGINT); CHECK(dm_term_key(t)=='q', "interrupt signal event");
   dm_term_close(t); raise(SIGINT); CHECK(restored, "signal handler restored");
-  t=dm_term_open(); CHECK(t && dm_term_key(t)==-1, "reopen clears interrupt"); dm_term_close(t);
+  t=dm_term_open(); CHECK(t && dm_term_key(t)==-1, "reopen clears interrupt");
+  close(p[1]); CHECK(dm_term_key(t)==-1, "closed input");
+  start=dm_now(); dm_term_wait(t,.020);
+  CHECK(dm_now()-start >= .010, "closed input made frame wait spin");
+  dm_term_close(t);
   sigaction(SIGINT,&saved,NULL);
-  fclose(null); close(p[0]); close(p[1]); dup2(oldin,0); dup2(oldout,1); close(oldin); close(oldout);
+  fclose(null); close(p[0]); dup2(oldin,0); dup2(oldout,1); close(oldin); close(oldout);
   puts("ok: terminal arrows, touchpad scrubbing, paste, escape fragments and signals");
   return 0;
 }

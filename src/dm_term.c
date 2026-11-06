@@ -6,13 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
 struct dm_term {
   struct termios saved;
-  int raw;
+  int raw, eof;
   char *buf; size_t cap;
   struct sigaction handlers[5]; unsigned installed;
   unsigned char input[256]; size_t input_pos, input_n;
@@ -188,8 +189,13 @@ int dm_term_key(dm_term *t) {
   for (unsigned budget = 0; budget < 4096; budget++) {
     if (t->input_pos == t->input_n) {
       struct pollfd pf = {0, POLLIN, 0};
-      if (poll(&pf, 1, 0) <= 0 || !(pf.revents & POLLIN)) return -1;
+      if (poll(&pf, 1, 0) <= 0) return -1;
+      if (!(pf.revents & POLLIN)) {
+        if (pf.revents & (POLLHUP | POLLERR | POLLNVAL)) t->eof = 1;
+        return -1;
+      }
       ssize_t n = read(0, t->input, sizeof t->input);
+      if (n == 0) t->eof = 1;
       if (n <= 0) return -1;
       t->input_pos = 0; t->input_n = (size_t)n;
     }
@@ -197,6 +203,18 @@ int dm_term_key(dm_term *t) {
     if (key >= 0) return key;
   }
   return -1;
+}
+
+void dm_term_wait(dm_term *t, double seconds) {
+  if (!t || seconds <= 0 || g_quit || g_suspend || t->input_pos < t->input_n) return;
+  if (t->eof) { dm_sleep(seconds); return; }
+  fd_set readfds; FD_ZERO(&readfds); FD_SET(0, &readfds);
+  struct timespec timeout;
+  timeout.tv_sec = (time_t)seconds;
+  timeout.tv_nsec = (long)((seconds - (double)timeout.tv_sec) * 1e9);
+  /* pselect preserves sub-millisecond frame deadlines and wakes on both input
+   * and signals. Buffered parser bytes are handled by the fast path above. */
+  if (pselect(1, &readfds, NULL, NULL, &timeout, NULL) < 0 && errno == EBADF) t->eof = 1;
 }
 
 void dm_term_close(dm_term *t) {

@@ -447,7 +447,7 @@ static int play_realtime(dm_module *mods, opts *o) {
   dm_scene scene; dm_scene_init(&scene, m); scene.nthreads = o->threads;
   dm_term *term = dm_term_open();
   dm_fb fb = {0}; dm_scrub scrub = {0};
-  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, srcm = mtime(o->file);
+  double epoch = dm_now(), last = epoch, fps_est = 0, lastcheck = epoch, srcm = mtime(o->file), last_draw = 0;
   char note[160] = ""; double note_until = 0;
   int frames = 0, frame_dirty = 1, restore_tstp = 0;
   struct sigaction saved_tstp;
@@ -543,6 +543,14 @@ static int play_realtime(dm_module *mods, opts *o) {
     if (!waiting && !scrub.active) dm_seek_request(seeker, pos, mute, 0);
     if (dm_seek_failed(seeker)) { fprintf(stderr, "dm: audio seek worker failed\n"); rc = 1; break; }
 
+    /* Input can wake a slow playback timer immediately. Coalesce rapid input
+     * into at most 120 drawings/s instead of repainting once per wheel report. */
+    double minimum_frame_time = 1.0 / (o->fps > 120 ? o->fps : 120);
+    if (k < 0 && now < last_draw + minimum_frame_time) {
+      dm_term_wait(term, last_draw + minimum_frame_time - dm_now());
+      continue;
+    }
+
     /* The sequencer's seek function only advances. Explicitly rewind the cheap
      * tracker clock when scrubbing backwards; never replay audio on this path. */
     if (pos < clk.sample) dm_seq_init(&clk, m, DM_SR);
@@ -569,6 +577,7 @@ static int play_realtime(dm_module *mods, opts *o) {
       m->title[0] ? m->title : o->file, scrub.active ? "scrub @ " : waiting ? "seeking @ " : paused ? "pause @ " : "speed ",
       speeds[speed_i], (double)pos / DM_SR, dm_seq_beat(&clk), fps_est, chs, now < note_until ? note : "");
     dm_term_blit(term, &fb, cols, rows, status);
+    last_draw = now;
 
     int reload = k == 'r';
     if (o->watch && now - lastcheck > .5) {
@@ -606,7 +615,7 @@ static int play_realtime(dm_module *mods, opts *o) {
     double t1 = dm_now();
     if (t1 - last >= 1) { fps_est = frames / (t1 - last); frames = 0; last = t1; }
     int fps = was_scrubbing && o->fps < 60 ? 60 : o->fps;
-    dm_sleep(now + 1.0 / fps - dm_now());
+    dm_term_wait(term, now + 1.0 / fps - dm_now());
   }
  done:
   dm_term_close(term);

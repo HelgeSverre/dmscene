@@ -64,6 +64,7 @@ int main(void) {
   before = fast.position;
   CHECK(dm_scrub_tick(&fast, 1.21) < before, "direction reversal retains forward motion");
   dm_scrub batch = {0}; dm_scrub_add(&batch, 200, 1, 10);
+  CHECK(batch.position > 10 && batch.position < batch.target, "first input has no immediate movement");
   CHECK(batch.target > 20, "large scroll burst was clipped");
   CHECK(dm_scrub_tick(&batch, 1.01) > 10 && batch.position < batch.target, "scroll jumps instead of interpolating");
   double target = batch.target;

@@ -13,6 +13,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 ./build/tests/seek || fail "background seek"
 ./build/tests/scrub-live || fail "live scrubbing"
 ./build/tests/scrub-live ./build/tests/dm-audio-clock audio || fail "scrubbing with audio output"
+./build/tests/scrub-live ./dm low-fps || fail "scrubbing with slow playback timer"
 
 ./dm compile demos/pulse.dmt -o "$T/pulse.dms" 2>/dev/null || fail "compile"
 ./dm check demos/pulse.dmt 2>/dev/null || fail "check"

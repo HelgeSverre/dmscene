@@ -224,7 +224,11 @@ void dm_scrub_add(dm_scrub *s, double delta, double now, double position) {
   double dt = fmax(0, now - s->last_event);
   s->density = s->density * exp(-dt / .080) + fabs(delta) / .080;
   double gain = 1.0 + 3.0 * s->density / (s->density + 80.0);
+  double previous_target = s->target;
   s->target = fmax(0, s->target + delta * .030 * gain);
+  /* Directly follow part of new motion so the first input/reversal is visible
+   * in this frame; interpolate the remainder rather than delaying all motion. */
+  s->position += .25 * (s->target - previous_target);
   s->last_event = now; s->direction = direction; s->active = 1;
 }
 
